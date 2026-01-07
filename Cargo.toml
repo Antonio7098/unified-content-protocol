@@ -1,0 +1,71 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ucm-core",
+    "crates/ucm-engine",
+    "crates/ucl-parser",
+    "crates/ucp-api",
+    "crates/ucp-observe",
+    "crates/ucp-bench",
+    "crates/translators/markdown",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/unified-content/ucp"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Core
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Hashing & Crypto
+sha2 = "0.10"
+hex = "0.4"
+
+# Unicode
+unicode-normalization = "0.1"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+reqwest = { version = "0.12", features = ["json"] }
+once_cell = "1.19"
+tiktoken-rs = "0.5"
+
+# Parsing
+logos = "0.14"
+nom = "7.1"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+metrics = "0.23"
+
+# Testing
+criterion = "0.5"
+proptest = "1.4"
+
+# Internal crates
+ucm-core = { path = "crates/ucm-core" }
+ucm-engine = { path = "crates/ucm-engine" }
+ucl-parser = { path = "crates/ucl-parser" }
+ucp-observe = { path = "crates/ucp-observe" }
+ucp-translator-markdown = { path = "crates/translators/markdown" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+lto = true

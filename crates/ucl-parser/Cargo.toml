@@ -1,0 +1,17 @@
+[package]
+name = "ucl-parser"
+description = "Parser for the Unified Content Language (UCL)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ucm-core = { workspace = true }
+ucm-engine = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+logos = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

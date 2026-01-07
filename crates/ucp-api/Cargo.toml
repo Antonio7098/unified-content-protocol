@@ -1,0 +1,16 @@
+[package]
+name = "ucp-api"
+description = "High-level API for UCP"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ucm-core = { workspace = true }
+ucm-engine = { workspace = true }
+ucl-parser = { workspace = true }
+ucp-observe = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

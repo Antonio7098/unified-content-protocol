@@ -1,0 +1,11 @@
+[package]
+name = "ucp-translator-markdown"
+description = "Markdown translator for UCP"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ucm-core = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
