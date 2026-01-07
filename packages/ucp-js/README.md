@@ -1,4 +1,4 @@
-# @ucp/core
+# @ucp-core/core
 
 Unified Content Protocol SDK for JavaScript/TypeScript.
 
@@ -7,15 +7,15 @@ Build LLM-powered content manipulation with minimal code.
 ## Installation
 
 ```bash
-npm install @ucp/core
+npm install @ucp-core/core
 # or
-bun add @ucp/core
+bun add @ucp-core/core
 ```
 
 ## Quick Start
 
 ```typescript
-import { ucp } from '@ucp/core'
+import { ucp } from '@ucp-core/core'
 
 // 1. Parse markdown into a document
 const doc = ucp.parse(`
@@ -142,7 +142,7 @@ import type {
   ContentType,
   SemanticRole,
   Capability 
-} from '@anthropic/ucp'
+} from '@ucp-core/core'
 ```
 
 ## License

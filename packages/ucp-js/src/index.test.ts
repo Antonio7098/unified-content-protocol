@@ -162,6 +162,140 @@ describe('UclBuilder', () => {
   })
 })
 
+describe('Edge Cases', () => {
+  it('handles empty markdown', () => {
+    const doc = parseMarkdown('')
+    expect(doc.blocks.size).toBe(1) // just root
+  })
+
+  it('handles deeply nested headings', () => {
+    const doc = parseMarkdown(`# H1
+## H2
+### H3
+#### H4
+##### H5
+###### H6
+
+Paragraph under H6`)
+
+    expect(doc.blocks.size).toBe(8) // root + 6 headings + 1 paragraph
+  })
+
+  it('preserves content with special characters', () => {
+    const content = 'Text with "quotes" and \'apostrophes\' and `backticks`'
+    const doc = parseMarkdown(`# Title\n\n${content}`)
+    const blocks = Array.from(doc.blocks.values())
+    const para = blocks.find(b => b.role === 'paragraph')
+    expect(para?.content).toBe(content)
+  })
+
+  it('handles multiple code blocks', () => {
+    const doc = parseMarkdown(`# Title
+
+\`\`\`js
+const a = 1
+\`\`\`
+
+\`\`\`python
+x = 2
+\`\`\``)
+
+    const codeBlocks = Array.from(doc.blocks.values()).filter(b => b.type === 'code')
+    expect(codeBlocks.length).toBe(2)
+  })
+
+  it('roundtrips markdown correctly', () => {
+    const original = `# Hello
+
+World
+
+## Section
+
+Content here
+`
+    const doc = parseMarkdown(original)
+    const rendered = renderMarkdown(doc)
+
+    expect(rendered).toContain('# Hello')
+    expect(rendered).toContain('World')
+    expect(rendered).toContain('## Section')
+    expect(rendered).toContain('Content here')
+  })
+})
+
+describe('Error Handling', () => {
+  it('throws when adding to non-existent parent', () => {
+    const doc = createDocument()
+    expect(() => addBlock(doc, 'invalid_id', 'content')).toThrow()
+  })
+
+  it('PromptBuilder requires at least one capability', () => {
+    expect(() => new PromptBuilder().build()).toThrow('At least one capability')
+  })
+
+  it('IdMapper returns undefined for unknown IDs', () => {
+    const mapper = new IdMapper()
+    expect(mapper.getShort('unknown')).toBeUndefined()
+    expect(mapper.getLong(999)).toBeUndefined()
+  })
+})
+
+describe('UclBuilder Advanced', () => {
+  it('builds move commands', () => {
+    expect(new UclBuilder().moveTo(1, 2).build()).toBe('MOVE 1 TO 2')
+    expect(new UclBuilder().moveBefore(1, 2).build()).toBe('MOVE 1 BEFORE 2')
+    expect(new UclBuilder().moveAfter(1, 2).build()).toBe('MOVE 1 AFTER 2')
+  })
+
+  it('builds link commands', () => {
+    expect(new UclBuilder().link(1, 'references', 2).build()).toBe('LINK 1 references 2')
+  })
+
+  it('chains multiple commands', () => {
+    const ucl = new UclBuilder()
+      .edit(1, 'a')
+      .append(1, 'b')
+      .delete(2)
+      .build()
+
+    expect(ucl).toContain('EDIT 1')
+    expect(ucl).toContain('APPEND 1')
+    expect(ucl).toContain('DELETE 2')
+  })
+
+  it('escapes special characters in content', () => {
+    const ucl = new UclBuilder().edit(1, 'line1\nline2').build()
+    expect(ucl).toContain('\\n')
+  })
+
+  it('returns commands as array', () => {
+    const builder = new UclBuilder().edit(1, 'a').edit(2, 'b')
+    expect(builder.toArray()).toHaveLength(2)
+  })
+})
+
+describe('IdMapper Advanced', () => {
+  it('handles UCL with multiple ID references', () => {
+    const doc = parseMarkdown('# A\n\n## B\n\n### C')
+    const mapper = IdMapper.fromDocument(doc)
+
+    const ucl = 'MOVE 3 TO 2\nLINK 2 references 4'
+    const expanded = mapper.expand(ucl)
+
+    expect(expanded).toContain('blk_')
+    expect(expanded).not.toMatch(/\b[234]\b/)
+  })
+
+  it('provides accurate mappings list', () => {
+    const doc = parseMarkdown('# Title\n\nPara')
+    const mapper = IdMapper.fromDocument(doc)
+    const mappings = mapper.getMappings()
+
+    expect(mappings.length).toBe(3) // root + heading + para
+    expect(mappings[0].short).toBe(1)
+  })
+})
+
 describe('ucp API', () => {
   it('exposes parse function', () => {
     const doc = ucp.parse('# Hello')
