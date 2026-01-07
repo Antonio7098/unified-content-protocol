@@ -45,4 +45,12 @@ mod tests {
         assert!(rendered.contains("Hello"));
         assert!(rendered.contains("paragraph"));
     }
+
+    #[test]
+    fn test_roundtrip_exact() {
+        let md = "# Hello\n\nThis is a paragraph.\n";
+        let doc = parse_markdown(md).unwrap();
+        let rendered = render_markdown(&doc).unwrap();
+        assert_eq!(md, rendered);
+    }
 }

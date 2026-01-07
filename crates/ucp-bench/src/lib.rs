@@ -1,9 +1,9 @@
 //! UCP Benchmarking System
 //!
 //! Comprehensive benchmarking for both system performance and LLM evaluation.
-//! 
+//!
 //! ## Architecture
-//! 
+//!
 //! - **suite**: Modular test suite system with categories, configs, and detailed results
 //! - **api**: REST API server for the benchmark UI
 //! - **agent**: LLM agent that generates and executes UCL commands
@@ -14,9 +14,11 @@
 pub mod agent;
 pub mod api;
 pub mod core;
+pub mod dev_tools;
 pub mod documents;
 pub mod id_mapper;
 pub mod metrics;
+pub mod prompt_builder;
 pub mod provider;
 pub mod report;
 pub mod runner;
@@ -30,42 +32,33 @@ pub use agent::BenchmarkAgent;
 pub use documents::{DocumentDefinition, DocumentRegistry};
 pub use metrics::{BenchmarkMetrics, TestResult};
 pub use provider::{
-    CompletionRequest,
-    CompletionResponse,
-    LlmProvider,
-    TokenPricing,
-    GroqProvider,
-    CerebrasProvider,
-    GmiCloudProvider,
-    OpenRouterProvider,
-    MockProvider,
-    fetch_openrouter_pricing,
+    fetch_openrouter_pricing, CerebrasProvider, CompletionRequest, CompletionResponse,
+    GmiCloudProvider, GroqProvider, LlmProvider, MockProvider, OpenRouterProvider, TokenPricing,
 };
 pub use report::BenchmarkReport;
+pub use runner::{BenchmarkConfig, BenchmarkRunner};
 pub use storage::{
-    default_storage,
-    default_storage_root,
-    default_core_benchmark_storage,
-    BenchmarkStorage,
-    FileBenchmarkStorage,
-    StoredBenchmark,
+    default_core_benchmark_storage, default_storage, default_storage_root, BenchmarkStorage,
+    CoreBenchmarkStorage, CoreBenchmarkSummary, FileBenchmarkStorage, StoredBenchmark,
     StoredBenchmarkMetadata,
-    CoreBenchmarkStorage,
-    CoreBenchmarkSummary,
 };
-pub use runner::{BenchmarkRunner, BenchmarkConfig};
-pub use suite::{BenchmarkSuite, TestRegistry, TestCategory, TestCategoryId};
+pub use suite::{BenchmarkSuite, TestCategory, TestCategoryId, TestRegistry};
 pub use test_cases::TestCase;
 pub use test_document::create_test_document;
 pub use tokenizer::count_tokens;
 
 // Core benchmarking exports
 pub use core::{
-    CoreBenchmark, CoreBenchmarkConfig, CoreBenchmarkRunner,
-    CoreBenchmarkMetrics, CoreTestResult, CoreTestInput,
-    CoreTestInputRegistry, InputCategory, CORE_INPUTS,
-    BenchmarkCategory,
+    BenchmarkCategory, CoreBenchmark, CoreBenchmarkConfig, CoreBenchmarkMetrics,
+    CoreBenchmarkRunner, CoreTestInput, CoreTestInputRegistry, CoreTestResult, InputCategory,
+    CORE_INPUTS,
 };
 
 // ID mapping for LLM prompts (token optimization)
 pub use id_mapper::IdMapper;
+
+// Prompt building for agents
+pub use prompt_builder::{PromptBuilder, UclCapability};
+
+// Developer tools for JSON-UCL workflows
+pub use dev_tools::{diff_json, DocumentInspector, JsonChange, UclBuilder};

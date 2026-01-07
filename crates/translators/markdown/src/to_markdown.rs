@@ -1,16 +1,48 @@
 //! Render UCM documents to Markdown.
+//!
+//! Supports two heading modes:
+//! - **Explicit**: Uses semantic roles (heading1, heading2, etc.) from block metadata
+//! - **Structural**: Derives heading level from document tree depth
+//!
+//! The hybrid approach uses explicit roles when present, falling back to structural
+//! derivation for blocks without heading roles.
 
 use crate::{Result, TranslatorError};
 use ucm_core::{Block, BlockId, Cell, Content, Document, MediaSource, Row};
+use ucm_core::metadata::RoleCategory;
+
+/// Configuration for heading level derivation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeadingMode {
+    /// Use explicit semantic roles only (heading1, heading2, etc.)
+    Explicit,
+    /// Derive heading level from document structure depth
+    Structural,
+    /// Use explicit roles when present, fall back to structural derivation
+    Hybrid,
+}
+
+impl Default for HeadingMode {
+    fn default() -> Self {
+        Self::Hybrid
+    }
+}
 
 /// Markdown renderer that converts UCM to Markdown
 pub struct MarkdownRenderer {
     indent_size: usize,
+    heading_mode: HeadingMode,
+    /// Base heading level offset (0 = start at H1, 1 = start at H2, etc.)
+    heading_offset: usize,
 }
 
 impl MarkdownRenderer {
     pub fn new() -> Self {
-        Self { indent_size: 2 }
+        Self {
+            indent_size: 2,
+            heading_mode: HeadingMode::default(),
+            heading_offset: 0,
+        }
     }
 
     pub fn indent_size(mut self, size: usize) -> Self {
@@ -18,37 +50,69 @@ impl MarkdownRenderer {
         self
     }
 
+    /// Set the heading derivation mode
+    pub fn heading_mode(mut self, mode: HeadingMode) -> Self {
+        self.heading_mode = mode;
+        self
+    }
+
+    /// Set heading level offset (useful for nested documents)
+    pub fn heading_offset(mut self, offset: usize) -> Self {
+        self.heading_offset = offset;
+        self
+    }
+
     pub fn render(&self, doc: &Document) -> Result<String> {
         let mut output = String::new();
         self.render_block(doc, &doc.root, &mut output, 0)?;
-        Ok(output)
+        
+        // Trim trailing whitespace but ensure single newline at end
+        let trimmed = output.trim_end();
+        if trimmed.is_empty() {
+            Ok(String::new())
+        } else {
+            Ok(format!("{}\n", trimmed))
+        }
     }
 
-    fn render_block(&self, doc: &Document, block_id: &BlockId, output: &mut String, depth: usize) -> Result<()> {
-        let block = doc.get_block(block_id)
-            .ok_or_else(|| TranslatorError::RenderError(format!("Block not found: {}", block_id)))?;
+    fn render_block(
+        &self,
+        doc: &Document,
+        block_id: &BlockId,
+        output: &mut String,
+        depth: usize,
+    ) -> Result<()> {
+        let block = doc.get_block(block_id).ok_or_else(|| {
+            TranslatorError::RenderError(format!("Block not found: {}", block_id))
+        })?;
 
-        // Render content based on type and role
-        self.render_content(block, output, depth)?;
+        // Skip root block content (it's just a container)
+        if !block.is_root() {
+            // Render content based on type and role, passing depth for structural heading derivation
+            self.render_content(block, output, depth)?;
+        }
 
-        // Render children
+        // Render children with incremented depth
         if let Some(children) = doc.structure.get(block_id) {
             for child_id in children {
-                self.render_block(doc, child_id, output, depth)?;
+                self.render_block(doc, child_id, output, depth + 1)?;
             }
         }
 
         Ok(())
     }
 
-    fn render_content(&self, block: &Block, output: &mut String, _depth: usize) -> Result<()> {
-        let role = block.metadata.semantic_role.as_ref()
-            .map(|r| format!("{:?}", r.category).to_lowercase())
-            .unwrap_or_else(|| "paragraph".to_string());
+    fn render_content(&self, block: &Block, output: &mut String, depth: usize) -> Result<()> {
+        // Determine the effective role, considering heading mode
+        let explicit_role = block
+            .metadata
+            .semantic_role
+            .as_ref()
+            .map(|r| r.category);
 
         match &block.content {
             Content::Text(text) => {
-                self.render_text(&text.text, &role, output);
+                self.render_text(&text.text, explicit_role, depth, output);
             }
             Content::Code(code) => {
                 output.push_str("```");
@@ -78,9 +142,11 @@ impl MarkdownRenderer {
                     MediaSource::Reference(id) => format!("[ref:{}]", id),
                     MediaSource::External(ext) => format!("[{}:{}]", ext.provider, ext.key),
                 };
-                output.push_str(&format!("![{}]({})\n\n", 
-                    media.alt_text.as_deref().unwrap_or(""), 
-                    src));
+                output.push_str(&format!(
+                    "![{}]({})\n\n",
+                    media.alt_text.as_deref().unwrap_or(""),
+                    src
+                ));
             }
             Content::Json { value, .. } => {
                 output.push_str("```json\n");
@@ -98,14 +164,84 @@ impl MarkdownRenderer {
         Ok(())
     }
 
-    fn render_text(&self, text: &str, role: &str, output: &mut String) {
+    /// Determine heading level based on mode, explicit role, and depth
+    fn resolve_heading_level(&self, explicit_role: Option<RoleCategory>, depth: usize) -> Option<usize> {
+        match self.heading_mode {
+            HeadingMode::Explicit => {
+                // Only use explicit heading roles
+                explicit_role.and_then(|r| self.role_to_heading_level(r))
+            }
+            HeadingMode::Structural => {
+                // Always derive from depth (depth 1 = H1, depth 2 = H2, etc.)
+                // Only for blocks that look like headings (have heading role or are section containers)
+                if explicit_role.map(|r| self.is_heading_role(r)).unwrap_or(false) {
+                    Some((depth + self.heading_offset).min(6).max(1))
+                } else {
+                    None
+                }
+            }
+            HeadingMode::Hybrid => {
+                // Use explicit role if present, otherwise derive from structure for heading-like blocks
+                if let Some(role) = explicit_role {
+                    self.role_to_heading_level(role)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn role_to_heading_level(&self, role: RoleCategory) -> Option<usize> {
         match role {
-            "heading1" => { output.push_str("# "); output.push_str(text); output.push_str("\n\n"); }
-            "heading2" => { output.push_str("## "); output.push_str(text); output.push_str("\n\n"); }
-            "heading3" => { output.push_str("### "); output.push_str(text); output.push_str("\n\n"); }
-            "heading4" => { output.push_str("#### "); output.push_str(text); output.push_str("\n\n"); }
-            "heading5" => { output.push_str("##### "); output.push_str(text); output.push_str("\n\n"); }
-            "heading6" => { output.push_str("###### "); output.push_str(text); output.push_str("\n\n"); }
+            RoleCategory::Heading1 => Some(1),
+            RoleCategory::Heading2 => Some(2),
+            RoleCategory::Heading3 => Some(3),
+            RoleCategory::Heading4 => Some(4),
+            RoleCategory::Heading5 => Some(5),
+            RoleCategory::Heading6 => Some(6),
+            RoleCategory::Title => Some(1),
+            RoleCategory::Subtitle => Some(2),
+            _ => None,
+        }
+    }
+
+    fn is_heading_role(&self, role: RoleCategory) -> bool {
+        matches!(
+            role,
+            RoleCategory::Heading1
+                | RoleCategory::Heading2
+                | RoleCategory::Heading3
+                | RoleCategory::Heading4
+                | RoleCategory::Heading5
+                | RoleCategory::Heading6
+                | RoleCategory::Title
+                | RoleCategory::Subtitle
+        )
+    }
+
+    fn render_text(
+        &self,
+        text: &str,
+        explicit_role: Option<RoleCategory>,
+        depth: usize,
+        output: &mut String,
+    ) {
+        // Check for heading
+        if let Some(level) = self.resolve_heading_level(explicit_role, depth) {
+            let hashes = "#".repeat(level);
+            output.push_str(&hashes);
+            output.push(' ');
+            output.push_str(text);
+            output.push_str("\n\n");
+            return;
+        }
+
+        // Handle other roles
+        let role_str = explicit_role
+            .map(|r| r.as_str())
+            .unwrap_or("paragraph");
+
+        match role_str {
             "quote" => {
                 for line in text.lines() {
                     output.push_str("> ");
@@ -128,7 +264,9 @@ impl MarkdownRenderer {
     }
 
     fn render_table(&self, rows: &[Row], output: &mut String) {
-        if rows.is_empty() { return; }
+        if rows.is_empty() {
+            return;
+        }
 
         // Header
         let header = &rows[0];
@@ -189,7 +327,7 @@ mod tests {
         let root = doc.root.clone();
         let block = Block::new(Content::text("Hello"), Some("title"));
         doc.add_block(block, &root).unwrap();
-        
+
         let md = MarkdownRenderer::new().render(&doc).unwrap();
         // Title role renders as plain text, verify content is present
         assert!(md.contains("Hello"));
@@ -201,7 +339,7 @@ mod tests {
         let root = doc.root.clone();
         let block = Block::new(Content::code("rust", "fn main() {}"), None);
         doc.add_block(block, &root).unwrap();
-        
+
         let md = MarkdownRenderer::new().render(&doc).unwrap();
         assert!(md.contains("```rust"));
         assert!(md.contains("fn main()"));

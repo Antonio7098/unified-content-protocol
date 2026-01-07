@@ -1,6 +1,6 @@
 //! LLM Agent for executing UCL commands.
 
-use crate::documents::{DocumentDefinition, DocumentRegistry, DocumentDetailPayload, DOCUMENTS};
+use crate::documents::DocumentDefinition;
 use crate::metrics::{ErrorCategory, TestResult};
 use crate::provider::{CompletionRequest, LlmProvider, Message};
 use crate::test_cases::TestCase;
@@ -138,7 +138,10 @@ impl BenchmarkAgent {
         );
 
         // Store full prompt for debugging
-        let full_prompt = format!("=== SYSTEM ===\n{}\n\n=== USER ===\n{}", SYSTEM_PROMPT, user_prompt);
+        let full_prompt = format!(
+            "=== SYSTEM ===\n{}\n\n=== USER ===\n{}",
+            SYSTEM_PROMPT, user_prompt
+        );
 
         let request = CompletionRequest::new(vec![
             Message::system(SYSTEM_PROMPT),
@@ -152,7 +155,9 @@ impl BenchmarkAgent {
             Ok(r) => r,
             Err(e) => {
                 let category = match &e {
-                    crate::provider::ProviderError::RateLimited { .. } => ErrorCategory::RateLimitError,
+                    crate::provider::ProviderError::RateLimited { .. } => {
+                        ErrorCategory::RateLimitError
+                    }
                     crate::provider::ProviderError::Timeout { .. } => ErrorCategory::TimeoutError,
                     _ => ErrorCategory::ProviderError,
                 };
@@ -178,12 +183,8 @@ impl BenchmarkAgent {
         let generated_ucl = extract_ucl(&response.content);
 
         // Create base result
-        let mut result = TestResult::success(
-            &test_case.id,
-            &test_case.command_type,
-            &model,
-            &provider_id,
-        );
+        let mut result =
+            TestResult::success(&test_case.id, &test_case.command_type, &model, &provider_id);
         result.latency_ms = response.latency_ms;
         result.input_tokens = response.input_tokens;
         result.output_tokens = response.output_tokens;
@@ -203,17 +204,22 @@ impl BenchmarkAgent {
                 if test_case.validation.must_execute && !commands.is_empty() {
                     if self.execute_commands {
                         // Skip execution for TRANSACTION/ATOMIC commands - they're validated at parse level
-                        let skip_execution = matches!(
-                            test_case.command_type.as_str(),
-                            "TRANSACTION" | "ATOMIC"
-                        ) || commands.iter().any(|c| matches!(
-                            c,
-                            ucl_parser::Command::Transaction(_) | 
-                            ucl_parser::Command::Atomic(_) |
-                            ucl_parser::Command::Snapshot(ucl_parser::SnapshotCommand::List) |
-                            ucl_parser::Command::Snapshot(ucl_parser::SnapshotCommand::Diff { .. })
-                        ));
-                        
+                        let skip_execution =
+                            matches!(test_case.command_type.as_str(), "TRANSACTION" | "ATOMIC")
+                                || commands.iter().any(|c| {
+                                    matches!(
+                                        c,
+                                        ucl_parser::Command::Transaction(_)
+                                            | ucl_parser::Command::Atomic(_)
+                                            | ucl_parser::Command::Snapshot(
+                                                ucl_parser::SnapshotCommand::List
+                                            )
+                                            | ucl_parser::Command::Snapshot(
+                                                ucl_parser::SnapshotCommand::Diff { .. }
+                                            )
+                                    )
+                                });
+
                         if skip_execution {
                             // These commands don't modify document state - just validate parsing
                             result.execute_success = true;
@@ -278,7 +284,7 @@ impl BenchmarkAgent {
     ) -> Result<(), String> {
         // Store initial document state for comparison
         let initial_block_count = self.document.blocks.len();
-        
+
         // Execute each command
         for command in commands {
             // Convert UCL command to engine operation
@@ -286,13 +292,13 @@ impl BenchmarkAgent {
                 Ok(op) => op,
                 Err(e) => return Err(format!("Failed to convert command: {}", e)),
             };
-            
+
             // Execute the operation
             if let Err(e) = self.engine.execute(&mut self.document, operation) {
                 return Err(format!("Engine execution failed: {:?}", e));
             }
         }
-        
+
         // Validate based on test case criteria
         if let Some(ref target_id) = test_case.validation.target_block_id {
             // Check that the target block exists (for non-DELETE operations)
@@ -300,12 +306,15 @@ impl BenchmarkAgent {
                 use std::str::FromStr;
                 if let Ok(block_id) = ucm_core::BlockId::from_str(target_id) {
                     if self.document.get_block(&block_id).is_none() {
-                        return Err(format!("Target block {} not found after execution", target_id));
+                        return Err(format!(
+                            "Target block {} not found after execution",
+                            target_id
+                        ));
                     }
                 }
             }
         }
-        
+
         // For APPEND, verify block count increased
         if test_case.command_type == "APPEND" {
             let new_block_count = self.document.blocks.len();
@@ -313,7 +322,7 @@ impl BenchmarkAgent {
                 return Err("APPEND did not increase block count".into());
             }
         }
-        
+
         // For DELETE, verify block count decreased or stayed same (CASCADE might delete multiple)
         if test_case.command_type == "DELETE" {
             let new_block_count = self.document.blocks.len();
@@ -321,22 +330,25 @@ impl BenchmarkAgent {
                 return Err("DELETE should not increase block count".into());
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Convert a UCL command to an engine operation
-    fn command_to_operation(&self, command: &ucl_parser::Command) -> Result<ucm_engine::Operation, String> {
-        use ucl_parser::Command;
-        use ucm_engine::{Operation, EditOperator};
-        use ucm_core::{BlockId, Content, EdgeType};
+    fn command_to_operation(
+        &self,
+        command: &ucl_parser::Command,
+    ) -> Result<ucm_engine::Operation, String> {
         use std::str::FromStr;
-        
+        use ucl_parser::Command;
+        use ucm_core::{BlockId, Content, EdgeType};
+        use ucm_engine::{EditOperator, Operation};
+
         // Helper to parse block ID from string
         let parse_block_id = |s: &str| -> Result<BlockId, String> {
             BlockId::from_str(s).map_err(|e| format!("Invalid block ID '{}': {}", s, e))
         };
-        
+
         match command {
             Command::Edit(edit) => {
                 let block_id = parse_block_id(&edit.block_id)?;
@@ -370,7 +382,11 @@ impl BenchmarkAgent {
                 };
                 let content = Content::Text(text);
                 let label = append.properties.get("label").and_then(|v| {
-                    if let ucl_parser::Value::String(s) = v { Some(s.clone()) } else { None }
+                    if let ucl_parser::Value::String(s) = v {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
                 });
                 Ok(Operation::Append {
                     parent_id,
@@ -403,7 +419,9 @@ impl BenchmarkAgent {
                 })
             }
             Command::Delete(del) => {
-                let block_id = del.block_id.as_ref()
+                let block_id = del
+                    .block_id
+                    .as_ref()
                     .ok_or_else(|| "DELETE command missing block_id".to_string())?;
                 let block_id = parse_block_id(block_id)?;
                 Ok(Operation::Delete {
@@ -415,8 +433,7 @@ impl BenchmarkAgent {
             Command::Link(link) => {
                 let source = parse_block_id(&link.source_id)?;
                 let target = parse_block_id(&link.target_id)?;
-                let edge_type = EdgeType::from_str(&link.edge_type)
-                    .unwrap_or(EdgeType::References);
+                let edge_type = EdgeType::from_str(&link.edge_type).unwrap_or(EdgeType::References);
                 Ok(Operation::Link {
                     source,
                     edge_type,
@@ -427,28 +444,26 @@ impl BenchmarkAgent {
             Command::Unlink(unlink) => {
                 let source = parse_block_id(&unlink.source_id)?;
                 let target = parse_block_id(&unlink.target_id)?;
-                let edge_type = EdgeType::from_str(&unlink.edge_type)
-                    .unwrap_or(EdgeType::References);
+                let edge_type =
+                    EdgeType::from_str(&unlink.edge_type).unwrap_or(EdgeType::References);
                 Ok(Operation::Unlink {
                     source,
                     edge_type,
                     target,
                 })
             }
-            Command::Snapshot(snap) => {
-                match snap {
-                    ucl_parser::SnapshotCommand::Create { name, description } => {
-                        Ok(Operation::CreateSnapshot {
-                            name: name.clone(),
-                            description: description.clone(),
-                        })
-                    }
-                    ucl_parser::SnapshotCommand::Restore { name } => {
-                        Ok(Operation::RestoreSnapshot { name: name.clone() })
-                    }
-                    _ => Err("Unsupported snapshot operation".into()),
+            Command::Snapshot(snap) => match snap {
+                ucl_parser::SnapshotCommand::Create { name, description } => {
+                    Ok(Operation::CreateSnapshot {
+                        name: name.clone(),
+                        description: description.clone(),
+                    })
                 }
-            }
+                ucl_parser::SnapshotCommand::Restore { name } => {
+                    Ok(Operation::RestoreSnapshot { name: name.clone() })
+                }
+                _ => Err("Unsupported snapshot operation".into()),
+            },
             Command::Transaction(_) | Command::Atomic(_) => {
                 // Transaction commands don't map directly to single operations
                 // For benchmarking, we just validate they parse correctly
@@ -470,7 +485,10 @@ impl BenchmarkAgent {
     }
 
     /// Execute commands for playground (without test case validation)
-    pub fn execute_and_validate_for_playground(&mut self, commands: &[ucl_parser::Command]) -> Result<(), String> {
+    pub fn execute_and_validate_for_playground(
+        &mut self,
+        commands: &[ucl_parser::Command],
+    ) -> Result<(), String> {
         for command in commands {
             let operation = match self.command_to_operation(command) {
                 Ok(op) => op,
@@ -570,11 +588,14 @@ This will update the text."#;
 
     #[tokio::test]
     async fn test_agent_run() {
+        use crate::documents::DOCUMENTS;
+        
         let provider = Arc::new(
             MockProvider::new("mock")
-                .with_responses(vec![r#"EDIT blk_000000000011 SET text = "updated""#.into()])
+                .with_responses(vec![r#"EDIT blk_000000000011 SET text = "updated""#.into()]),
         );
-        let mut agent = BenchmarkAgent::new(provider, false);
+        let doc_def = DOCUMENTS.default().expect("Should have default document");
+        let mut agent = BenchmarkAgent::new(provider, doc_def, false);
 
         let test_case = TestCase {
             id: "test_001".into(),
@@ -583,6 +604,7 @@ This will update the text."#;
             prompt: "Edit the intro hook".into(),
             expected_pattern: Some(r"EDIT\s+blk_000000000011".into()),
             validation: crate::test_cases::ValidationCriteria::default(),
+            document_id: "ml_tutorial".into(),
         };
 
         let result = agent.run_test(&test_case).await;
