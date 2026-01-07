@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ucp-content"
+version = "0.1.0"
+description = "Unified Content Protocol - Python SDK for LLM content manipulation"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "UCP Contributors"}
+]
+keywords = ["ucp", "llm", "content", "document", "markdown", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Markup",
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Antonio7098/unified-content-protocol"
+Repository = "https://github.com/Antonio7098/unified-content-protocol"
+Documentation = "https://github.com/Antonio7098/unified-content-protocol#readme"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
