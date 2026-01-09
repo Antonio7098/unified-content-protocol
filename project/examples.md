@@ -5,11 +5,11 @@ Ready-to-run snippets for common tasks.
 ## 1. Summarize Section via LLM
 
 ```typescript
-import { ucp } from '@ucp-core/core'
+import { parse, mapIds } from '@ucp-core/core'
 import OpenAI from 'openai'
 
-const doc = ucp.parse(`# Postmortem\n\n## Timeline\n- 10:32 alert triggered`)
-const mapper = ucp.mapIds(doc)
+const doc = parse(`# Postmortem\n\n## Timeline\n- 10:32 alert triggered`)
+const mapper = mapIds(doc)
 
 const client = new OpenAI()
 const prompt = `${mapper.describe(doc)}\n\nSummarize the timeline.`
@@ -40,7 +40,9 @@ APPEND 3 text :: New paragraph"""
 ## 3. Token-Efficient Editing
 
 ```typescript
-const prompt = ucp.prompt().edit().append().withShortIds().build()
-const mapper = ucp.mapIds(doc)
+import { prompt, mapIds } from '@ucp-core/core'
+
+const systemPrompt = prompt().edit().append().withShortIds().build()
+const mapper = mapIds(doc)
 const shortDoc = mapper.describe(doc)
 ```

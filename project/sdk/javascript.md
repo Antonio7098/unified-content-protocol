@@ -13,21 +13,31 @@ bun add @ucp-core/core
 ## Core Imports
 
 ```typescript
-import { ucp, PromptBuilder, IdMapper, UclBuilder } from '@ucp-core/core'
+import {
+  createDocument,
+  parse,
+  render,
+  prompt,
+  mapIds,
+  ucl,
+  PromptBuilder,
+  IdMapper,
+  UclBuilder,
+} from '@ucp-core/core'
 ```
 
 ## Creating Documents
 
 ```typescript
-const doc = ucp.parse(`# Title\n\nParagraph text\n\n## Section\n\nMore text`)
-const markdown = ucp.render(doc)
-const empty = ucp.create()
+const doc = parse(`# Title\n\nParagraph text\n\n## Section\n\nMore text`)
+const markdown = render(doc)
+const empty = createDocument()
 ```
 
 ## Prompt Builder
 
 ```typescript
-const prompt = ucp.prompt()
+const prompt = prompt()
   .edit()
   .append()
   .move()
@@ -39,7 +49,7 @@ const prompt = ucp.prompt()
 ## ID Mapper
 
 ```typescript
-const mapper = ucp.mapIds(doc)
+const mapper = mapIds(doc)
 const summary = mapper.describe(doc)
 const shortened = mapper.shorten('EDIT blk_00000000000c SET text = "Hi"')
 const expanded = mapper.expand('EDIT 12 SET text = "Hi"')
@@ -48,7 +58,7 @@ const expanded = mapper.expand('EDIT 12 SET text = "Hi"')
 ## UCL Builder
 
 ```typescript
-const commands = ucp.ucl()
+const commands = ucl()
   .edit(4, 'Updated intro')
   .append(2, 'New paragraph')
   .delete(7, true)

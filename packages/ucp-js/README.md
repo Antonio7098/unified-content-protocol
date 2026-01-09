@@ -15,10 +15,10 @@ bun add @ucp-core/core
 ## Quick Start
 
 ```typescript
-import { ucp } from '@ucp-core/core'
+import { parse, mapIds, prompt } from '@ucp-core/core'
 
 // 1. Parse markdown into a document
-const doc = ucp.parse(`
+const doc = parse(`
 # My Article
 
 This is the introduction.
@@ -29,7 +29,7 @@ Some content here.
 `)
 
 // 2. Create an ID mapper for token efficiency
-const mapper = ucp.mapIds(doc)
+const mapper = mapIds(doc)
 
 // 3. Get a compact document description for the LLM
 const description = mapper.describe(doc)
@@ -41,7 +41,7 @@ const description = mapper.describe(doc)
 //       [5] paragraph - Some content here.
 
 // 4. Build a prompt with only the capabilities you need
-const systemPrompt = ucp.prompt()
+const systemPrompt = prompt()
   .edit()
   .append()
   .withShortIds()
@@ -58,14 +58,16 @@ const expandedUcl = mapper.expand(llmResponse)
 ### Document Operations
 
 ```typescript
+import { parse, render, createDocument } from '@ucp-core/core'
+
 // Parse markdown
-const doc = ucp.parse('# Hello\n\nWorld')
+const doc = parse('# Hello\n\nWorld')
 
 // Render back to markdown
-const md = ucp.render(doc)
+const md = render(doc)
 
 // Create empty document
-const doc = ucp.create()
+const empty = createDocument()
 ```
 
 ### Prompt Builder
@@ -73,7 +75,9 @@ const doc = ucp.create()
 Build prompts with only the capabilities your agent needs:
 
 ```typescript
-const prompt = ucp.prompt()
+import { prompt } from '@ucp-core/core'
+
+const systemPrompt = prompt()
   .edit()           // Enable EDIT command
   .append()         // Enable APPEND command
   .move()           // Enable MOVE command
@@ -92,7 +96,9 @@ const prompt = ucp.prompt()
 Save tokens by using short numeric IDs:
 
 ```typescript
-const mapper = ucp.mapIds(doc)
+import { mapIds } from '@ucp-core/core'
+
+const mapper = mapIds(doc)
 
 // Shorten IDs in any text
 const short = mapper.shorten('Block blk_000000000003 has content')
@@ -111,7 +117,9 @@ const desc = mapper.describe(doc)
 Build UCL commands programmatically:
 
 ```typescript
-const commands = ucp.ucl()
+import { ucl } from '@ucp-core/core'
+
+const commands = ucl()
   .edit(3, 'Updated content')
   .append(2, 'New paragraph')
   .delete(5)

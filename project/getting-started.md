@@ -19,9 +19,9 @@ pip install ucp-content
 ## 2. Parse Markdown into UCM
 
 ```typescript
-import { ucp } from '@ucp-core/core'
+import { parse } from '@ucp-core/core'
 
-const doc = ucp.parse(`# Welcome\n\nIntro paragraph\n\n## Section\n\nMore text`)
+const doc = parse(`# Welcome\n\nIntro paragraph\n\n## Section\n\nMore text`)
 console.log(doc.blocks.size) // root + heading + paragraph + subheading + paragraph
 ```
 
@@ -42,8 +42,10 @@ print(len(doc.blocks))
 ## 3. Build an LLM Prompt
 
 ```typescript
-const mapper = ucp.mapIds(doc)
-const prompt = ucp.prompt()
+import { mapIds, prompt } from '@ucp-core/core'
+
+const mapper = mapIds(doc)
+const systemPrompt = prompt()
   .edit()
   .append()
   .withShortIds()
@@ -54,7 +56,7 @@ const docSummary = mapper.describe(doc)
 
 ```python
 mapper = ucp.map_ids(doc)
-prompt = (
+system_prompt = (
     ucp.prompt()
     .edit()
     .append()
