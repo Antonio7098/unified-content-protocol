@@ -5,6 +5,13 @@ import {
   renderMarkdown,
   createDocument,
   addBlock,
+  editBlock,
+  moveBlock,
+  deleteBlock,
+  addTag,
+  removeTag,
+  blockHasTag,
+  findBlocksByTag,
   PromptBuilder,
   IdMapper,
   UclBuilder,
@@ -47,6 +54,46 @@ describe('Document Operations', () => {
 
     expect(codeBlock).toBeDefined()
     expect(codeBlock?.content).toContain('console.log')
+  })
+
+  it('edits block content', () => {
+    const doc = parseMarkdown('# Title\n\nParagraph')
+    const paragraph = Array.from(doc.blocks.values()).find(b => b.role === 'paragraph')!
+
+    editBlock(doc, paragraph.id, 'Updated')
+    expect(doc.blocks.get(paragraph.id)?.content).toBe('Updated')
+  })
+
+  it('moves blocks to new parent', () => {
+    const doc = parseMarkdown('# Title\n\n## Section\n\nParagraph')
+    const section = Array.from(doc.blocks.values()).find(b => b.role === 'heading2')!
+    const paragraph = Array.from(doc.blocks.values()).find(b => b.role === 'paragraph')!
+
+    moveBlock(doc, paragraph.id, doc.root)
+    expect(doc.blocks.get(doc.root)?.children).toContain(paragraph.id)
+    // ensure original parent no longer references it
+    expect(section.children).not.toContain(paragraph.id)
+  })
+
+  it('deletes blocks', () => {
+    const doc = parseMarkdown('# Title\n\nParagraph')
+    const paragraph = Array.from(doc.blocks.values()).find(b => b.role === 'paragraph')!
+
+    deleteBlock(doc, paragraph.id)
+    expect(doc.blocks.has(paragraph.id)).toBe(false)
+  })
+
+  it('manages tags on blocks', () => {
+    const doc = parseMarkdown('# Title\n\nParagraph')
+    const paragraph = Array.from(doc.blocks.values()).find(b => b.role === 'paragraph')!
+
+    addTag(doc, paragraph.id, 'important')
+    addTag(doc, paragraph.id, 'draft')
+    expect(blockHasTag(doc, paragraph.id, 'important')).toBe(true)
+    expect(findBlocksByTag(doc, 'important')).toEqual([paragraph.id])
+
+    removeTag(doc, paragraph.id, 'important')
+    expect(blockHasTag(doc, paragraph.id, 'important')).toBe(false)
   })
 })
 

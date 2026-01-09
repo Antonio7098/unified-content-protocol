@@ -38,6 +38,57 @@ class TestDocumentOperations:
         assert code_block is not None
         assert "console.log" in code_block.content
 
+    def test_edits_blocks(self):
+        doc = ucp.parse("# Title\n\nParagraph")
+        paragraph = next(
+            (b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None
+        )
+        assert paragraph is not None
+
+        doc.edit_block(paragraph.id, "Updated")
+        assert doc.blocks[paragraph.id].content == "Updated"
+
+    def test_moves_blocks(self):
+        doc = ucp.parse("# Title\n\n## Section\n\nParagraph")
+        blocks = list(doc.blocks.values())
+        section = next((b for b in blocks if b.role == ucp.SemanticRole.HEADING2), None)
+        paragraph = next(
+            (b for b in blocks if b.role == ucp.SemanticRole.PARAGRAPH),
+            None,
+        )
+
+        assert section is not None
+        assert paragraph is not None
+
+        doc.move_block(paragraph.id, doc.root)
+        root_children = doc.blocks[doc.root].children
+        assert paragraph.id in root_children
+
+    def test_deletes_blocks(self):
+        doc = ucp.parse("# Title\n\nParagraph")
+        paragraph = next(
+            (b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None
+        )
+        assert paragraph is not None
+
+        doc.delete_block(paragraph.id)
+        assert paragraph.id not in doc.blocks
+
+    def test_manages_tags(self):
+        doc = ucp.parse("# Title\n\nParagraph")
+        paragraph = next(
+            (b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None
+        )
+        assert paragraph is not None
+
+        doc.add_tag(paragraph.id, "important")
+        doc.add_tag(paragraph.id, "draft")
+        assert doc.block_has_tag(paragraph.id, "important")
+        assert sorted(doc.find_blocks_by_tag("important")) == [paragraph.id]
+
+        doc.remove_tag(paragraph.id, "important")
+        assert not doc.block_has_tag(paragraph.id, "important")
+
 
 class TestPromptBuilder:
     def test_builds_prompt_with_capabilities(self):

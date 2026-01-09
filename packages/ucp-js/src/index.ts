@@ -32,13 +32,81 @@
 export type BlockId = string
 
 /** Content types supported by UCM */
-export type ContentType = 'text' | 'code' | 'table' | 'math' | 'json' | 'media'
+export type ContentType = 'text' | 'code' | 'table' | 'math' | 'json' | 'media' | 'binary' | 'composite'
 
 /** Semantic roles for blocks */
 export type SemanticRole =
   | 'heading1' | 'heading2' | 'heading3' | 'heading4' | 'heading5' | 'heading6'
   | 'paragraph' | 'quote' | 'list' | 'code' | 'table'
-  | 'title' | 'subtitle' | 'abstract'
+  | 'title' | 'subtitle' | 'abstract' | 'intro' | 'body' | 'conclusion'
+
+/** Edge types for block relationships */
+export type EdgeType =
+  // Derivation relationships
+  | 'derived_from' | 'supersedes' | 'transformed_from'
+  // Reference relationships
+  | 'references' | 'cited_by' | 'links_to'
+  // Semantic relationships
+  | 'supports' | 'contradicts' | 'elaborates' | 'summarizes'
+  // Structural relationships
+  | 'parent_of' | 'child_of' | 'sibling_of' | 'previous_sibling' | 'next_sibling'
+  // Version relationships
+  | 'version_of' | 'alternative_of' | 'translation_of'
+
+/** Edge metadata */
+export interface EdgeMetadata {
+  confidence?: number
+  description?: string
+  custom?: Record<string, unknown>
+}
+
+/** An edge represents a relationship between blocks */
+export interface Edge {
+  edgeType: EdgeType
+  target: BlockId
+  metadata: EdgeMetadata
+  createdAt: Date
+}
+
+/** Validation severity levels */
+export type ValidationSeverity = 'error' | 'warning' | 'info'
+
+/** A validation issue */
+export interface ValidationIssue {
+  severity: ValidationSeverity
+  code: string
+  message: string
+  blockId?: BlockId
+}
+
+/** Validation result */
+export interface ValidationResult {
+  valid: boolean
+  issues: ValidationIssue[]
+}
+
+/** Resource limits for validation */
+export interface ResourceLimits {
+  maxDocumentSize: number
+  maxBlockCount: number
+  maxBlockSize: number
+  maxNestingDepth: number
+  maxEdgesPerBlock: number
+}
+
+/** Transaction states */
+export type TransactionState = 'active' | 'committed' | 'rolled_back' | 'timed_out'
+
+/** Block metadata */
+export interface BlockMetadata {
+  semanticRole?: SemanticRole
+  label?: string
+  tags: string[]
+  summary?: string
+  createdAt: Date
+  modifiedAt: Date
+  custom: Record<string, unknown>
+}
 
 /** A content block in the document */
 export interface Block {
@@ -47,7 +115,21 @@ export interface Block {
   type: ContentType
   role?: SemanticRole
   label?: string
+  tags: string[]
   children: BlockId[]
+  edges: Edge[]
+  metadata?: BlockMetadata
+}
+
+/** Document metadata */
+export interface DocumentMetadata {
+  title?: string
+  description?: string
+  authors: string[]
+  language?: string
+  createdAt: Date
+  modifiedAt: Date
+  custom: Record<string, unknown>
 }
 
 /** A UCM document */
@@ -55,6 +137,8 @@ export interface Document {
   id: string
   root: BlockId
   blocks: Map<BlockId, Block>
+  metadata?: DocumentMetadata
+  version: number
 }
 
 /** UCL command capabilities */
@@ -72,19 +156,30 @@ function generateId(): BlockId {
 }
 
 /** Create a new empty document */
-export function createDocument(): Document {
+export function createDocument(title?: string): Document {
   const rootId = generateId()
+  const now = new Date()
   const root: Block = {
     id: rootId,
     content: '',
     type: 'text',
+    tags: [],
     children: [],
+    edges: [],
   }
 
   return {
     id: `doc_${Date.now().toString(16)}`,
     root: rootId,
     blocks: new Map([[rootId, root]]),
+    metadata: {
+      title,
+      authors: [],
+      createdAt: now,
+      modifiedAt: now,
+      custom: {},
+    },
+    version: 1,
   }
 }
 
@@ -105,7 +200,9 @@ export function addBlock(
     type: options.type ?? 'text',
     role: options.role,
     label: options.label,
+    tags: [],
     children: [],
+    edges: [],
   }
 
   doc.blocks.set(id, block)
@@ -117,6 +214,396 @@ export function addBlock(
 /** Get a block by ID */
 export function getBlock(doc: Document, id: BlockId): Block | undefined {
   return doc.blocks.get(id)
+}
+
+/** Edit a block's textual content */
+export function editBlock(doc: Document, id: BlockId, content: string): void {
+  const block = doc.blocks.get(id)
+  if (!block) throw new Error(`Block not found: ${id}`)
+  block.content = content
+}
+
+/** Move a block (and its subtree) to a new parent */
+export function moveBlock(doc: Document, id: BlockId, newParentId: BlockId, index?: number): void {
+  if (id === doc.root) throw new Error('Cannot move the root block')
+
+  const block = doc.blocks.get(id)
+  if (!block) throw new Error(`Block not found: ${id}`)
+
+  const newParent = doc.blocks.get(newParentId)
+  if (!newParent) throw new Error(`Parent block not found: ${newParentId}`)
+
+  if (newParentId === id || isDescendant(doc, id, newParentId)) {
+    throw new Error('Cannot move a block into itself or its descendants')
+  }
+
+  const oldParentId = findParent(doc, id)
+  if (!oldParentId) throw new Error(`Parent block not found for: ${id}`)
+  const oldParent = doc.blocks.get(oldParentId)!
+
+  const childIndex = oldParent.children.indexOf(id)
+  if (childIndex === -1) throw new Error(`Block ${id} not linked to parent ${oldParentId}`)
+  oldParent.children.splice(childIndex, 1)
+
+  if (index === undefined || index < 0 || index > newParent.children.length) {
+    newParent.children.push(id)
+  } else {
+    newParent.children.splice(index, 0, id)
+  }
+}
+
+/** Delete a block (with optional cascade to children) */
+export function deleteBlock(doc: Document, id: BlockId, options: { cascade?: boolean } = {}): void {
+  if (id === doc.root) throw new Error('Cannot delete the root block')
+
+  const block = doc.blocks.get(id)
+  if (!block) throw new Error(`Block not found: ${id}`)
+
+  const parentId = findParent(doc, id)
+  if (!parentId) throw new Error(`Parent block not found for: ${id}`)
+  const parent = doc.blocks.get(parentId)!
+
+  const idx = parent.children.indexOf(id)
+  if (idx === -1) throw new Error(`Block ${id} not linked to parent ${parentId}`)
+  parent.children.splice(idx, 1)
+
+  if (options.cascade ?? true) {
+    for (const childId of block.children) {
+      deleteSubtree(doc, childId)
+    }
+  } else {
+    parent.children.splice(idx, 0, ...block.children)
+  }
+
+  doc.blocks.delete(id)
+}
+
+function findParent(doc: Document, id: BlockId): BlockId | undefined {
+  for (const [candidateId, block] of doc.blocks.entries()) {
+    if (block.children.includes(id)) {
+      return candidateId
+    }
+  }
+  return undefined
+}
+
+function isDescendant(doc: Document, ancestorId: BlockId, candidateId: BlockId): boolean {
+  const ancestor = doc.blocks.get(ancestorId)
+  if (!ancestor) return false
+
+  const queue = [...ancestor.children]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    if (current === candidateId) return true
+    const block = doc.blocks.get(current)
+    if (block) queue.push(...block.children)
+  }
+  return false
+}
+
+function deleteSubtree(doc: Document, id: BlockId): void {
+  const block = doc.blocks.get(id)
+  if (!block) return
+  for (const child of block.children) {
+    deleteSubtree(doc, child)
+  }
+  doc.blocks.delete(id)
+}
+
+/** Add a tag to a block */
+export function addTag(doc: Document, id: BlockId, tag: string): void {
+  const block = doc.blocks.get(id)
+  if (!block) throw new Error(`Block not found: ${id}`)
+  if (!block.tags.includes(tag)) {
+    block.tags.push(tag)
+  }
+}
+
+/** Remove a tag from a block */
+export function removeTag(doc: Document, id: BlockId, tag: string): void {
+  const block = doc.blocks.get(id)
+  if (!block) throw new Error(`Block not found: ${id}`)
+  block.tags = block.tags.filter(t => t !== tag)
+}
+
+/** Check if a block has a tag */
+export function blockHasTag(doc: Document, id: BlockId, tag: string): boolean {
+  const block = doc.blocks.get(id)
+  if (!block) throw new Error(`Block not found: ${id}`)
+  return block.tags.includes(tag)
+}
+
+/** Find block IDs with a tag */
+export function findBlocksByTag(doc: Document, tag: string): BlockId[] {
+  const ids: BlockId[] = []
+  for (const [id, block] of doc.blocks.entries()) {
+    if (block.tags.includes(tag)) {
+      ids.push(id)
+    }
+  }
+  return ids
+}
+
+// =============================================================================
+// EDGE MANAGEMENT
+// =============================================================================
+
+/** Create a new edge */
+export function createEdge(edgeType: EdgeType, target: BlockId, metadata: EdgeMetadata = {}): Edge {
+  return {
+    edgeType,
+    target,
+    metadata,
+    createdAt: new Date(),
+  }
+}
+
+/** Add an edge to a block */
+export function addEdge(
+  doc: Document,
+  sourceId: BlockId,
+  edgeType: EdgeType,
+  targetId: BlockId,
+  metadata: EdgeMetadata = {}
+): void {
+  const source = doc.blocks.get(sourceId)
+  if (!source) throw new Error(`Source block not found: ${sourceId}`)
+  if (!doc.blocks.has(targetId)) throw new Error(`Target block not found: ${targetId}`)
+
+  const edge = createEdge(edgeType, targetId, metadata)
+  source.edges.push(edge)
+  touchDocument(doc)
+}
+
+/** Remove an edge from a block */
+export function removeEdge(
+  doc: Document,
+  sourceId: BlockId,
+  edgeType: EdgeType,
+  targetId: BlockId
+): boolean {
+  const source = doc.blocks.get(sourceId)
+  if (!source) throw new Error(`Source block not found: ${sourceId}`)
+
+  const initialLength = source.edges.length
+  source.edges = source.edges.filter(
+    e => !(e.edgeType === edgeType && e.target === targetId)
+  )
+  const removed = source.edges.length < initialLength
+  if (removed) touchDocument(doc)
+  return removed
+}
+
+/** Check if an edge exists */
+export function hasEdge(
+  doc: Document,
+  sourceId: BlockId,
+  targetId: BlockId,
+  edgeType?: EdgeType
+): boolean {
+  const source = doc.blocks.get(sourceId)
+  if (!source) return false
+  return source.edges.some(
+    e => e.target === targetId && (edgeType === undefined || e.edgeType === edgeType)
+  )
+}
+
+/** Get outgoing edges from a block */
+export function getOutgoingEdges(doc: Document, sourceId: BlockId): Edge[] {
+  const source = doc.blocks.get(sourceId)
+  return source ? [...source.edges] : []
+}
+
+/** Get incoming edges to a block */
+export function getIncomingEdges(doc: Document, targetId: BlockId): Array<{ source: BlockId; edge: Edge }> {
+  const result: Array<{ source: BlockId; edge: Edge }> = []
+  for (const [sourceId, block] of doc.blocks.entries()) {
+    for (const edge of block.edges) {
+      if (edge.target === targetId) {
+        result.push({ source: sourceId, edge })
+      }
+    }
+  }
+  return result
+}
+
+/** Touch document to update modification time and version */
+function touchDocument(doc: Document): void {
+  if (doc.metadata) {
+    doc.metadata.modifiedAt = new Date()
+  }
+  doc.version++
+}
+
+// =============================================================================
+// VALIDATION
+// =============================================================================
+
+/** Default resource limits */
+export const DEFAULT_LIMITS: ResourceLimits = {
+  maxDocumentSize: 50 * 1024 * 1024, // 50MB
+  maxBlockCount: 100_000,
+  maxBlockSize: 5 * 1024 * 1024, // 5MB
+  maxNestingDepth: 50,
+  maxEdgesPerBlock: 1000,
+}
+
+/** Validate a document */
+export function validateDocument(doc: Document, limits: ResourceLimits = DEFAULT_LIMITS): ValidationResult {
+  const issues: ValidationIssue[] = []
+
+  // Check block count
+  if (doc.blocks.size > limits.maxBlockCount) {
+    issues.push({
+      severity: 'error',
+      code: 'E400',
+      message: `Document has ${doc.blocks.size} blocks, max is ${limits.maxBlockCount}`,
+    })
+  }
+
+  // Check for cycles
+  if (hasCycles(doc)) {
+    issues.push({
+      severity: 'error',
+      code: 'E201',
+      message: 'Document structure contains a cycle',
+    })
+  }
+
+  // Check nesting depth
+  const maxDepth = computeMaxDepth(doc)
+  if (maxDepth > limits.maxNestingDepth) {
+    issues.push({
+      severity: 'error',
+      code: 'E403',
+      message: `Max nesting depth is ${limits.maxNestingDepth}, document has ${maxDepth}`,
+    })
+  }
+
+  // Validate each block
+  for (const [id, block] of doc.blocks.entries()) {
+    const blockIssues = validateBlock(doc, block, limits)
+    issues.push(...blockIssues)
+  }
+
+  // Check for orphans (warning)
+  const orphans = findOrphans(doc)
+  for (const orphan of orphans) {
+    issues.push({
+      severity: 'warning',
+      code: 'E203',
+      message: `Block ${orphan} is unreachable from root`,
+      blockId: orphan,
+    })
+  }
+
+  const hasErrors = issues.some(i => i.severity === 'error')
+  return { valid: !hasErrors, issues }
+}
+
+function validateBlock(doc: Document, block: Block, limits: ResourceLimits): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+
+  // Check block size
+  const size = new TextEncoder().encode(block.content).length
+  if (size > limits.maxBlockSize) {
+    issues.push({
+      severity: 'error',
+      code: 'E402',
+      message: `Block ${block.id} has size ${size}, max is ${limits.maxBlockSize}`,
+      blockId: block.id,
+    })
+  }
+
+  // Check edge count
+  if (block.edges.length > limits.maxEdgesPerBlock) {
+    issues.push({
+      severity: 'error',
+      code: 'E404',
+      message: `Block ${block.id} has ${block.edges.length} edges, max is ${limits.maxEdgesPerBlock}`,
+      blockId: block.id,
+    })
+  }
+
+  // Check edge targets exist
+  for (const edge of block.edges) {
+    if (!doc.blocks.has(edge.target)) {
+      issues.push({
+        severity: 'error',
+        code: 'E001',
+        message: `Block ${block.id} has edge to non-existent block ${edge.target}`,
+        blockId: block.id,
+      })
+    }
+  }
+
+  return issues
+}
+
+function hasCycles(doc: Document): boolean {
+  const visited = new Set<BlockId>()
+  const recStack = new Set<BlockId>()
+
+  function dfs(nodeId: BlockId): boolean {
+    visited.add(nodeId)
+    recStack.add(nodeId)
+
+    const node = doc.blocks.get(nodeId)
+    if (node) {
+      for (const child of node.children) {
+        if (!visited.has(child)) {
+          if (dfs(child)) return true
+        } else if (recStack.has(child)) {
+          return true
+        }
+      }
+    }
+
+    recStack.delete(nodeId)
+    return false
+  }
+
+  return dfs(doc.root)
+}
+
+function computeMaxDepth(doc: Document): number {
+  function depthFrom(nodeId: BlockId, current: number): number {
+    const node = doc.blocks.get(nodeId)
+    if (!node || node.children.length === 0) return current
+    return Math.max(...node.children.map(c => depthFrom(c, current + 1)))
+  }
+  return depthFrom(doc.root, 1)
+}
+
+/** Find orphaned blocks (unreachable from root) */
+export function findOrphans(doc: Document): BlockId[] {
+  const reachable = new Set<BlockId>([doc.root])
+  const queue = [doc.root]
+
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    const block = doc.blocks.get(current)
+    if (block) {
+      for (const child of block.children) {
+        if (!reachable.has(child)) {
+          reachable.add(child)
+          queue.push(child)
+        }
+      }
+    }
+  }
+
+  return Array.from(doc.blocks.keys()).filter(id => !reachable.has(id))
+}
+
+/** Remove all orphaned blocks */
+export function pruneOrphans(doc: Document): BlockId[] {
+  const orphans = findOrphans(doc)
+  for (const id of orphans) {
+    doc.blocks.delete(id)
+  }
+  if (orphans.length > 0) touchDocument(doc)
+  return orphans
 }
 
 // =============================================================================
@@ -628,6 +1115,596 @@ export function ucl(): UclBuilder {
 }
 
 // =============================================================================
+// SNAPSHOT MANAGEMENT
+// =============================================================================
+
+/** Snapshot data */
+export interface Snapshot {
+  id: string
+  description?: string
+  createdAt: Date
+  documentVersion: number
+  data: string // JSON serialized document
+}
+
+/** Serialize a document to JSON string */
+export function serializeDocument(doc: Document): string {
+  const serializable = {
+    id: doc.id,
+    root: doc.root,
+    blocks: Array.from(doc.blocks.entries()).map(([id, block]) => [id, {
+      ...block,
+      edges: block.edges.map(e => ({ ...e, createdAt: e.createdAt.toISOString() })),
+    }]),
+    metadata: doc.metadata ? {
+      ...doc.metadata,
+      createdAt: doc.metadata.createdAt.toISOString(),
+      modifiedAt: doc.metadata.modifiedAt.toISOString(),
+    } : undefined,
+    version: doc.version,
+  }
+  return JSON.stringify(serializable)
+}
+
+/** Deserialize a document from JSON string */
+export function deserializeDocument(data: string): Document {
+  const parsed = JSON.parse(data)
+  const blocks = new Map<BlockId, Block>()
+  
+  for (const [id, blockData] of parsed.blocks) {
+    blocks.set(id, {
+      ...blockData,
+      edges: blockData.edges.map((e: { createdAt: string } & Edge) => ({
+        ...e,
+        createdAt: new Date(e.createdAt),
+      })),
+    })
+  }
+
+  return {
+    id: parsed.id,
+    root: parsed.root,
+    blocks,
+    metadata: parsed.metadata ? {
+      ...parsed.metadata,
+      createdAt: new Date(parsed.metadata.createdAt),
+      modifiedAt: new Date(parsed.metadata.modifiedAt),
+    } : undefined,
+    version: parsed.version,
+  }
+}
+
+/** Snapshot manager for document versioning */
+export class SnapshotManager {
+  private snapshots = new Map<string, Snapshot>()
+  private maxSnapshots: number
+
+  constructor(maxSnapshots = 100) {
+    this.maxSnapshots = maxSnapshots
+  }
+
+  /** Create a snapshot of the document */
+  create(name: string, doc: Document, description?: string): string {
+    if (this.snapshots.size >= this.maxSnapshots) {
+      this.evictOldest()
+    }
+
+    const snapshot: Snapshot = {
+      id: name,
+      description,
+      createdAt: new Date(),
+      documentVersion: doc.version,
+      data: serializeDocument(doc),
+    }
+
+    this.snapshots.set(name, snapshot)
+    return name
+  }
+
+  /** Restore a document from a snapshot */
+  restore(name: string): Document {
+    const snapshot = this.snapshots.get(name)
+    if (!snapshot) throw new Error(`Snapshot not found: ${name}`)
+    return deserializeDocument(snapshot.data)
+  }
+
+  /** Get a snapshot by name */
+  get(name: string): Snapshot | undefined {
+    return this.snapshots.get(name)
+  }
+
+  /** List all snapshots (newest first) */
+  list(): Snapshot[] {
+    return Array.from(this.snapshots.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  }
+
+  /** Delete a snapshot */
+  delete(name: string): boolean {
+    return this.snapshots.delete(name)
+  }
+
+  /** Check if a snapshot exists */
+  exists(name: string): boolean {
+    return this.snapshots.has(name)
+  }
+
+  /** Get snapshot count */
+  count(): number {
+    return this.snapshots.size
+  }
+
+  private evictOldest(): void {
+    let oldest: Snapshot | undefined
+    for (const snapshot of this.snapshots.values()) {
+      if (!oldest || snapshot.createdAt < oldest.createdAt) {
+        oldest = snapshot
+      }
+    }
+    if (oldest) this.snapshots.delete(oldest.id)
+  }
+}
+
+// =============================================================================
+// TRANSACTION MANAGEMENT
+// =============================================================================
+
+/** Transaction for atomic operations */
+export class Transaction {
+  readonly id: string
+  readonly name?: string
+  private _state: TransactionState = 'active'
+  private _startTime: number
+  private _timeout: number
+  private _initialState: string
+  private _doc: Document
+
+  constructor(doc: Document, timeoutMs = 30000, name?: string) {
+    this.id = name ?? `txn_${Date.now().toString(16)}`
+    this.name = name
+    this._doc = doc
+    this._startTime = Date.now()
+    this._timeout = timeoutMs
+    this._initialState = serializeDocument(doc)
+  }
+
+  get state(): TransactionState {
+    if (this._state === 'active' && this.isTimedOut()) {
+      this._state = 'timed_out'
+    }
+    return this._state
+  }
+
+  isActive(): boolean {
+    return this.state === 'active'
+  }
+
+  isTimedOut(): boolean {
+    return Date.now() - this._startTime > this._timeout
+  }
+
+  elapsedMs(): number {
+    return Date.now() - this._startTime
+  }
+
+  commit(): void {
+    if (!this.isActive()) {
+      throw new Error(`Cannot commit ${this._state} transaction`)
+    }
+    this._state = 'committed'
+  }
+
+  rollback(): void {
+    if (this._state === 'committed') {
+      throw new Error('Cannot rollback a committed transaction')
+    }
+    
+    // Restore initial state
+    const restored = deserializeDocument(this._initialState)
+    this._doc.blocks = restored.blocks
+    this._doc.metadata = restored.metadata
+    this._doc.version = restored.version
+    
+    this._state = 'rolled_back'
+  }
+}
+
+/** Transaction manager */
+export class TransactionManager {
+  private transactions = new Map<string, Transaction>()
+  private defaultTimeout: number
+
+  constructor(defaultTimeoutMs = 30000) {
+    this.defaultTimeout = defaultTimeoutMs
+  }
+
+  begin(doc: Document, name?: string, timeoutMs?: number): Transaction {
+    const txn = new Transaction(doc, timeoutMs ?? this.defaultTimeout, name)
+    this.transactions.set(txn.id, txn)
+    return txn
+  }
+
+  get(id: string): Transaction | undefined {
+    return this.transactions.get(id)
+  }
+
+  commit(id: string): void {
+    const txn = this.transactions.get(id)
+    if (!txn) throw new Error(`Transaction not found: ${id}`)
+    txn.commit()
+  }
+
+  rollback(id: string): void {
+    const txn = this.transactions.get(id)
+    if (!txn) throw new Error(`Transaction not found: ${id}`)
+    txn.rollback()
+  }
+
+  activeCount(): number {
+    return Array.from(this.transactions.values()).filter(t => t.isActive()).length
+  }
+
+  cleanup(): number {
+    const toRemove: string[] = []
+    for (const [id, txn] of this.transactions) {
+      if (!txn.isActive()) toRemove.push(id)
+    }
+    toRemove.forEach(id => this.transactions.delete(id))
+    return toRemove.length
+  }
+}
+
+// =============================================================================
+// UCL EXECUTOR
+// =============================================================================
+
+/** UCL execution error */
+export class UclExecutionError extends Error {
+  constructor(message: string, public command?: string) {
+    super(command ? `[${command}] ${message}` : message)
+    this.name = 'UclExecutionError'
+  }
+}
+
+/** UCL parse error */
+export class UclParseError extends Error {
+  constructor(message: string, public line?: number) {
+    super(line !== undefined ? `Line ${line}: ${message}` : message)
+    this.name = 'UclParseError'
+  }
+}
+
+/** Execute UCL commands on a document */
+export function executeUcl(doc: Document, uclText: string): BlockId[] {
+  const affectedBlocks: BlockId[] = []
+  const lines = extractUclLines(uclText)
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    try {
+      const result = executeUclLine(doc, line)
+      affectedBlocks.push(...result)
+    } catch (e) {
+      if (e instanceof Error) {
+        throw new UclExecutionError(e.message, line)
+      }
+      throw e
+    }
+  }
+
+  return affectedBlocks
+}
+
+function extractUclLines(ucl: string): string[] {
+  const lines: string[] = []
+  let atomicDepth = 0
+
+  for (const raw of ucl.split('\n')) {
+    const stripped = raw.trim()
+    if (!stripped || stripped.startsWith('#')) continue
+    if (stripped.toUpperCase() === 'ATOMIC {') {
+      atomicDepth++
+      continue
+    }
+    if (stripped === '}' && atomicDepth > 0) {
+      atomicDepth--
+      continue
+    }
+    lines.push(stripped)
+  }
+
+  return lines
+}
+
+function executeUclLine(doc: Document, line: string): BlockId[] {
+  const upper = line.toUpperCase()
+
+  if (upper.startsWith('EDIT ')) {
+    return executeEdit(doc, line)
+  } else if (upper.startsWith('APPEND ')) {
+    return executeAppend(doc, line)
+  } else if (upper.startsWith('MOVE ')) {
+    return executeMove(doc, line)
+  } else if (upper.startsWith('DELETE ')) {
+    return executeDelete(doc, line)
+  } else if (upper.startsWith('LINK ')) {
+    return executeLink(doc, line)
+  } else if (upper.startsWith('UNLINK ')) {
+    return executeUnlink(doc, line)
+  } else if (upper.startsWith('PRUNE')) {
+    return executePrune(doc, line)
+  } else {
+    throw new UclParseError(`Unknown command: ${line}`)
+  }
+}
+
+function executeEdit(doc: Document, line: string): BlockId[] {
+  const match = line.match(/^EDIT\s+(\S+)\s+SET\s+(\S+)\s*=\s*"((?:\\.|[^"])*)"/i)
+  if (!match) throw new UclParseError(`Malformed EDIT command: ${line}`)
+  
+  const [, blockId, path, value] = match
+  const unescaped = value.replace(/\\(.)/g, '$1')
+
+  if (!doc.blocks.has(blockId)) {
+    throw new UclExecutionError(`Block not found: ${blockId}`)
+  }
+
+  if (path.toLowerCase() === 'text') {
+    editBlock(doc, blockId, unescaped)
+  } else {
+    throw new UclExecutionError(`Unsupported edit path: ${path}`)
+  }
+
+  return [blockId]
+}
+
+function executeAppend(doc: Document, line: string): BlockId[] {
+  const match = line.match(/^APPEND\s+(\S+)\s+(\w+)(?:\s+WITH\s+([^:]+))?\s*::\s*(.+)$/i)
+  if (!match) throw new UclParseError(`Malformed APPEND command: ${line}`)
+
+  const [, parentId, contentType, propsStr, content] = match
+  
+  if (!doc.blocks.has(parentId)) {
+    throw new UclExecutionError(`Parent block not found: ${parentId}`)
+  }
+
+  const props: Record<string, string> = {}
+  if (propsStr) {
+    const propMatches = propsStr.matchAll(/(\w+)\s*=\s*"([^"]*)"/g)
+    for (const m of propMatches) {
+      props[m[1].toLowerCase()] = m[2]
+    }
+  }
+
+  const newId = addBlock(doc, parentId, content, {
+    type: contentType.toLowerCase() as ContentType,
+    role: props.role as SemanticRole | undefined,
+    label: props.label,
+  })
+
+  return [newId]
+}
+
+function executeMove(doc: Document, line: string): BlockId[] {
+  const match = line.match(/^MOVE\s+(\S+)\s+(TO|BEFORE|AFTER)\s+(\S+)(?:\s+INDEX\s+(\d+))?$/i)
+  if (!match) throw new UclParseError(`Malformed MOVE command: ${line}`)
+
+  const [, blockId, mode, targetId, indexStr] = match
+  const index = indexStr ? parseInt(indexStr, 10) : undefined
+
+  if (!doc.blocks.has(blockId)) {
+    throw new UclExecutionError(`Block not found: ${blockId}`)
+  }
+  if (!doc.blocks.has(targetId)) {
+    throw new UclExecutionError(`Target block not found: ${targetId}`)
+  }
+
+  if (mode.toUpperCase() === 'TO') {
+    moveBlock(doc, blockId, targetId, index)
+  } else {
+    const parentId = findParent(doc, targetId)
+    if (!parentId) throw new UclExecutionError(`Target ${targetId} has no parent`)
+    
+    const parent = doc.blocks.get(parentId)!
+    const siblingIndex = parent.children.indexOf(targetId)
+    if (siblingIndex === -1) {
+      throw new UclExecutionError(`Target ${targetId} not found in parent's children`)
+    }
+    
+    const insertIndex = mode.toUpperCase() === 'AFTER' ? siblingIndex + 1 : siblingIndex
+    moveBlock(doc, blockId, parentId, insertIndex)
+  }
+
+  return [blockId]
+}
+
+function executeDelete(doc: Document, line: string): BlockId[] {
+  const match = line.match(/^DELETE\s+(\S+)(\s+CASCADE)?$/i)
+  if (!match) throw new UclParseError(`Malformed DELETE command: ${line}`)
+
+  const [, blockId, cascade] = match
+  
+  if (!doc.blocks.has(blockId)) {
+    throw new UclExecutionError(`Block not found: ${blockId}`)
+  }
+
+  deleteBlock(doc, blockId, { cascade: !!cascade })
+  return [blockId]
+}
+
+function executeLink(doc: Document, line: string): BlockId[] {
+  const match = line.match(/^LINK\s+(\S+)\s+(\w+)\s+(\S+)$/i)
+  if (!match) throw new UclParseError(`Malformed LINK command: ${line}`)
+
+  const [, sourceId, edgeTypeStr, targetId] = match
+  
+  if (!doc.blocks.has(sourceId)) {
+    throw new UclExecutionError(`Source block not found: ${sourceId}`)
+  }
+  if (!doc.blocks.has(targetId)) {
+    throw new UclExecutionError(`Target block not found: ${targetId}`)
+  }
+
+  addEdge(doc, sourceId, edgeTypeStr.toLowerCase() as EdgeType, targetId)
+  return [sourceId, targetId]
+}
+
+function executeUnlink(doc: Document, line: string): BlockId[] {
+  const match = line.match(/^UNLINK\s+(\S+)\s+(\w+)\s+(\S+)$/i)
+  if (!match) throw new UclParseError(`Malformed UNLINK command: ${line}`)
+
+  const [, sourceId, edgeTypeStr, targetId] = match
+  
+  if (!doc.blocks.has(sourceId)) {
+    throw new UclExecutionError(`Source block not found: ${sourceId}`)
+  }
+
+  removeEdge(doc, sourceId, edgeTypeStr.toLowerCase() as EdgeType, targetId)
+  return [sourceId, targetId]
+}
+
+function executePrune(doc: Document, _line: string): BlockId[] {
+  return pruneOrphans(doc)
+}
+
+// =============================================================================
+// OBSERVABILITY
+// =============================================================================
+
+/** Event types for observability */
+export type EventType =
+  | 'document.created' | 'document.modified'
+  | 'block.added' | 'block.edited' | 'block.moved' | 'block.deleted'
+  | 'edge.added' | 'edge.removed'
+  | 'tag.added' | 'tag.removed'
+  | 'ucl.parsed' | 'ucl.executed' | 'ucl.error'
+  | 'validation.started' | 'validation.completed'
+  | 'transaction.started' | 'transaction.committed' | 'transaction.rolled_back'
+  | 'snapshot.created' | 'snapshot.restored'
+
+/** UCP event */
+export interface UcpEvent {
+  type: EventType
+  timestamp: Date
+  data: Record<string, unknown>
+}
+
+/** Event handler type */
+export type EventHandler = (event: UcpEvent) => void
+
+/** Simple event bus for observability */
+export class EventBus {
+  private static instance: EventBus
+  private handlers = new Map<string, EventHandler[]>()
+  private globalHandlers: EventHandler[] = []
+
+  static getInstance(): EventBus {
+    if (!EventBus.instance) {
+      EventBus.instance = new EventBus()
+    }
+    return EventBus.instance
+  }
+
+  subscribe(eventType: EventType, handler: EventHandler): void {
+    const handlers = this.handlers.get(eventType) ?? []
+    handlers.push(handler)
+    this.handlers.set(eventType, handlers)
+  }
+
+  subscribeAll(handler: EventHandler): void {
+    this.globalHandlers.push(handler)
+  }
+
+  unsubscribe(eventType: EventType, handler: EventHandler): void {
+    const handlers = this.handlers.get(eventType) ?? []
+    this.handlers.set(eventType, handlers.filter(h => h !== handler))
+  }
+
+  unsubscribeAll(handler: EventHandler): void {
+    this.globalHandlers = this.globalHandlers.filter(h => h !== handler)
+  }
+
+  publish(event: UcpEvent): void {
+    const handlers = this.handlers.get(event.type) ?? []
+    handlers.forEach(h => {
+      try { h(event) } catch (e) { console.error('Event handler error:', e) }
+    })
+    this.globalHandlers.forEach(h => {
+      try { h(event) } catch (e) { console.error('Global handler error:', e) }
+    })
+  }
+
+  clear(): void {
+    this.handlers.clear()
+    this.globalHandlers = []
+  }
+}
+
+/** Emit an event to the global event bus */
+export function emitEvent(type: EventType, data: Record<string, unknown> = {}): void {
+  EventBus.getInstance().publish({
+    type,
+    timestamp: new Date(),
+    data,
+  })
+}
+
+/** Simple metrics collector */
+export class Metrics {
+  private static instance: Metrics
+  private counters = new Map<string, number>()
+  private gauges = new Map<string, number>()
+  private histograms = new Map<string, number[]>()
+
+  static getInstance(): Metrics {
+    if (!Metrics.instance) {
+      Metrics.instance = new Metrics()
+    }
+    return Metrics.instance
+  }
+
+  increment(name: string, value = 1): void {
+    this.counters.set(name, (this.counters.get(name) ?? 0) + value)
+  }
+
+  setGauge(name: string, value: number): void {
+    this.gauges.set(name, value)
+  }
+
+  recordHistogram(name: string, value: number): void {
+    const values = this.histograms.get(name) ?? []
+    values.push(value)
+    this.histograms.set(name, values)
+  }
+
+  getCounter(name: string): number {
+    return this.counters.get(name) ?? 0
+  }
+
+  getGauge(name: string): number | undefined {
+    return this.gauges.get(name)
+  }
+
+  getHistogram(name: string): number[] {
+    return [...(this.histograms.get(name) ?? [])]
+  }
+
+  getAll(): { counters: Record<string, number>; gauges: Record<string, number>; histograms: Record<string, number[]> } {
+    return {
+      counters: Object.fromEntries(this.counters),
+      gauges: Object.fromEntries(this.gauges),
+      histograms: Object.fromEntries(this.histograms),
+    }
+  }
+
+  reset(): void {
+    this.counters.clear()
+    this.gauges.clear()
+    this.histograms.clear()
+  }
+}
+
+// =============================================================================
 // MAIN API - Simple unified interface
 // =============================================================================
 
@@ -638,6 +1715,12 @@ export const ucp = {
 
   /** Render document to markdown */
   render: renderMarkdown,
+
+  /** Execute UCL commands */
+  execute: executeUcl,
+
+  /** Validate a document */
+  validate: validateDocument,
 
   /** Create an empty document */
   create: createDocument,
