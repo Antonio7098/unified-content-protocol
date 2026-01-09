@@ -15,9 +15,9 @@
 //! - `shorten_ucl()`: Convert UCL with long IDs to short IDs
 //! - `expand_ucl()`: Convert UCL with short IDs back to long IDs
 
+use regex::Regex;
 use std::collections::HashMap;
 use ucm_core::{BlockId, Content, Document};
-use regex::Regex;
 
 /// Get a preview of content (first N characters)
 fn content_preview(content: &Content, max_len: usize) -> String {
@@ -151,22 +151,22 @@ impl IdMapper {
     }
 
     /// Convert UCL commands from long BlockIds to short numeric IDs
-    /// 
+    ///
     /// This is the primary method for token-efficient UCL generation.
     /// The LLM receives prompts with short IDs and generates UCL with short IDs,
     /// which is then expanded back to full BlockIds before execution.
     pub fn shorten_ucl(&self, ucl: &str) -> String {
         let mut result = ucl.to_string();
-        
+
         // Replace all block IDs with their short versions
         // Process longer IDs first to avoid partial matches
         let mut entries: Vec<_> = self.to_short.iter().collect();
         entries.sort_by(|a, b| b.0.to_string().len().cmp(&a.0.to_string().len()));
-        
+
         for (block_id, short_id) in entries {
             result = result.replace(&block_id.to_string(), &short_id.to_string());
         }
-        
+
         result
     }
 
@@ -187,7 +187,7 @@ impl IdMapper {
         ).unwrap();
 
         let mut result = ucl.to_string();
-        
+
         // Find all matches and collect replacements
         let replacements: Vec<_> = ucl_id_pattern
             .captures_iter(&result.clone())
@@ -236,16 +236,16 @@ impl IdMapper {
     }
 
     /// Estimate token savings from using short IDs
-    /// 
+    ///
     /// Returns (original_tokens, shortened_tokens, savings)
     pub fn estimate_token_savings(&self, text: &str) -> (usize, usize, usize) {
         let shortened = self.shorten_text(text);
-        
+
         // Rough token estimation: ~4 chars per token for English
         let original_tokens = text.len() / 4;
         let shortened_tokens = shortened.len() / 4;
         let savings = original_tokens.saturating_sub(shortened_tokens);
-        
+
         (original_tokens, shortened_tokens, savings)
     }
 
@@ -417,7 +417,7 @@ mod tests {
         let original = format!("LINK {} references {}", block1, block2);
         let shortened = mapper.shorten_ucl(&original);
         let expanded = mapper.expand_ucl(&shortened);
-        
+
         assert_eq!(original, expanded);
     }
 
@@ -433,7 +433,7 @@ mod tests {
         }
 
         let mapper = IdMapper::from_document(&doc);
-        
+
         // Create a prompt with multiple block references
         let mut prompt = String::new();
         for (block_id, _) in &mapper.to_short {

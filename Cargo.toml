@@ -6,8 +6,9 @@ members = [
     "crates/ucl-parser",
     "crates/ucp-api",
     "crates/ucp-observe",
-    "crates/ucp-bench",
+    "crates/ucp-llm",
     "crates/translators/markdown",
+    "tools/ucp-bench",
 ]
 
 [workspace.package]
@@ -23,6 +24,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
 anyhow = "1.0"
+regex = "1.10"
 
 # Hashing & Crypto
 sha2 = "0.10"
@@ -60,6 +62,7 @@ ucm-core = { path = "crates/ucm-core" }
 ucm-engine = { path = "crates/ucm-engine" }
 ucl-parser = { path = "crates/ucl-parser" }
 ucp-observe = { path = "crates/ucp-observe" }
+ucp-llm = { path = "crates/ucp-llm" }
 ucp-translator-markdown = { path = "crates/translators/markdown" }
 
 [profile.release]

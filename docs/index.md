@@ -41,6 +41,10 @@ Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major a
 
 - [Markdown Translator](./translators/markdown/README.md)
 
+## LLM Utilities (ucp-llm)
+
+- [Overview](./ucp-llm/README.md)
+
 ## Observability (ucp-observe)
 
 - [Tracing, Audit, Metrics](./ucp-observe/README.md)

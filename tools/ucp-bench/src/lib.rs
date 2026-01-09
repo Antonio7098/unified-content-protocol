@@ -15,18 +15,13 @@ pub mod agent;
 pub mod api;
 pub mod core;
 pub mod dev_tools;
-pub mod documents;
-pub mod id_mapper;
 pub mod metrics;
-pub mod prompt_builder;
 pub mod provider;
-pub mod report;
 pub mod runner;
 pub mod storage;
 pub mod suite;
 pub mod test_cases;
 pub mod test_document;
-pub mod tokenizer;
 
 pub use agent::BenchmarkAgent;
 pub use documents::{DocumentDefinition, DocumentRegistry};
@@ -54,11 +49,8 @@ pub use core::{
     CORE_INPUTS,
 };
 
-// ID mapping for LLM prompts (token optimization)
-pub use id_mapper::IdMapper;
-
-// Prompt building for agents
-pub use prompt_builder::{PromptBuilder, UclCapability};
+// LLM utilities (prompt builder, ID mapper, etc.)
+pub use ucp_llm::{IdMapper, PromptBuilder, UclCapability};
 
 // Developer tools for JSON-UCL workflows
 pub use dev_tools::{diff_json, DocumentInspector, JsonChange, UclBuilder};

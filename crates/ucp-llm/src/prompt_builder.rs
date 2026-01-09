@@ -1,7 +1,6 @@
 //! Dynamic prompt builder for LLM agents.
 //!
-//! Builds prompts based on specified capabilities, following the Single Responsibility
-//! and Open/Closed principles. New capabilities can be added without modifying existing code.
+//! Builds prompts based on specified capabilities so LLMs generate valid UCL.
 
 use std::collections::HashSet;
 
@@ -217,7 +216,7 @@ impl PromptBuilder {
 
         // Rules section
         parts.push("## Rules".to_string());
-        
+
         // Default rules
         let default_rules = self.default_rules();
         for (i, rule) in default_rules.iter().enumerate() {
@@ -257,11 +256,12 @@ impl PromptBuilder {
     }
 
     fn default_system_context(&self) -> String {
-        let caps: Vec<_> = self.capabilities
+        let caps: Vec<_> = self
+            .capabilities
             .iter()
             .flat_map(|c| c.command_names())
             .collect();
-        
+
         format!(
             "You are a UCL (Unified Content Language) command generator. \
             Your task is to generate valid UCL commands to manipulate documents.\n\n\
@@ -412,12 +412,12 @@ mod tests {
     #[test]
     fn test_build_complete_prompt() {
         let builder = presets::basic_editing();
-        
+
         let doc_desc = "Document with blocks: [1] Title, [2] Paragraph";
         let task = "Edit block 2 to say 'Hello World'";
-        
+
         let prompt = builder.build_prompt(doc_desc, task);
-        
+
         assert!(prompt.contains("Document Structure"));
         assert!(prompt.contains(doc_desc));
         assert!(prompt.contains("Task"));

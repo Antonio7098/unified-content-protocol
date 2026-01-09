@@ -10,6 +10,7 @@ ucm-core = { workspace = true }
 ucm-engine = { workspace = true }
 ucl-parser = { workspace = true }
 ucp-observe = { workspace = true }
+ucp-llm = { workspace = true }
 ucp-translator-markdown = { workspace = true }
 
 serde = { workspace = true }
