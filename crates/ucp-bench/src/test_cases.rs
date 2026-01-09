@@ -213,7 +213,8 @@ fn move_test_cases() -> Vec<TestCase> {
             description: "Move block to new parent".into(),
             prompt: format!(
                 "Move block {} to be a child of {}",
-                ids::section3_list(), ids::section1()
+                ids::section3_list(),
+                ids::section1()
             ),
             expected_pattern: Some(r"MOVE\s+blk_000000000043\s+TO\s+blk_000000000021".into()),
             validation: ValidationCriteria {
@@ -231,7 +232,8 @@ fn move_test_cases() -> Vec<TestCase> {
             description: "Move block before sibling".into(),
             prompt: format!(
                 "Move block {} to be before block {}",
-                ids::section1_table(), ids::section1_code()
+                ids::section1_table(),
+                ids::section1_code()
             ),
             expected_pattern: Some(r"MOVE.*BEFORE".into()),
             validation: ValidationCriteria {
@@ -248,7 +250,8 @@ fn move_test_cases() -> Vec<TestCase> {
             description: "Move block after sibling".into(),
             prompt: format!(
                 "Move block {} to be after block {}",
-                ids::intro_hook(), ids::intro_thesis()
+                ids::intro_hook(),
+                ids::intro_thesis()
             ),
             expected_pattern: Some(r"MOVE.*AFTER".into()),
             validation: ValidationCriteria {
@@ -268,10 +271,7 @@ fn delete_test_cases() -> Vec<TestCase> {
             id: "delete_single_001".into(),
             command_type: "DELETE".into(),
             description: "Delete a single block".into(),
-            prompt: format!(
-                "Delete the block {}",
-                ids::section3_list()
-            ),
+            prompt: format!("Delete the block {}", ids::section3_list()),
             expected_pattern: Some(r"DELETE\s+blk_000000000043".into()),
             validation: ValidationCriteria {
                 must_parse: true,
@@ -327,9 +327,12 @@ fn link_test_cases() -> Vec<TestCase> {
             description: "Create a references link".into(),
             prompt: format!(
                 "Create a 'references' link from {} to {}",
-                ids::section2_math(), ids::references()
+                ids::section2_math(),
+                ids::references()
             ),
-            expected_pattern: Some(r"LINK\s+blk_000000000033\s+references\s+blk_000000000060".into()),
+            expected_pattern: Some(
+                r"LINK\s+blk_000000000033\s+references\s+blk_000000000060".into(),
+            ),
             validation: ValidationCriteria {
                 must_parse: true,
                 must_execute: true,
@@ -344,7 +347,8 @@ fn link_test_cases() -> Vec<TestCase> {
             description: "Create an elaborates link".into(),
             prompt: format!(
                 "Create an 'elaborates' link from {} to {}",
-                ids::section1_code(), ids::section1_para()
+                ids::section1_code(),
+                ids::section1_para()
             ),
             expected_pattern: Some(r"LINK.*elaborates".into()),
             validation: ValidationCriteria {
@@ -361,7 +365,8 @@ fn link_test_cases() -> Vec<TestCase> {
             description: "Remove an existing link".into(),
             prompt: format!(
                 "Remove the 'references' link from {} to {}",
-                ids::section2_math(), ids::references()
+                ids::section2_math(),
+                ids::references()
             ),
             expected_pattern: Some(r"UNLINK".into()),
             validation: ValidationCriteria {
@@ -381,7 +386,9 @@ fn snapshot_test_cases() -> Vec<TestCase> {
             id: "snapshot_create_001".into(),
             command_type: "SNAPSHOT".into(),
             description: "Create a named snapshot".into(),
-            prompt: "Create a snapshot named 'before-edit' with description 'State before major edits'".into(),
+            prompt:
+                "Create a snapshot named 'before-edit' with description 'State before major edits'"
+                    .into(),
             expected_pattern: Some(r#"SNAPSHOT\s+CREATE\s+"before-edit""#.into()),
             validation: ValidationCriteria {
                 must_parse: true,

@@ -36,9 +36,9 @@ pub mod version;
 
 pub use block::{Block, BlockState};
 pub use content::{
-    BinaryEncoding, Cell, Code, Column, CompositeLayout, Content, DataType, Dimensions,
-    JsonSchema, LineRange, Math, MathFormat, Media, MediaSource, MediaType, Row, Table,
-    TableSchema, Text, TextFormat,
+    BinaryEncoding, Cell, Code, Column, CompositeLayout, Content, DataType, Dimensions, JsonSchema,
+    LineRange, Math, MathFormat, Media, MediaSource, MediaType, Row, Table, TableSchema, Text,
+    TextFormat,
 };
 pub use document::{Document, DocumentId, DocumentMetadata};
 pub use edge::{Edge, EdgeIndex, EdgeMetadata, EdgeType};

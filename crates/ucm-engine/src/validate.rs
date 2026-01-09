@@ -273,8 +273,12 @@ impl ValidationPipeline {
 
     /// Validate a block ID format
     pub fn validate_block_id(&self, id: &str) -> Result<BlockId> {
-        id.parse::<BlockId>()
-            .map_err(|_| Error::new(ErrorCode::E002InvalidBlockId, format!("Invalid block ID: {}", id)))
+        id.parse::<BlockId>().map_err(|_| {
+            Error::new(
+                ErrorCode::E002InvalidBlockId,
+                format!("Invalid block ID: {}", id),
+            )
+        })
     }
 }
 

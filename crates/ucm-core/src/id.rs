@@ -58,10 +58,16 @@ impl BlockId {
     /// Create a BlockId from hex string (12 hex chars = 6 bytes, padded to 12)
     pub fn from_hex(s: &str) -> Result<Self> {
         let bytes = hex::decode(s).map_err(|_| {
-            Error::new(ErrorCode::E002InvalidBlockId, format!("Invalid hex string: {}", s))
+            Error::new(
+                ErrorCode::E002InvalidBlockId,
+                format!("Invalid hex string: {}", s),
+            )
         })?;
         if bytes.len() > 12 {
-            return Err(Error::new(ErrorCode::E002InvalidBlockId, "Hex string too long"));
+            return Err(Error::new(
+                ErrorCode::E002InvalidBlockId,
+                "Hex string too long",
+            ));
         }
         let mut arr = [0u8; 12];
         let start = 12 - bytes.len();
@@ -329,7 +335,9 @@ mod tests {
 
     #[test]
     fn test_block_id_display() {
-        let id = BlockId::from_bytes([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c]);
+        let id = BlockId::from_bytes([
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
+        ]);
         assert_eq!(id.to_string(), "blk_0102030405060708090a0b0c");
     }
 

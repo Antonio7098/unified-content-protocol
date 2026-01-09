@@ -223,14 +223,14 @@ impl Engine {
                 target,
             } => self.execute_unlink(doc, &source, edge_type, &target),
 
-            Operation::CreateSnapshot { name, description } => {
+            Operation::CreateSnapshot { .. } => {
                 // Snapshots are handled separately
                 Ok(OperationResult::failure(
                     "Use create_snapshot method for snapshots",
                 ))
             }
 
-            Operation::RestoreSnapshot { name } => {
+            Operation::RestoreSnapshot { .. } => {
                 // Snapshots are handled separately
                 Ok(OperationResult::failure(
                     "Use restore_snapshot method for snapshots",
@@ -422,7 +422,9 @@ impl Engine {
             }
             Some(PruneCondition::Custom(_)) => {
                 // Custom conditions require UCL expression evaluation
-                return Ok(OperationResult::failure("Custom prune conditions not yet supported"));
+                return Ok(OperationResult::failure(
+                    "Custom prune conditions not yet supported",
+                ));
             }
         };
 

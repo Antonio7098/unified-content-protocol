@@ -23,7 +23,7 @@ pub mod parser;
 
 pub use ast::*;
 pub use lexer::{Token, TokenKind};
-pub use parser::{Parser, ParseError, ParseResult};
+pub use parser::{ParseError, ParseResult, Parser};
 
 /// Parse a UCL document string
 pub fn parse(input: &str) -> ParseResult<UclDocument> {

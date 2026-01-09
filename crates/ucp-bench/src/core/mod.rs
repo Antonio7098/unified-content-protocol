@@ -10,9 +10,8 @@ pub mod tests;
 
 pub use inputs::{CoreTestInput, CoreTestInputRegistry, InputCategory, CORE_INPUTS};
 pub use metrics::{CoreBenchmarkMetrics, CoreTestResult, ValidationResult};
-pub use runner::{CoreBenchmarkRunner, CoreBenchmarkConfig};
+pub use runner::{CoreBenchmarkConfig, CoreBenchmarkRunner};
 pub use tests::{
-    CoreBenchmark, BenchmarkCategory,
-    MarkdownBenchmark, UclBenchmark, DocumentBenchmark, NormalizationBenchmark,
-    JsonBenchmark, TableBenchmark, CodeBlockBenchmark,
+    BenchmarkCategory, CodeBlockBenchmark, CoreBenchmark, DocumentBenchmark, JsonBenchmark,
+    MarkdownBenchmark, NormalizationBenchmark, TableBenchmark, UclBenchmark,
 };

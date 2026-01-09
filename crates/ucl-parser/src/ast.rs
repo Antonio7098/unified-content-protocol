@@ -109,9 +109,16 @@ pub struct MoveCommand {
 /// Move target
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MoveTarget {
-    ToParent { parent_id: String, index: Option<usize> },
-    Before { sibling_id: String },
-    After { sibling_id: String },
+    ToParent {
+        parent_id: String,
+        index: Option<usize>,
+    },
+    Before {
+        sibling_id: String,
+    },
+    After {
+        sibling_id: String,
+    },
 }
 
 /// APPEND command
@@ -176,11 +183,21 @@ pub struct UnlinkCommand {
 /// SNAPSHOT command
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SnapshotCommand {
-    Create { name: String, description: Option<String> },
-    Restore { name: String },
+    Create {
+        name: String,
+        description: Option<String>,
+    },
+    Restore {
+        name: String,
+    },
     List,
-    Delete { name: String },
-    Diff { name1: String, name2: String },
+    Delete {
+        name: String,
+    },
+    Diff {
+        name1: String,
+        name2: String,
+    },
 }
 
 /// Transaction command
@@ -214,14 +231,12 @@ impl Path {
             .map(|s| match s {
                 PathSegment::Property(p) => p.clone(),
                 PathSegment::Index(i) => format!("[{}]", i),
-                PathSegment::Slice { start, end } => {
-                    match (start, end) {
-                        (Some(s), Some(e)) => format!("[{}:{}]", s, e),
-                        (Some(s), None) => format!("[{}:]", s),
-                        (None, Some(e)) => format!("[:{}]", e),
-                        (None, None) => "[:]".to_string(),
-                    }
-                }
+                PathSegment::Slice { start, end } => match (start, end) {
+                    (Some(s), Some(e)) => format!("[{}:{}]", s, e),
+                    (Some(s), None) => format!("[{}:]", s),
+                    (None, Some(e)) => format!("[:{}]", e),
+                    (None, None) => "[:]".to_string(),
+                },
                 PathSegment::JsonPath(p) => format!("${}", p),
             })
             .collect::<Vec<_>>()
@@ -234,16 +249,19 @@ impl Path {
 pub enum PathSegment {
     Property(String),
     Index(i64),
-    Slice { start: Option<i64>, end: Option<i64> },
+    Slice {
+        start: Option<i64>,
+        end: Option<i64>,
+    },
     JsonPath(String),
 }
 
 /// Operator
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Operator {
-    Set,      // =
-    Append,   // +=
-    Remove,   // -=
+    Set,       // =
+    Append,    // +=
+    Remove,    // -=
     Increment, // ++
     Decrement, // --
 }
@@ -272,10 +290,8 @@ impl Value {
                 serde_json::Value::Array(arr.iter().map(|v| v.to_json()).collect())
             }
             Value::Object(obj) => {
-                let map: serde_json::Map<String, serde_json::Value> = obj
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.to_json()))
-                    .collect();
+                let map: serde_json::Map<String, serde_json::Value> =
+                    obj.iter().map(|(k, v)| (k.clone(), v.to_json())).collect();
                 serde_json::Value::Object(map)
             }
             Value::BlockRef(id) => serde_json::json!({"$ref": id}),
@@ -321,12 +337,12 @@ pub enum Condition {
 /// Comparison operator
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ComparisonOp {
-    Eq,  // =
-    Ne,  // !=
-    Gt,  // >
-    Ge,  // >=
-    Lt,  // <
-    Le,  // <=
+    Eq, // =
+    Ne, // !=
+    Gt, // >
+    Ge, // >=
+    Lt, // <
+    Le, // <=
 }
 
 #[cfg(test)]

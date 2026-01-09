@@ -3,8 +3,8 @@
 //! Each block contains typed content that can be text, tables, code,
 //! math expressions, media, JSON, or binary data.
 
-use serde::{Deserialize, Serialize};
 use crate::id::BlockId;
+use serde::{Deserialize, Serialize};
 
 /// The content payload of a block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -101,17 +101,24 @@ impl Content {
         let columns = if rows.is_empty() {
             Vec::new()
         } else {
-            rows[0].iter().enumerate().map(|(i, _)| Column {
-                name: format!("col{}", i),
-                data_type: Some(DataType::Text),
-                nullable: true,
-            }).collect()
+            rows[0]
+                .iter()
+                .enumerate()
+                .map(|(i, _)| Column {
+                    name: format!("col{}", i),
+                    data_type: Some(DataType::Text),
+                    nullable: true,
+                })
+                .collect()
         };
-        
-        let table_rows = rows.into_iter().map(|r| Row {
-            cells: r.into_iter().map(|c| Cell::Text(c)).collect(),
-        }).collect();
-        
+
+        let table_rows = rows
+            .into_iter()
+            .map(|r| Row {
+                cells: r.into_iter().map(|c| Cell::Text(c)).collect(),
+            })
+            .collect();
+
         Content::Table(Table {
             columns,
             rows: table_rows,
@@ -139,7 +146,11 @@ impl Content {
             Content::Text(t) => t.text.len(),
             Content::Table(t) => {
                 t.columns.iter().map(|c| c.name.len()).sum::<usize>()
-                    + t.rows.iter().flat_map(|r| &r.cells).map(|c| c.size_bytes()).sum::<usize>()
+                    + t.rows
+                        .iter()
+                        .flat_map(|r| &r.cells)
+                        .map(|c| c.size_bytes())
+                        .sum::<usize>()
             }
             Content::Code(c) => c.source.len(),
             Content::Math(m) => m.expression.len(),
@@ -269,7 +280,10 @@ impl Row {
 
     pub fn from_strings(values: Vec<&str>) -> Self {
         Self {
-            cells: values.into_iter().map(|s| Cell::Text(s.to_string())).collect(),
+            cells: values
+                .into_iter()
+                .map(|s| Cell::Text(s.to_string()))
+                .collect(),
         }
     }
 }
@@ -282,7 +296,7 @@ pub enum Cell {
     Text(String),
     Number(f64),
     Boolean(bool),
-    Date(String), // ISO 8601 date
+    Date(String),     // ISO 8601 date
     DateTime(String), // ISO 8601 datetime
     Json(serde_json::Value),
 }
@@ -350,9 +364,16 @@ pub struct TableSchema {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Constraint {
-    Unique { columns: Vec<String> },
-    Check { expression: String },
-    ForeignKey { columns: Vec<String>, references: String },
+    Unique {
+        columns: Vec<String>,
+    },
+    Check {
+        expression: String,
+    },
+    ForeignKey {
+        columns: Vec<String>,
+        references: String,
+    },
 }
 
 /// Index definition
@@ -409,7 +430,10 @@ impl LineRange {
     }
 
     pub fn single(line: usize) -> Self {
-        Self { start: line, end: line }
+        Self {
+            start: line,
+            end: line,
+        }
     }
 }
 
@@ -555,8 +579,8 @@ pub enum CompositeLayout {
 
 // Base64 serde helper
 mod base64_serde {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
     use serde::{self, Deserialize, Deserializer, Serializer};
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
 
     pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
     where

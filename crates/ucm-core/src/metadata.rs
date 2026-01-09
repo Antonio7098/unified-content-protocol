@@ -187,7 +187,7 @@ pub enum RoleCategory {
     Subtitle,
     Abstract,
     TableOfContents,
-    
+
     // Headings (H1-H6)
     Heading1,
     Heading2,
@@ -195,7 +195,7 @@ pub enum RoleCategory {
     Heading4,
     Heading5,
     Heading6,
-    
+
     // Paragraphs and lists
     Paragraph,
     List,

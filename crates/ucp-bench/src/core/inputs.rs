@@ -141,7 +141,7 @@ impl CoreTestInputRegistry {
 
         inputs
     }
-    
+
     fn markdown_render_inputs() -> Vec<CoreTestInput> {
         // These use the same markdown content but test rendering UCM back to markdown
         vec![
@@ -173,7 +173,8 @@ More detailed content.
 ## Section 2
 
 Another section.
-"#.into(),
+"#
+                .into(),
                 expected_structure: None,
             },
             CoreTestInput {
@@ -190,7 +191,8 @@ def hello():
 ```
 
 Some text after code.
-"#.into(),
+"#
+                .into(),
                 expected_structure: None,
             },
         ]
@@ -233,7 +235,8 @@ More detailed content.
 ## Section 2
 
 Another section.
-"#.into(),
+"#
+                .into(),
                 expected_structure: Some(ExpectedStructure {
                     block_count: Some(6),
                     content_types: vec!["text".into()],
@@ -268,7 +271,8 @@ fn main() {
     println!("Hello from Rust!");
 }
 ```
-"#.into(),
+"#
+                .into(),
                 expected_structure: Some(ExpectedStructure {
                     block_count: Some(5),
                     content_types: vec!["text".into(), "code".into()],
@@ -332,7 +336,8 @@ print(f"Prediction: {model.predict([[5]])}")
 ## Conclusion
 
 Machine learning is powerful!
-"#.into(),
+"#
+                .into(),
                 expected_structure: Some(ExpectedStructure {
                     block_count: Some(15),
                     content_types: vec!["text".into(), "code".into(), "table".into()],
@@ -384,7 +389,8 @@ Machine learning is powerful!
     EDIT blk_000000000001 SET text = "updated title"
     APPEND blk_000000000002 text :: "new content"
     MOVE blk_000000000003 TO blk_000000000004
-}"#.into(),
+}"#
+                .into(),
                 expected_structure: None,
             },
             CoreTestInput {
@@ -402,7 +408,8 @@ Machine learning is powerful!
     MOVE blk_000000000006 TO blk_000000000007 AT 0
 }
 
-EDIT blk_000000000008 SET text = "Final notes""#.into(),
+EDIT blk_000000000008 SET text = "Final notes""#
+                    .into(),
                 expected_structure: None,
             },
             CoreTestInput {
@@ -544,7 +551,8 @@ EDIT blk_000000000008 SET text = "Final notes""#.into(),
         }
     },
     "active": true
-}"#.into(),
+}"#
+                .into(),
                 expected_structure: None,
             },
             CoreTestInput {
@@ -560,7 +568,8 @@ EDIT blk_000000000008 SET text = "Final notes""#.into(),
         {"id": 3, "name": "Item 3"}
     ],
     "total": 3
-}"#.into(),
+}"#
+                .into(),
                 expected_structure: None,
             },
             CoreTestInput {
@@ -625,7 +634,8 @@ EDIT blk_000000000008 SET text = "Final notes""#.into(),
                 category: InputCategory::CodeBlock,
                 complexity: ComplexityLevel::Simple,
                 input: r#"python:def hello():
-    print("Hello, world!")"#.into(),
+    print("Hello, world!")"#
+                    .into(),
                 expected_structure: None,
             },
             CoreTestInput {
@@ -643,7 +653,8 @@ fn main() {
     for (k, v) in &map {
         println!("{}: {}", k, v);
     }
-}"#.into(),
+}"#
+                .into(),
                 expected_structure: None,
             },
             CoreTestInput {
@@ -664,7 +675,8 @@ async function fetchUser(id: number): Promise<User> {
 }
 
 const users: User[] = [];
-users.push({ id: 1, name: "Alice", email: "alice@example.com" });"#.into(),
+users.push({ id: 1, name: "Alice", email: "alice@example.com" });"#
+                    .into(),
                 expected_structure: None,
             },
         ]
@@ -722,7 +734,7 @@ users.push({ id: 1, name: "Alice", email: "alice@example.com" });"#.into(),
         let mut json = String::from("{\n");
         json.push_str(r#"    "metadata": {"version": "1.0", "generated": "2025-01-07"},"#);
         json.push_str("\n    \"data\": [\n");
-        
+
         for i in 0..20 {
             json.push_str(&format!(
                 r#"        {{"id": {}, "name": "Item {}", "properties": {{"a": {}, "b": "val{}"}}}}"#,
@@ -733,7 +745,7 @@ users.push({ id: 1, name: "Alice", email: "alice@example.com" });"#.into(),
             }
             json.push('\n');
         }
-        
+
         json.push_str("    ],\n");
         json.push_str(r#"    "summary": {"total": 20, "status": "complete"}"#);
         json.push_str("\n}");

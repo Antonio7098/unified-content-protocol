@@ -2,7 +2,7 @@
 
 use crate::content::Content;
 use crate::edge::Edge;
-use crate::id::{generate_block_id, compute_content_hash, BlockId};
+use crate::id::{compute_content_hash, generate_block_id, BlockId};
 use crate::metadata::BlockMetadata;
 use crate::version::Version;
 use serde::{Deserialize, Serialize};

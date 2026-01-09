@@ -19,8 +19,7 @@ import {
   fetchProviders,
   PlaygroundChatResponse
 } from '../api/client'
-
-type DocumentView = 'markdown' | 'udm'
+import { ContentFormat, ContentFormatToggle, ContentViewer } from '../components/ContentFormatToggle'
 
 interface ChatMessage {
   id: string
@@ -36,10 +35,11 @@ export default function Playground() {
   const [message, setMessage] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [documentView, setDocumentView] = useState<DocumentView>('markdown')
+  const [documentView, setDocumentView] = useState<ContentFormat>('md-formatted')
   const [executeCommands, setExecuteCommands] = useState(false)
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null)
   const [showMessageDetail, setShowMessageDetail] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const { data: documents } = useQuery({
     queryKey: ['playground-documents'],
@@ -88,6 +88,7 @@ export default function Playground() {
     if (!message.trim() || !selectedDocumentId || !selectedProviderId || !selectedModelId) return
 
     setIsLoading(true)
+    setErrorMessage(null)
     try {
       const response = await sendPlaygroundChat({
         document_id: selectedDocumentId,
@@ -108,6 +109,11 @@ export default function Playground() {
       setMessage('')
     } catch (error) {
       console.error('Failed to send message:', error)
+      if (error instanceof Error) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage('Failed to send message. Please try again.')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -123,22 +129,14 @@ export default function Playground() {
   const renderDocument = () => {
     if (!currentDocument) return null
 
-    if (documentView === 'udm') {
-      return (
-        <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-auto max-h-full">
-          <pre className="text-sm font-mono whitespace-pre-wrap">
-            {JSON.stringify(currentDocument.ucm, null, 2)}
-          </pre>
-        </div>
-      )
-    }
-
     return (
-      <div className="prose prose-sm max-w-none overflow-auto max-h-full">
-        <div className="bg-white p-6 rounded-lg">
-          <div className="whitespace-pre-wrap">{currentDocument.markdown}</div>
-        </div>
-      </div>
+      <ContentViewer
+        format={documentView}
+        mdRaw={currentDocument.markdown}
+        ucm={currentDocument.ucm}
+        ucl={currentDocument.llm_description}
+        className="max-h-full"
+      />
     )
   }
 
@@ -209,28 +207,14 @@ export default function Playground() {
               <FileText size={18} className="text-gray-600" />
               <span className="font-medium text-gray-900">Document</span>
             </div>
-            <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
-              <button
-                onClick={() => setDocumentView('markdown')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  documentView === 'markdown'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Markdown
-              </button>
-              <button
-                onClick={() => setDocumentView('udm')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  documentView === 'udm'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                UDM
-              </button>
-            </div>
+            <ContentFormatToggle
+              value={documentView}
+              onChange={setDocumentView}
+              showMdRaw={true}
+              showMdFormatted={true}
+              showUcm={true}
+              showUcl={true}
+            />
           </div>
           <div className="flex-1 overflow-auto p-4 bg-gray-50">
             {currentDocument ? renderDocument() : (
@@ -249,6 +233,11 @@ export default function Playground() {
           </div>
 
           <div className="flex-1 overflow-auto p-4 space-y-4">
+            {errorMessage && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                {errorMessage}
+              </div>
+            )}
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 mt-20">
                 <MessageSquare size={48} className="mx-auto mb-4 opacity-50" />

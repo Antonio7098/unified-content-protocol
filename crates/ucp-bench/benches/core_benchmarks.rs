@@ -10,9 +10,7 @@ fn bench_id_generation(c: &mut Criterion) {
 
     group.bench_function("generate_block_id", |b| {
         let content = Content::text("Hello, world!");
-        b.iter(|| {
-            ucm_core::id::generate_block_id(black_box(&content), Some("intro"), None)
-        });
+        b.iter(|| ucm_core::id::generate_block_id(black_box(&content), Some("intro"), None));
     });
 
     group.bench_function("generate_1000_ids", |b| {
@@ -130,9 +128,7 @@ fn bench_ucl_parsing(c: &mut Criterion) {
 
     let simple_cmd = r#"EDIT blk_000000000001 SET text = "hello""#;
     group.bench_function("parse_simple_command", |b| {
-        b.iter(|| {
-            ucl_parser::Parser::new(black_box(simple_cmd)).parse_commands_only()
-        });
+        b.iter(|| ucl_parser::Parser::new(black_box(simple_cmd)).parse_commands_only());
     });
 
     let complex_cmd = r#"
@@ -144,9 +140,7 @@ ATOMIC {
 }
 "#;
     group.bench_function("parse_atomic_block", |b| {
-        b.iter(|| {
-            ucl_parser::Parser::new(black_box(complex_cmd)).parse_commands_only()
-        });
+        b.iter(|| ucl_parser::Parser::new(black_box(complex_cmd)).parse_commands_only());
     });
 
     // Generate 100 commands
@@ -156,9 +150,7 @@ ATOMIC {
         .join("\n");
 
     group.bench_function("parse_100_commands", |b| {
-        b.iter(|| {
-            ucl_parser::Parser::new(black_box(&many_commands)).parse_commands_only()
-        });
+        b.iter(|| ucl_parser::Parser::new(black_box(&many_commands)).parse_commands_only());
     });
 
     group.finish();

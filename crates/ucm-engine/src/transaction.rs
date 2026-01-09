@@ -196,19 +196,17 @@ impl TransactionManager {
 
     /// Add operation to a transaction
     pub fn add_operation(&mut self, id: &TransactionId, op: Operation) -> Result<()> {
-        let txn = self
-            .transactions
-            .get_mut(id)
-            .ok_or_else(|| Error::new(ucm_core::ErrorCode::E303TransactionNotFound, id.to_string()))?;
+        let txn = self.transactions.get_mut(id).ok_or_else(|| {
+            Error::new(ucm_core::ErrorCode::E303TransactionNotFound, id.to_string())
+        })?;
         txn.add_operation(op)
     }
 
     /// Commit a transaction (returns operations to execute)
     pub fn commit(&mut self, id: &TransactionId) -> Result<Vec<Operation>> {
-        let txn = self
-            .transactions
-            .get_mut(id)
-            .ok_or_else(|| Error::new(ucm_core::ErrorCode::E303TransactionNotFound, id.to_string()))?;
+        let txn = self.transactions.get_mut(id).ok_or_else(|| {
+            Error::new(ucm_core::ErrorCode::E303TransactionNotFound, id.to_string())
+        })?;
 
         if txn.state != TransactionState::Active {
             return Err(Error::Internal(format!(
@@ -231,10 +229,9 @@ impl TransactionManager {
 
     /// Rollback a transaction
     pub fn rollback(&mut self, id: &TransactionId) -> Result<()> {
-        let txn = self
-            .transactions
-            .get_mut(id)
-            .ok_or_else(|| Error::new(ucm_core::ErrorCode::E303TransactionNotFound, id.to_string()))?;
+        let txn = self.transactions.get_mut(id).ok_or_else(|| {
+            Error::new(ucm_core::ErrorCode::E303TransactionNotFound, id.to_string())
+        })?;
 
         if txn.state != TransactionState::Active {
             return Err(Error::Internal(format!(
@@ -249,9 +246,8 @@ impl TransactionManager {
 
     /// Remove completed transactions
     pub fn cleanup(&mut self) {
-        self.transactions.retain(|_, txn| {
-            txn.state == TransactionState::Active && !txn.is_timed_out()
-        });
+        self.transactions
+            .retain(|_, txn| txn.state == TransactionState::Active && !txn.is_timed_out());
     }
 
     /// Get active transaction count

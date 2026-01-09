@@ -110,7 +110,7 @@ mod tests {
         let entry = AuditEntry::new("EDIT", "doc_123")
             .with_user("user_456")
             .with_duration(42);
-        
+
         assert_eq!(entry.operation, "EDIT");
         assert!(entry.success);
     }
@@ -121,7 +121,7 @@ mod tests {
         m.record_operation(true);
         m.record_operation(false);
         m.record_block_created();
-        
+
         assert_eq!(m.operations_total, 2);
         assert_eq!(m.operations_failed, 1);
         assert_eq!(m.blocks_created, 1);

@@ -6,7 +6,9 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use super::inputs::{CoreTestInput, CoreTestInputRegistry, InputCategory, CORE_INPUTS};
-use super::metrics::{CoreBenchmarkReport, CoreBenchmarkReportConfig, CoreBenchmarkStatus, CoreTestResult};
+use super::metrics::{
+    CoreBenchmarkReport, CoreBenchmarkReportConfig, CoreBenchmarkStatus, CoreTestResult,
+};
 use super::tests::{all_benchmarks, benchmark_for_category, CoreBenchmark};
 
 /// Configuration for core benchmark runs.
@@ -53,11 +55,26 @@ impl CoreBenchmarkConfig {
 /// Update message for real-time progress tracking.
 #[derive(Debug, Clone)]
 pub enum CoreBenchmarkUpdate {
-    Started { report_id: String },
-    Progress { report_id: String, progress: f32, current_test: String },
-    TestCompleted { report_id: String, test_id: String, success: bool },
-    Completed { report_id: String },
-    Failed { report_id: String, error: String },
+    Started {
+        report_id: String,
+    },
+    Progress {
+        report_id: String,
+        progress: f32,
+        current_test: String,
+    },
+    TestCompleted {
+        report_id: String,
+        test_id: String,
+        success: bool,
+    },
+    Completed {
+        report_id: String,
+    },
+    Failed {
+        report_id: String,
+        error: String,
+    },
 }
 
 /// Core benchmark runner.
@@ -90,7 +107,12 @@ impl CoreBenchmarkRunner {
     pub async fn run(&self, name: impl Into<String>) -> CoreBenchmarkReport {
         let name = name.into();
         let report_config = CoreBenchmarkReportConfig {
-            categories: self.config.categories.iter().map(|c| format!("{:?}", c)).collect(),
+            categories: self
+                .config
+                .categories
+                .iter()
+                .map(|c| format!("{:?}", c))
+                .collect(),
             iterations: self.config.iterations,
             warmup_iterations: self.config.warmup_iterations,
         };
@@ -157,7 +179,12 @@ impl CoreBenchmarkRunner {
     pub fn run_sync(&self, name: impl Into<String>) -> CoreBenchmarkReport {
         let name = name.into();
         let report_config = CoreBenchmarkReportConfig {
-            categories: self.config.categories.iter().map(|c| format!("{:?}", c)).collect(),
+            categories: self
+                .config
+                .categories
+                .iter()
+                .map(|c| format!("{:?}", c))
+                .collect(),
             iterations: self.config.iterations,
             warmup_iterations: self.config.warmup_iterations,
         };

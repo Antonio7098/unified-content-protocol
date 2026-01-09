@@ -70,13 +70,22 @@ pub struct Message {
 
 impl Message {
     pub fn system(content: impl Into<String>) -> Self {
-        Self { role: Role::System, content: content.into() }
+        Self {
+            role: Role::System,
+            content: content.into(),
+        }
     }
     pub fn user(content: impl Into<String>) -> Self {
-        Self { role: Role::User, content: content.into() }
+        Self {
+            role: Role::User,
+            content: content.into(),
+        }
     }
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self { role: Role::Assistant, content: content.into() }
+        Self {
+            role: Role::Assistant,
+            content: content.into(),
+        }
     }
 }
 
@@ -214,7 +223,9 @@ fn gmi_pricing_for(model: &str) -> TokenPricing {
         "deepseek-ai/DeepSeek-R1" => (0.55 / 1_000_000.0, 2.19 / 1_000_000.0),
         "deepseek-ai/DeepSeek-V3" => (0.27 / 1_000_000.0, 1.10 / 1_000_000.0),
         // Llama models
-        "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8" => (0.18 / 1_000_000.0, 0.59 / 1_000_000.0),
+        "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8" => {
+            (0.18 / 1_000_000.0, 0.59 / 1_000_000.0)
+        }
         "meta-llama/Llama-3.3-70B-Instruct" => (0.59 / 1_000_000.0, 0.79 / 1_000_000.0),
         // Qwen models
         "Qwen/Qwen3-235B-A22B-FP8" => (0.30 / 1_000_000.0, 0.60 / 1_000_000.0),
@@ -336,8 +347,12 @@ impl GroqProvider {
 
 #[async_trait]
 impl LlmProvider for GroqProvider {
-    fn provider_id(&self) -> &str { "groq" }
-    fn model_id(&self) -> &str { &self.model }
+    fn provider_id(&self) -> &str {
+        "groq"
+    }
+    fn model_id(&self) -> &str {
+        &self.model
+    }
 
     fn pricing(&self) -> TokenPricing {
         groq_pricing_for(&self.model)
@@ -347,16 +362,20 @@ impl LlmProvider for GroqProvider {
         let start = Instant::now();
         let prompt_snapshot = snapshot_messages(&request.messages);
 
-        let messages: Vec<serde_json::Value> = request.messages.iter().map(|m| {
-            serde_json::json!({
-                "role": match m.role {
-                    Role::System => "system",
-                    Role::User => "user",
-                    Role::Assistant => "assistant",
-                },
-                "content": m.content,
+        let messages: Vec<serde_json::Value> = request
+            .messages
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "role": match m.role {
+                        Role::System => "system",
+                        Role::User => "user",
+                        Role::Assistant => "assistant",
+                    },
+                    "content": m.content,
+                })
             })
-        }).collect();
+            .collect();
 
         let mut body = serde_json::json!({
             "model": self.model,
@@ -373,7 +392,8 @@ impl LlmProvider for GroqProvider {
             body["stop"] = serde_json::json!(request.stop_sequences);
         }
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -385,12 +405,17 @@ impl LlmProvider for GroqProvider {
         let status = response.status();
 
         if status == 429 {
-            return Err(ProviderError::RateLimited { retry_after_ms: 1000 });
+            return Err(ProviderError::RateLimited {
+                retry_after_ms: 1000,
+            });
         }
 
         if !status.is_success() {
             let text = response.text().await.unwrap_or_default();
-            return Err(ProviderError::Api { status: status.as_u16(), message: text });
+            return Err(ProviderError::Api {
+                status: status.as_u16(),
+                message: text,
+            });
         }
 
         let json: Value = response.json().await?;
@@ -450,8 +475,12 @@ impl CerebrasProvider {
 
 #[async_trait]
 impl LlmProvider for CerebrasProvider {
-    fn provider_id(&self) -> &str { "cerebras" }
-    fn model_id(&self) -> &str { &self.model }
+    fn provider_id(&self) -> &str {
+        "cerebras"
+    }
+    fn model_id(&self) -> &str {
+        &self.model
+    }
 
     fn pricing(&self) -> TokenPricing {
         cerebras_pricing_for(&self.model)
@@ -478,7 +507,9 @@ impl LlmProvider for CerebrasProvider {
                     messages.push(serde_json::json!({ "role": "user", "content": content }));
                     system_content.clear(); // Only apply to first user message
                 }
-                Role::Assistant => messages.push(serde_json::json!({ "role": "assistant", "content": m.content })),
+                Role::Assistant => {
+                    messages.push(serde_json::json!({ "role": "assistant", "content": m.content }))
+                }
             }
         }
 
@@ -494,7 +525,8 @@ impl LlmProvider for CerebrasProvider {
             body["stop_sequences"] = serde_json::json!(request.stop_sequences);
         }
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -506,12 +538,17 @@ impl LlmProvider for CerebrasProvider {
         let status = response.status();
 
         if status == 429 {
-            return Err(ProviderError::RateLimited { retry_after_ms: 1000 });
+            return Err(ProviderError::RateLimited {
+                retry_after_ms: 1000,
+            });
         }
 
         if !status.is_success() {
             let text = response.text().await.unwrap_or_default();
-            return Err(ProviderError::Api { status: status.as_u16(), message: text });
+            return Err(ProviderError::Api {
+                status: status.as_u16(),
+                message: text,
+            });
         }
 
         let json: Value = response.json().await?;
@@ -556,10 +593,7 @@ pub struct OpenRouterProvider {
 }
 
 impl OpenRouterProvider {
-    pub fn new(
-        api_key: impl Into<String>,
-        model: impl Into<String>,
-    ) -> Self {
+    pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
         Self {
             client: reqwest::Client::new(),
             api_key: api_key.into(),
@@ -570,7 +604,11 @@ impl OpenRouterProvider {
         }
     }
 
-    pub fn with_metadata(mut self, referer: impl Into<String>, site_name: impl Into<String>) -> Self {
+    pub fn with_metadata(
+        mut self,
+        referer: impl Into<String>,
+        site_name: impl Into<String>,
+    ) -> Self {
         self.referer = referer.into();
         self.site_name = site_name.into();
         self
@@ -584,8 +622,12 @@ impl OpenRouterProvider {
 
 #[async_trait]
 impl LlmProvider for OpenRouterProvider {
-    fn provider_id(&self) -> &str { "openrouter" }
-    fn model_id(&self) -> &str { &self.model }
+    fn provider_id(&self) -> &str {
+        "openrouter"
+    }
+    fn model_id(&self) -> &str {
+        &self.model
+    }
 
     fn pricing(&self) -> TokenPricing {
         openrouter_pricing_for(&self.model)
@@ -595,16 +637,20 @@ impl LlmProvider for OpenRouterProvider {
         let start = Instant::now();
         let prompt_snapshot = snapshot_messages(&request.messages);
 
-        let messages: Vec<serde_json::Value> = request.messages.iter().map(|m| {
-            serde_json::json!({
-                "role": match m.role {
-                    Role::System => "system",
-                    Role::User => "user",
-                    Role::Assistant => "assistant",
-                },
-                "content": m.content,
+        let messages: Vec<serde_json::Value> = request
+            .messages
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "role": match m.role {
+                        Role::System => "system",
+                        Role::User => "user",
+                        Role::Assistant => "assistant",
+                    },
+                    "content": m.content,
+                })
             })
-        }).collect();
+            .collect();
 
         let mut body = serde_json::json!({
             "model": self.model,
@@ -621,7 +667,8 @@ impl LlmProvider for OpenRouterProvider {
             body["stop"] = serde_json::json!(request.stop_sequences);
         }
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -635,12 +682,17 @@ impl LlmProvider for OpenRouterProvider {
         let status = response.status();
 
         if status == 429 {
-            return Err(ProviderError::RateLimited { retry_after_ms: 1000 });
+            return Err(ProviderError::RateLimited {
+                retry_after_ms: 1000,
+            });
         }
 
         if !status.is_success() {
             let text = response.text().await.unwrap_or_default();
-            return Err(ProviderError::Api { status: status.as_u16(), message: text });
+            return Err(ProviderError::Api {
+                status: status.as_u16(),
+                message: text,
+            });
         }
 
         let json: Value = response.json().await?;
@@ -700,8 +752,12 @@ impl GmiCloudProvider {
 
 #[async_trait]
 impl LlmProvider for GmiCloudProvider {
-    fn provider_id(&self) -> &str { "gmi" }
-    fn model_id(&self) -> &str { &self.model }
+    fn provider_id(&self) -> &str {
+        "gmi"
+    }
+    fn model_id(&self) -> &str {
+        &self.model
+    }
 
     fn pricing(&self) -> TokenPricing {
         gmi_pricing_for(&self.model)
@@ -711,16 +767,20 @@ impl LlmProvider for GmiCloudProvider {
         let start = Instant::now();
         let prompt_snapshot = snapshot_messages(&request.messages);
 
-        let messages: Vec<serde_json::Value> = request.messages.iter().map(|m| {
-            serde_json::json!({
-                "role": match m.role {
-                    Role::System => "system",
-                    Role::User => "user",
-                    Role::Assistant => "assistant",
-                },
-                "content": m.content,
+        let messages: Vec<serde_json::Value> = request
+            .messages
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "role": match m.role {
+                        Role::System => "system",
+                        Role::User => "user",
+                        Role::Assistant => "assistant",
+                    },
+                    "content": m.content,
+                })
             })
-        }).collect();
+            .collect();
 
         let mut body = serde_json::json!({
             "model": self.model,
@@ -737,7 +797,8 @@ impl LlmProvider for GmiCloudProvider {
             body["stop"] = serde_json::json!(request.stop_sequences);
         }
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -749,12 +810,17 @@ impl LlmProvider for GmiCloudProvider {
         let status = response.status();
 
         if status == 429 {
-            return Err(ProviderError::RateLimited { retry_after_ms: 1000 });
+            return Err(ProviderError::RateLimited {
+                retry_after_ms: 1000,
+            });
         }
 
         if !status.is_success() {
             let text = response.text().await.unwrap_or_default();
-            return Err(ProviderError::Api { status: status.as_u16(), message: text });
+            return Err(ProviderError::Api {
+                status: status.as_u16(),
+                message: text,
+            });
         }
 
         let json: Value = response.json().await?;
@@ -817,8 +883,12 @@ impl MockProvider {
 
 #[async_trait]
 impl LlmProvider for MockProvider {
-    fn provider_id(&self) -> &str { "mock" }
-    fn model_id(&self) -> &str { &self.model }
+    fn provider_id(&self) -> &str {
+        "mock"
+    }
+    fn model_id(&self) -> &str {
+        &self.model
+    }
 
     fn pricing(&self) -> TokenPricing {
         TokenPricing {
@@ -835,7 +905,9 @@ impl LlmProvider for MockProvider {
             let mut responses = self.responses.lock().unwrap();
             if responses.is_empty() {
                 // Generate a mock UCL response based on last user message
-                let last_msg = request.messages.last()
+                let last_msg = request
+                    .messages
+                    .last()
                     .map(|m| m.content.as_str())
                     .unwrap_or("");
                 if last_msg.contains("EDIT") {
@@ -850,7 +922,9 @@ impl LlmProvider for MockProvider {
             }
         };
 
-        let input_tokens = request.messages.iter()
+        let input_tokens = request
+            .messages
+            .iter()
             .map(|m| m.content.len() / 4)
             .sum::<usize>() as u32;
         let output_tokens = (content.len() / 4) as u32;
@@ -872,12 +946,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_provider() {
-        let provider = MockProvider::new("mock-model")
-            .with_responses(vec!["EDIT blk_abc SET x = 1".into()]);
+        let provider =
+            MockProvider::new("mock-model").with_responses(vec!["EDIT blk_abc SET x = 1".into()]);
 
-        let request = CompletionRequest::new(vec![
-            Message::user("Generate an EDIT command"),
-        ]);
+        let request = CompletionRequest::new(vec![Message::user("Generate an EDIT command")]);
 
         let response = provider.complete(request).await.unwrap();
         assert_eq!(response.content, "EDIT blk_abc SET x = 1");

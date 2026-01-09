@@ -17,30 +17,30 @@ pub struct DetailedTestResult {
     pub model_id: String,
     /// When the test was executed
     pub executed_at: chrono::DateTime<chrono::Utc>,
-    
+
     // Execution metrics
     pub latency_ms: u64,
     pub input_tokens: u32,
     pub output_tokens: u32,
     pub cost_usd: f64,
-    
+
     // Results
     pub success: bool,
     pub parse_success: bool,
     pub execute_success: bool,
     pub semantic_score: f32,
     pub efficiency_score: f32,
-    
+
     // Error information
     pub error: Option<TestError>,
-    
+
     // Full context for debugging
     pub context: ExecutionContext,
-    
+
     // Document snapshots (if captured)
     pub document_before: Option<DocumentSnapshot>,
     pub document_after: Option<DocumentSnapshot>,
-    
+
     // Diff information
     pub diff: Option<DocumentDiff>,
 }
@@ -58,7 +58,12 @@ fn role_category_to_heading_level(category: RoleCategory) -> Option<u8> {
 }
 
 impl DetailedTestResult {
-    pub fn new(test_id: String, category_id: String, provider_id: String, model_id: String) -> Self {
+    pub fn new(
+        test_id: String,
+        category_id: String,
+        provider_id: String,
+        model_id: String,
+    ) -> Self {
         Self {
             test_id,
             category_id,
@@ -274,7 +279,7 @@ impl DocumentDiff {
         for id in before_ids.intersection(&after_ids) {
             let before_block = &before.blocks[*id];
             let after_block = &after.blocks[*id];
-            
+
             if before_block.content_preview != after_block.content_preview {
                 modified_blocks.push(BlockModification {
                     block_id: (*id).clone(),
@@ -324,11 +329,25 @@ fn content_preview(content: &ucm_core::Content) -> String {
         ucm_core::Content::Code(c) => {
             let lang = &c.language;
             let source = &c.source;
-            format!("[code:{}] {}", lang, 
-                    if source.len() > 50 { &source[..50] } else { source })
+            format!(
+                "[code:{}] {}",
+                lang,
+                if source.len() > 50 {
+                    &source[..50]
+                } else {
+                    source
+                }
+            )
         }
         ucm_core::Content::Json { value, .. } => {
-            format!("[json] {}", serde_json::to_string(value).unwrap_or_default().chars().take(50).collect::<String>())
+            format!(
+                "[json] {}",
+                serde_json::to_string(value)
+                    .unwrap_or_default()
+                    .chars()
+                    .take(50)
+                    .collect::<String>()
+            )
         }
         _ => format!("[{:?}]", std::mem::discriminant(content)),
     }

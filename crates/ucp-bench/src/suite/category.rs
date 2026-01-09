@@ -39,15 +39,33 @@ impl From<String> for TestCategoryId {
 pub mod categories {
     use super::TestCategoryId;
 
-    pub fn edit() -> TestCategoryId { TestCategoryId::new("EDIT") }
-    pub fn append() -> TestCategoryId { TestCategoryId::new("APPEND") }
-    pub fn delete() -> TestCategoryId { TestCategoryId::new("DELETE") }
-    pub fn move_block() -> TestCategoryId { TestCategoryId::new("MOVE") }
-    pub fn link() -> TestCategoryId { TestCategoryId::new("LINK") }
-    pub fn unlink() -> TestCategoryId { TestCategoryId::new("UNLINK") }
-    pub fn snapshot() -> TestCategoryId { TestCategoryId::new("SNAPSHOT") }
-    pub fn transaction() -> TestCategoryId { TestCategoryId::new("TRANSACTION") }
-    pub fn atomic() -> TestCategoryId { TestCategoryId::new("ATOMIC") }
+    pub fn edit() -> TestCategoryId {
+        TestCategoryId::new("EDIT")
+    }
+    pub fn append() -> TestCategoryId {
+        TestCategoryId::new("APPEND")
+    }
+    pub fn delete() -> TestCategoryId {
+        TestCategoryId::new("DELETE")
+    }
+    pub fn move_block() -> TestCategoryId {
+        TestCategoryId::new("MOVE")
+    }
+    pub fn link() -> TestCategoryId {
+        TestCategoryId::new("LINK")
+    }
+    pub fn unlink() -> TestCategoryId {
+        TestCategoryId::new("UNLINK")
+    }
+    pub fn snapshot() -> TestCategoryId {
+        TestCategoryId::new("SNAPSHOT")
+    }
+    pub fn transaction() -> TestCategoryId {
+        TestCategoryId::new("TRANSACTION")
+    }
+    pub fn atomic() -> TestCategoryId {
+        TestCategoryId::new("ATOMIC")
+    }
 
     pub fn all() -> Vec<TestCategoryId> {
         vec![
@@ -134,49 +152,41 @@ pub fn build_standard_categories() -> Vec<TestCategory> {
             .with_tags(vec!["content".into(), "modification".into()])
             .with_complexity(2)
             .with_test_count(4),
-
         TestCategory::new(categories::append(), "Append Commands")
             .with_description("Test APPEND commands for adding new blocks")
             .with_tags(vec!["content".into(), "creation".into()])
             .with_complexity(2)
             .with_test_count(4),
-
         TestCategory::new(categories::delete(), "Delete Commands")
             .with_description("Test DELETE commands for removing blocks")
             .with_tags(vec!["content".into(), "deletion".into()])
             .with_complexity(2)
             .with_test_count(3),
-
         TestCategory::new(categories::move_block(), "Move Commands")
             .with_description("Test MOVE commands for relocating blocks")
             .with_tags(vec!["structure".into(), "reorganization".into()])
             .with_complexity(3)
             .with_test_count(3),
-
         TestCategory::new(categories::link(), "Link Commands")
             .with_description("Test LINK commands for creating relationships")
             .with_tags(vec!["relationships".into(), "edges".into()])
             .with_complexity(2)
             .with_test_count(2),
-
         TestCategory::new(categories::unlink(), "Unlink Commands")
             .with_description("Test UNLINK commands for removing relationships")
             .with_tags(vec!["relationships".into(), "edges".into()])
             .with_complexity(2)
             .with_test_count(2),
-
         TestCategory::new(categories::snapshot(), "Snapshot Commands")
             .with_description("Test SNAPSHOT commands for version control")
             .with_tags(vec!["versioning".into(), "state".into()])
             .with_complexity(3)
             .with_test_count(3),
-
         TestCategory::new(categories::transaction(), "Transaction Commands")
             .with_description("Test transaction control commands (BEGIN, COMMIT, ROLLBACK)")
             .with_tags(vec!["transactions".into(), "atomicity".into()])
             .with_complexity(4)
             .with_test_count(1),
-
         TestCategory::new(categories::atomic(), "Atomic Commands")
             .with_description("Test ATOMIC blocks for grouped operations")
             .with_tags(vec!["transactions".into(), "atomicity".into()])

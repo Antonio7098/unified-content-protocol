@@ -60,7 +60,11 @@ impl ValidationCheck {
         }
     }
 
-    pub fn fail(name: impl Into<String>, expected: impl Into<String>, actual: impl Into<String>) -> Self {
+    pub fn fail(
+        name: impl Into<String>,
+        expected: impl Into<String>,
+        actual: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             passed: false,
@@ -245,16 +249,26 @@ impl CoreBenchmarkMetrics {
             .map(|(cat, cat_results)| {
                 let cat_total = cat_results.len() as u32;
                 let cat_passed = cat_results.iter().filter(|r| r.success).count() as u32;
-                let cat_durations: Vec<f64> = cat_results.iter().map(|r| r.performance.duration_ms).collect();
+                let cat_durations: Vec<f64> = cat_results
+                    .iter()
+                    .map(|r| r.performance.duration_ms)
+                    .collect();
                 let cat_avg = cat_durations.iter().sum::<f64>() / cat_durations.len() as f64;
 
-                (cat, CategoryMetrics {
-                    total: cat_total,
-                    passed: cat_passed,
-                    failed: cat_total - cat_passed,
-                    success_rate: if cat_total > 0 { cat_passed as f32 / cat_total as f32 } else { 0.0 },
-                    avg_duration_ms: cat_avg,
-                })
+                (
+                    cat,
+                    CategoryMetrics {
+                        total: cat_total,
+                        passed: cat_passed,
+                        failed: cat_total - cat_passed,
+                        success_rate: if cat_total > 0 {
+                            cat_passed as f32 / cat_total as f32
+                        } else {
+                            0.0
+                        },
+                        avg_duration_ms: cat_avg,
+                    },
+                )
             })
             .collect();
 
@@ -262,7 +276,11 @@ impl CoreBenchmarkMetrics {
             total_tests: total,
             passed,
             failed,
-            success_rate: if total > 0 { passed as f32 / total as f32 } else { 0.0 },
+            success_rate: if total > 0 {
+                passed as f32 / total as f32
+            } else {
+                0.0
+            },
             total_duration_ms: total_duration,
             avg_duration_ms: avg,
             min_duration_ms: min,
@@ -338,7 +356,10 @@ impl CoreBenchmarkReport {
     }
 
     pub fn mark_running(&mut self, current_test: String, progress: f32) {
-        self.status = CoreBenchmarkStatus::Running { progress, current_test };
+        self.status = CoreBenchmarkStatus::Running {
+            progress,
+            current_test,
+        };
     }
 
     pub fn mark_completed(&mut self) {
@@ -365,11 +386,17 @@ impl CoreBenchmarkReport {
         let mut s = String::new();
         s.push_str(&format!("# Core Benchmark Report: {}\n\n", self.name));
         s.push_str(&format!("**ID:** {}\n", self.report_id));
-        s.push_str(&format!("**Date:** {}\n", self.started_at.format("%Y-%m-%d %H:%M:%S UTC")));
-        
+        s.push_str(&format!(
+            "**Date:** {}\n",
+            self.started_at.format("%Y-%m-%d %H:%M:%S UTC")
+        ));
+
         if let Some(completed) = self.completed_at {
             let duration = completed - self.started_at;
-            s.push_str(&format!("**Duration:** {}ms\n\n", duration.num_milliseconds()));
+            s.push_str(&format!(
+                "**Duration:** {}ms\n\n",
+                duration.num_milliseconds()
+            ));
         }
 
         s.push_str("## Summary\n\n");
@@ -378,18 +405,39 @@ impl CoreBenchmarkReport {
         s.push_str(&format!("| Total Tests | {} |\n", self.metrics.total_tests));
         s.push_str(&format!("| Passed | {} |\n", self.metrics.passed));
         s.push_str(&format!("| Failed | {} |\n", self.metrics.failed));
-        s.push_str(&format!("| Success Rate | {:.1}% |\n", self.metrics.success_rate * 100.0));
-        s.push_str(&format!("| Avg Duration | {:.3}ms |\n", self.metrics.avg_duration_ms));
-        s.push_str(&format!("| P50 Duration | {:.3}ms |\n", self.metrics.p50_duration_ms));
-        s.push_str(&format!("| P95 Duration | {:.3}ms |\n", self.metrics.p95_duration_ms));
-        s.push_str(&format!("| P99 Duration | {:.3}ms |\n\n", self.metrics.p99_duration_ms));
+        s.push_str(&format!(
+            "| Success Rate | {:.1}% |\n",
+            self.metrics.success_rate * 100.0
+        ));
+        s.push_str(&format!(
+            "| Avg Duration | {:.3}ms |\n",
+            self.metrics.avg_duration_ms
+        ));
+        s.push_str(&format!(
+            "| P50 Duration | {:.3}ms |\n",
+            self.metrics.p50_duration_ms
+        ));
+        s.push_str(&format!(
+            "| P95 Duration | {:.3}ms |\n",
+            self.metrics.p95_duration_ms
+        ));
+        s.push_str(&format!(
+            "| P99 Duration | {:.3}ms |\n\n",
+            self.metrics.p99_duration_ms
+        ));
 
         s.push_str("## By Category\n\n");
         for (cat, metrics) in &self.metrics.by_category {
             s.push_str(&format!("### {}\n\n", cat));
             s.push_str(&format!("- Tests: {}\n", metrics.total));
-            s.push_str(&format!("- Success Rate: {:.1}%\n", metrics.success_rate * 100.0));
-            s.push_str(&format!("- Avg Duration: {:.3}ms\n\n", metrics.avg_duration_ms));
+            s.push_str(&format!(
+                "- Success Rate: {:.1}%\n",
+                metrics.success_rate * 100.0
+            ));
+            s.push_str(&format!(
+                "- Avg Duration: {:.3}ms\n\n",
+                metrics.avg_duration_ms
+            ));
         }
 
         s

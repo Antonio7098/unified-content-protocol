@@ -26,9 +26,9 @@ impl BenchmarkReport {
 
     /// Export report to JSON file
     pub fn save_json(&self, path: &str) -> std::io::Result<()> {
-        let json = self.to_json().map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-        })?;
+        let json = self
+            .to_json()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
         std::fs::write(path, json)
     }
 
@@ -38,7 +38,10 @@ impl BenchmarkReport {
 
         s.push_str(&format!("# Benchmark Report: {}\n\n", self.name));
         s.push_str(&format!("**ID:** {}\n", self.benchmark_id));
-        s.push_str(&format!("**Date:** {}\n", self.start_time.format("%Y-%m-%d %H:%M:%S UTC")));
+        s.push_str(&format!(
+            "**Date:** {}\n",
+            self.start_time.format("%Y-%m-%d %H:%M:%S UTC")
+        ));
         s.push_str(&format!("**Duration:** {}s\n\n", self.duration_seconds));
 
         s.push_str("## Summary\n\n");
@@ -47,27 +50,51 @@ impl BenchmarkReport {
         s.push_str(&format!("| Total Tests | {} |\n", self.metrics.total_tests));
         s.push_str(&format!("| Passed | {} |\n", self.metrics.passed));
         s.push_str(&format!("| Failed | {} |\n", self.metrics.failed));
-        s.push_str(&format!("| Success Rate | {:.1}% |\n", self.metrics.success_rate() * 100.0));
-        s.push_str(&format!("| Total Cost | ${:.4} |\n", self.metrics.total_cost_usd));
-        s.push_str(&format!("| Avg Latency | {}ms |\n", self.metrics.avg_latency_ms()));
-        s.push_str(&format!("| P50 Latency | {}ms |\n", self.metrics.latency_p50_ms));
-        s.push_str(&format!("| P95 Latency | {}ms |\n", self.metrics.latency_p95_ms));
-        s.push_str(&format!("| P99 Latency | {}ms |\n\n", self.metrics.latency_p99_ms));
+        s.push_str(&format!(
+            "| Success Rate | {:.1}% |\n",
+            self.metrics.success_rate() * 100.0
+        ));
+        s.push_str(&format!(
+            "| Total Cost | ${:.4} |\n",
+            self.metrics.total_cost_usd
+        ));
+        s.push_str(&format!(
+            "| Avg Latency | {}ms |\n",
+            self.metrics.avg_latency_ms()
+        ));
+        s.push_str(&format!(
+            "| P50 Latency | {}ms |\n",
+            self.metrics.latency_p50_ms
+        ));
+        s.push_str(&format!(
+            "| P95 Latency | {}ms |\n",
+            self.metrics.latency_p95_ms
+        ));
+        s.push_str(&format!(
+            "| P99 Latency | {}ms |\n\n",
+            self.metrics.latency_p99_ms
+        ));
 
         s.push_str("## Results by Model\n\n");
         for (model, metrics) in &self.metrics.by_model {
             s.push_str(&format!("### {}\n\n", model));
             s.push_str(&format!("- Tests: {}\n", metrics.total));
-            s.push_str(&format!("- Success Rate: {:.1}%\n", metrics.success_rate() * 100.0));
+            s.push_str(&format!(
+                "- Success Rate: {:.1}%\n",
+                metrics.success_rate() * 100.0
+            ));
             s.push_str(&format!("- Avg Latency: {}ms\n", metrics.avg_latency_ms()));
             s.push_str(&format!("- Total Cost: ${:.4}\n", metrics.total_cost_usd));
-            s.push_str(&format!("- Tokens: {} in / {} out\n\n", 
-                metrics.total_input_tokens, metrics.total_output_tokens));
+            s.push_str(&format!(
+                "- Tokens: {} in / {} out\n\n",
+                metrics.total_input_tokens, metrics.total_output_tokens
+            ));
 
             s.push_str("| Command | Success | Avg Latency |\n");
             s.push_str("|---------|---------|-------------|\n");
             for (cmd, cmd_metrics) in &metrics.by_command {
-                s.push_str(&format!("| {} | {:.0}% | {}ms |\n",
+                s.push_str(&format!(
+                    "| {} | {:.0}% | {}ms |\n",
                     cmd,
                     cmd_metrics.success_rate() * 100.0,
                     cmd_metrics.avg_latency_ms()
@@ -81,15 +108,26 @@ impl BenchmarkReport {
         if !failures.is_empty() {
             s.push_str("## Failures\n\n");
             for (i, failure) in failures.iter().enumerate().take(10) {
-                s.push_str(&format!("### {}. {} ({})\n\n", i + 1, failure.test_id, failure.model));
+                s.push_str(&format!(
+                    "### {}. {} ({})\n\n",
+                    i + 1,
+                    failure.test_id,
+                    failure.model
+                ));
                 s.push_str(&format!("- **Error:** {:?}\n", failure.error_category));
                 if let Some(ref msg) = failure.error_message {
                     s.push_str(&format!("- **Message:** {}\n", msg));
                 }
-                s.push_str(&format!("- **Generated:**\n```\n{}\n```\n\n", failure.generated_ucl));
+                s.push_str(&format!(
+                    "- **Generated:**\n```\n{}\n```\n\n",
+                    failure.generated_ucl
+                ));
             }
             if failures.len() > 10 {
-                s.push_str(&format!("... and {} more failures\n\n", failures.len() - 10));
+                s.push_str(&format!(
+                    "... and {} more failures\n\n",
+                    failures.len() - 10
+                ));
             }
         }
 
@@ -125,7 +163,10 @@ impl BenchmarkReport {
                 r.parse_success,
                 r.execute_success,
                 r.semantic_score,
-                r.error_category.as_ref().map(|c| format!("{:?}", c)).unwrap_or_default(),
+                r.error_category
+                    .as_ref()
+                    .map(|c| format!("{:?}", c))
+                    .unwrap_or_default(),
             ));
         }
 
@@ -138,7 +179,12 @@ impl BenchmarkReport {
     }
 
     /// Print a live progress update
-    pub fn print_progress<W: Write>(writer: &mut W, current: usize, total: usize, result: &TestResult) {
+    pub fn print_progress<W: Write>(
+        writer: &mut W,
+        current: usize,
+        total: usize,
+        result: &TestResult,
+    ) {
         let status = if result.is_success() { "✓" } else { "✗" };
         let _ = writeln!(
             writer,
@@ -169,7 +215,8 @@ pub struct BenchmarkComparison {
 impl BenchmarkComparison {
     pub fn compare(baseline: &BenchmarkReport, current: &BenchmarkReport) -> Self {
         let success_rate_delta = current.metrics.success_rate() - baseline.metrics.success_rate();
-        let latency_delta_ms = current.metrics.avg_latency_ms() as i64 - baseline.metrics.avg_latency_ms() as i64;
+        let latency_delta_ms =
+            current.metrics.avg_latency_ms() as i64 - baseline.metrics.avg_latency_ms() as i64;
         let cost_delta_usd = current.metrics.total_cost_usd - baseline.metrics.total_cost_usd;
 
         let mut regressions = Vec::new();
@@ -180,9 +227,17 @@ impl BenchmarkComparison {
             if let Some(baseline_metrics) = baseline.metrics.by_model.get(model) {
                 let rate_delta = current_metrics.success_rate() - baseline_metrics.success_rate();
                 if rate_delta < -0.05 {
-                    regressions.push(format!("{}: success rate dropped {:.1}%", model, rate_delta * 100.0));
+                    regressions.push(format!(
+                        "{}: success rate dropped {:.1}%",
+                        model,
+                        rate_delta * 100.0
+                    ));
                 } else if rate_delta > 0.05 {
-                    improvements.push(format!("{}: success rate improved {:.1}%", model, rate_delta * 100.0));
+                    improvements.push(format!(
+                        "{}: success rate improved {:.1}%",
+                        model,
+                        rate_delta * 100.0
+                    ));
                 }
             }
         }
@@ -204,13 +259,35 @@ impl BenchmarkComparison {
         s.push_str(&format!("Baseline: {}\n", self.baseline_id));
         s.push_str(&format!("Current: {}\n\n", self.current_id));
 
-        let success_icon = if self.success_rate_delta >= 0.0 { "📈" } else { "📉" };
-        let latency_icon = if self.latency_delta_ms <= 0 { "⚡" } else { "🐢" };
-        let cost_icon = if self.cost_delta_usd <= 0.0 { "💰" } else { "💸" };
+        let success_icon = if self.success_rate_delta >= 0.0 {
+            "📈"
+        } else {
+            "📉"
+        };
+        let latency_icon = if self.latency_delta_ms <= 0 {
+            "⚡"
+        } else {
+            "🐢"
+        };
+        let cost_icon = if self.cost_delta_usd <= 0.0 {
+            "💰"
+        } else {
+            "💸"
+        };
 
-        s.push_str(&format!("{} Success Rate: {:+.1}%\n", success_icon, self.success_rate_delta * 100.0));
-        s.push_str(&format!("{} Latency: {:+}ms\n", latency_icon, self.latency_delta_ms));
-        s.push_str(&format!("{} Cost: ${:+.4}\n\n", cost_icon, self.cost_delta_usd));
+        s.push_str(&format!(
+            "{} Success Rate: {:+.1}%\n",
+            success_icon,
+            self.success_rate_delta * 100.0
+        ));
+        s.push_str(&format!(
+            "{} Latency: {:+}ms\n",
+            latency_icon, self.latency_delta_ms
+        ));
+        s.push_str(&format!(
+            "{} Cost: ${:+.4}\n\n",
+            cost_icon, self.cost_delta_usd
+        ));
 
         if !self.regressions.is_empty() {
             s.push_str("## Regressions ⚠️\n");
@@ -264,9 +341,7 @@ mod tests {
             duration_seconds: 60,
             models_tested: vec![],
             metrics: BenchmarkMetrics::new(),
-            results: vec![
-                TestResult::success("t1", "EDIT", "gpt-4o", "openai"),
-            ],
+            results: vec![TestResult::success("t1", "EDIT", "gpt-4o", "openai")],
         };
 
         let csv = report.to_csv();

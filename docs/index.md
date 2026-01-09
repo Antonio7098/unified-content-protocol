@@ -1,37 +1,52 @@
-# Unified Content Protocol
+# Unified Content Protocol Documentation Index
 
-Welcome to the Unified Content Protocol (UCP) documentation. This site explains how to use the JavaScript and Python SDKs to build LLM-native content editors, automated document transformations, and benchmarking pipelines.
+Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major area below.
 
-## What is UCP?
+## Getting Started
 
-UCP is a structured content layer designed for large language model workflows. It combines:
+- [Installation](./getting-started/installation.md)
+- [Quick Start Guide](./getting-started/quick-start.md)
+- [Core Concepts](./getting-started/concepts.md)
 
-- **Unified Content Model (UCM)** — immutable block-based document graph
-- **Unified Content Language (UCL)** — declarative command language for edits
-- **UCP Bench** — benchmarking harness for evaluating LLM editing quality
-- **SDKs** — portable TypeScript & Python libraries for integrating UCP from any stack
+## Core Model (ucm-core)
 
-## Why UCP?
+- [Overview](./ucm-core/README.md)
+- [Blocks](./ucm-core/blocks.md)
+- [Content Types](./ucm-core/content-types.md)
+- [Documents](./ucm-core/documents.md)
+- [Edges & Relationships](./ucm-core/edges.md)
+- [Metadata & Semantic Roles](./ucm-core/metadata.md)
+- [ID Generation](./ucm-core/id-generation.md)
 
-1. **Model-friendly structure** — Content is block-addressable and consistent across markdown, JSON, LLM prompts, etc.
-2. **Reliable editing** — UCL commands are verifiable and can be replayed, diffed, or canonicalized.
-3. **Token efficiency** — Built-in ID mapping keeps prompts compact without losing referential integrity.
-4. **Cross-language parity** — Identical JS/TS and Python APIs make it easy to build on both server and client.
+## Transformation Engine (ucm-engine)
 
-## Core Concepts
+- [Overview](./ucm-engine/README.md)
+- [Operations](./ucm-engine/operations.md)
+- [Transactions](./ucm-engine/transactions.md)
+- [Snapshots](./ucm-engine/snapshots.md)
+- [Validation](./ucm-engine/validation.md)
 
-| Concept | Description |
-| --- | --- |
-| **Document** | A tree of blocks, each block has a semantic role (heading, paragraph, quote, etc.) |
-| **Block ID** | Stable identifier derived from content; used in UCL commands |
-| **Prompt Builder** | Capability-aware system prompt generator for LLMs |
-| **ID Mapper** | Maps long block IDs to short numbers for token savings |
-| **UCL Builder** | Fluent API for generating valid UCL commands programmatically |
+## Unified Content Language (ucl-parser)
 
-## Quick Links
+- [Overview](./ucl-parser/README.md)
+- [Syntax Reference](./ucl-parser/syntax.md)
+- [Command Reference](./ucl-parser/commands.md)
+- [Expressions](./ucl-parser/expressions.md)
 
-- [Getting Started](getting-started.md)
-- [JavaScript SDK](sdk/javascript.md)
-- [Python SDK](sdk/python.md)
-- [Examples](examples.md)
-- [Release Notes](releases.md)
+## High-Level API (ucp-api)
+
+- [Client Overview](./ucp-api/README.md)
+
+## Translators
+
+- [Markdown Translator](./translators/markdown/README.md)
+
+## Observability (ucp-observe)
+
+- [Tracing, Audit, Metrics](./ucp-observe/README.md)
+
+## Examples
+
+- [Basic Examples](./examples/basic.md)
+- [Intermediate Examples](./examples/intermediate.md)
+- [Advanced Examples](./examples/advanced.md)

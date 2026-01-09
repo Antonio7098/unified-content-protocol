@@ -82,7 +82,9 @@ pub fn normalize_content(content: &Content) -> String {
         Content::Math(math) => normalize_math_content(math),
         Content::Media(media) => normalize_media_content(media),
         Content::Json { value, .. } => canonical_json(value),
-        Content::Binary { data, mime_type, .. } => {
+        Content::Binary {
+            data, mime_type, ..
+        } => {
             format!("{}:{}", mime_type, hex::encode(sha256_hash(data)))
         }
         Content::Composite { layout, children } => {
@@ -109,15 +111,15 @@ fn normalize_code_content(code: &Code) -> String {
         line_endings: LineEndingNorm::LF,
         ..Default::default()
     };
-    format!("{}:{}", code.language.to_lowercase(), normalize_text(&code.source, config))
+    format!(
+        "{}:{}",
+        code.language.to_lowercase(),
+        normalize_text(&code.source, config)
+    )
 }
 
 fn normalize_table_content(table: &Table) -> String {
-    let columns: Vec<String> = table
-        .columns
-        .iter()
-        .map(|c| normalize_column(c))
-        .collect();
+    let columns: Vec<String> = table.columns.iter().map(|c| normalize_column(c)).collect();
 
     let rows: Vec<String> = table.rows.iter().map(|r| normalize_row(r)).collect();
 
@@ -178,7 +180,12 @@ fn normalize_media_content(media: &Media) -> String {
     };
 
     match &media.content_hash {
-        Some(hash) => format!("{:?}:{}:hash:{}", media.media_type, source, hex::encode(hash)),
+        Some(hash) => format!(
+            "{:?}:{}:hash:{}",
+            media.media_type,
+            source,
+            hex::encode(hash)
+        ),
         None => format!("{:?}:{}", media.media_type, source),
     }
 }
@@ -195,9 +202,7 @@ pub fn normalize_text(text: &str, config: NormalizationConfig) -> String {
 
     // Step 2: Line ending normalization
     let line_normalized = match config.line_endings {
-        LineEndingNorm::LF => unicode_normalized
-            .replace("\r\n", "\n")
-            .replace('\r', "\n"),
+        LineEndingNorm::LF => unicode_normalized.replace("\r\n", "\n").replace('\r', "\n"),
         LineEndingNorm::CRLF => unicode_normalized
             .replace("\r\n", "\n")
             .replace('\r', "\n")

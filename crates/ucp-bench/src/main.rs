@@ -7,8 +7,10 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 use ucp_bench::{
-    provider::{MockProvider, GroqProvider, CerebrasProvider, GmiCloudProvider, OpenRouterProvider},
     fetch_openrouter_pricing,
+    provider::{
+        CerebrasProvider, GmiCloudProvider, GroqProvider, MockProvider, OpenRouterProvider,
+    },
     runner::{BenchmarkConfig, BenchmarkRunner},
     test_cases::generate_test_cases,
 };
@@ -107,7 +109,17 @@ async fn main() -> Result<()> {
             verbose,
             execute_commands,
         } => {
-            run_llm_benchmark(provider, model, commands, concurrency, output, save, verbose, execute_commands).await?;
+            run_llm_benchmark(
+                provider,
+                model,
+                commands,
+                concurrency,
+                output,
+                save,
+                verbose,
+                execute_commands,
+            )
+            .await?;
         }
         Commands::List { command } => {
             list_test_cases(command);
@@ -146,7 +158,7 @@ async fn run_llm_benchmark(
     let mut config = BenchmarkConfig::new("llm-benchmark")
         .with_concurrency(concurrency)
         .with_execution(execute_commands);
-    
+
     if execute_commands {
         info!("Full execution mode enabled - commands will be executed and document changes validated");
     }
@@ -161,8 +173,8 @@ async fn run_llm_benchmark(
     // Add provider based on selection
     match provider_name.as_str() {
         "groq" => {
-            let api_key = std::env::var("GROQ_API_KEY")
-                .expect("GROQ_API_KEY environment variable required");
+            let api_key =
+                std::env::var("GROQ_API_KEY").expect("GROQ_API_KEY environment variable required");
             let model = model.unwrap_or_else(|| "llama-3.3-70b-versatile".into());
             info!("Using Groq provider with model: {}", model);
             runner = runner.add_provider(GroqProvider::new(api_key, model));
@@ -175,8 +187,8 @@ async fn run_llm_benchmark(
             runner = runner.add_provider(CerebrasProvider::new(api_key, model));
         }
         "gmi" => {
-            let api_key = std::env::var("GMI_API_KEY")
-                .expect("GMI_API_KEY environment variable required");
+            let api_key =
+                std::env::var("GMI_API_KEY").expect("GMI_API_KEY environment variable required");
             let model = model.unwrap_or_else(|| "deepseek-ai/DeepSeek-V3.1".into());
             info!("Using GMI Cloud provider with model: {}", model);
             runner = runner.add_provider(GmiCloudProvider::new(api_key, model));
@@ -187,7 +199,10 @@ async fn run_llm_benchmark(
             // Fetch dynamic pricing from OpenRouter API
             info!("Fetching OpenRouter model pricing...");
             if let Err(e) = fetch_openrouter_pricing(&api_key).await {
-                info!("Warning: Could not fetch OpenRouter pricing: {}. Using defaults.", e);
+                info!(
+                    "Warning: Could not fetch OpenRouter pricing: {}. Using defaults.",
+                    e
+                );
             }
             let model = model.unwrap_or_else(|| "anthropic/claude-3.5-sonnet".into());
             info!("Using OpenRouter provider with model: {}", model);
@@ -219,7 +234,10 @@ async fn run_llm_benchmark(
             }
         }
         _ => {
-            anyhow::bail!("Unknown provider: {}. Use: groq, cerebras, gmi, openrouter, mock, or all", provider_name);
+            anyhow::bail!(
+                "Unknown provider: {}. Use: groq, cerebras, gmi, openrouter, mock, or all",
+                provider_name
+            );
         }
     }
 
@@ -288,6 +306,9 @@ fn list_test_cases(filter_command: Option<String>) {
                 continue;
             }
         }
-        println!("{:<30} {:<12} {}", case.id, case.command_type, case.description);
+        println!(
+            "{:<30} {:<12} {}",
+            case.id, case.command_type, case.description
+        );
     }
 }

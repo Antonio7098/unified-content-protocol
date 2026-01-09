@@ -1,10 +1,7 @@
 //! Application state for the API server.
 
-use crate::suite::{
-    BenchmarkSuite, SuiteRunResult, TestRegistry, TestCategoryId,
-    config::MatrixConfig,
-};
 use crate::core::metrics::CoreBenchmarkReport;
+use crate::suite::{BenchmarkSuite, SuiteRunResult, TestRegistry};
 use std::collections::HashMap;
 use tokio::sync::broadcast;
 
@@ -30,7 +27,7 @@ impl AppState {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(100);
         let (core_tx, _) = broadcast::channel(100);
-        
+
         Self {
             registry: TestRegistry::new(),
             suites: HashMap::new(),
@@ -43,6 +40,9 @@ impl AppState {
     }
 
     fn detect_available_providers() -> Vec<ProviderInfo> {
+        // Load .env from repo root
+        let _ = dotenvy::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/../../.env"));
+
         let mut providers = Vec::new();
 
         // Check for Groq
@@ -52,8 +52,16 @@ impl AppState {
                 name: "Groq".into(),
                 available: true,
                 models: vec![
-                    ModelInfo { id: "llama-3.1-8b-instant".into(), name: "Llama 3.1 8B Instant".into(), context_length: 131072 },
-                    ModelInfo { id: "llama-3.3-70b-versatile".into(), name: "Llama 3.3 70B Versatile".into(), context_length: 131072 },
+                    ModelInfo {
+                        id: "llama-3.1-8b-instant".into(),
+                        name: "Llama 3.1 8B Instant".into(),
+                        context_length: 131072,
+                    },
+                    ModelInfo {
+                        id: "llama-3.3-70b-versatile".into(),
+                        name: "Llama 3.3 70B Versatile".into(),
+                        context_length: 131072,
+                    },
                 ],
             });
         }
@@ -65,8 +73,16 @@ impl AppState {
                 name: "Cerebras".into(),
                 available: true,
                 models: vec![
-                    ModelInfo { id: "llama3.1-8b".into(), name: "Llama 3.1 8B".into(), context_length: 8192 },
-                    ModelInfo { id: "llama-3.3-70b".into(), name: "Llama 3.3 70B".into(), context_length: 8192 },
+                    ModelInfo {
+                        id: "llama3.1-8b".into(),
+                        name: "Llama 3.1 8B".into(),
+                        context_length: 8192,
+                    },
+                    ModelInfo {
+                        id: "llama-3.3-70b".into(),
+                        name: "Llama 3.3 70B".into(),
+                        context_length: 8192,
+                    },
                 ],
             });
         }
@@ -78,8 +94,16 @@ impl AppState {
                 name: "OpenRouter".into(),
                 available: true,
                 models: vec![
-                    ModelInfo { id: "meta-llama/llama-3.1-8b-instruct".into(), name: "Llama 3.1 8B Instruct".into(), context_length: 131072 },
-                    ModelInfo { id: "anthropic/claude-3.5-sonnet".into(), name: "Claude 3.5 Sonnet".into(), context_length: 200000 },
+                    ModelInfo {
+                        id: "meta-llama/llama-3.1-8b-instruct".into(),
+                        name: "Llama 3.1 8B Instruct".into(),
+                        context_length: 131072,
+                    },
+                    ModelInfo {
+                        id: "anthropic/claude-3.5-sonnet".into(),
+                        name: "Claude 3.5 Sonnet".into(),
+                        context_length: 200000,
+                    },
                 ],
             });
         }
@@ -90,9 +114,11 @@ impl AppState {
                 id: "gmi".into(),
                 name: "GMI Cloud".into(),
                 available: true,
-                models: vec![
-                    ModelInfo { id: "deepseek-ai/DeepSeek-V3.1".into(), name: "DeepSeek V3.1".into(), context_length: 65536 },
-                ],
+                models: vec![ModelInfo {
+                    id: "deepseek-ai/DeepSeek-V3.1".into(),
+                    name: "DeepSeek V3.1".into(),
+                    context_length: 65536,
+                }],
             });
         }
 
@@ -101,9 +127,11 @@ impl AppState {
             id: "mock".into(),
             name: "Mock Provider".into(),
             available: true,
-            models: vec![
-                ModelInfo { id: "mock-model".into(), name: "Mock Model".into(), context_length: 4096 },
-            ],
+            models: vec![ModelInfo {
+                id: "mock-model".into(),
+                name: "Mock Model".into(),
+                context_length: 4096,
+            }],
         });
 
         providers
@@ -153,20 +181,50 @@ pub struct ModelInfo {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum RunUpdate {
-    RunStarted { run_id: String },
-    RunProgress { run_id: String, progress: f32, current_test: String },
-    TestCompleted { run_id: String, test_id: String, success: bool },
-    RunCompleted { run_id: String },
-    RunFailed { run_id: String, error: String },
+    RunStarted {
+        run_id: String,
+    },
+    RunProgress {
+        run_id: String,
+        progress: f32,
+        current_test: String,
+    },
+    TestCompleted {
+        run_id: String,
+        test_id: String,
+        success: bool,
+    },
+    RunCompleted {
+        run_id: String,
+    },
+    RunFailed {
+        run_id: String,
+        error: String,
+    },
 }
 
 /// Update message for core benchmark WebSocket clients
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum CoreBenchmarkUpdate {
-    Started { report_id: String },
-    Progress { report_id: String, progress: f32, current_test: String },
-    TestCompleted { report_id: String, test_id: String, success: bool },
-    Completed { report_id: String },
-    Failed { report_id: String, error: String },
+    Started {
+        report_id: String,
+    },
+    Progress {
+        report_id: String,
+        progress: f32,
+        current_test: String,
+    },
+    TestCompleted {
+        report_id: String,
+        test_id: String,
+        success: bool,
+    },
+    Completed {
+        report_id: String,
+    },
+    Failed {
+        report_id: String,
+        error: String,
+    },
 }

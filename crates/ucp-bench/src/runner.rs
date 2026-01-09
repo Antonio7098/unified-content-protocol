@@ -198,7 +198,9 @@ async fn run_single_test(
     test_case: TestCase,
     config: &BenchmarkConfig,
 ) -> TestResult {
-    let doc_def = crate::documents::DOCUMENTS.default().expect("No default document");
+    let doc_def = crate::documents::DOCUMENTS
+        .default()
+        .expect("No default document");
     let mut agent = BenchmarkAgent::new(provider, doc_def, config.execute_commands);
     let mut retries = 0;
 
@@ -269,6 +271,9 @@ mod tests {
 
         assert_eq!(config.name, "my-bench");
         assert_eq!(config.max_concurrent, 10);
-        assert_eq!(config.filter_commands, Some(vec!["EDIT".into(), "APPEND".into()]));
+        assert_eq!(
+            config.filter_commands,
+            Some(vec!["EDIT".into(), "APPEND".into()])
+        );
     }
 }

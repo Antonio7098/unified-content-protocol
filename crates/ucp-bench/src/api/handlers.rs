@@ -1,30 +1,33 @@
 //! API request handlers.
 
-use super::state::{AppState, RunUpdate, ProviderInfo, CoreBenchmarkUpdate};
+use super::state::{AppState, CoreBenchmarkUpdate, RunUpdate};
+use crate::core::metrics::{CoreBenchmarkReport, CoreBenchmarkStatus};
+use crate::core::{
+    runner::{list_benchmarks, list_inputs},
+    CoreBenchmarkConfig, CoreBenchmarkRunner, InputCategory, CORE_INPUTS,
+};
+use crate::documents::{DocumentDetailPayload, DocumentRegistry, DocumentSummary, DOCUMENTS};
+use crate::storage::{default_core_benchmark_storage, CoreBenchmarkStorage};
 use crate::suite::{
-    BenchmarkSuite, SuiteRunResult, RunStatus,
     category::TestCategoryId,
     config::{BenchmarkSuiteConfig, MatrixConfig},
     result::DocumentSnapshot,
+    BenchmarkSuite, RunStatus, SuiteRunResult,
 };
-use crate::documents::{DocumentDefinition, DocumentRegistry, DocumentDetailPayload, DocumentSummary, DOCUMENTS};
-use crate::core::{
-    CoreBenchmarkConfig, CoreBenchmarkRunner, InputCategory, CORE_INPUTS,
-    runner::{list_benchmarks, list_inputs},
-};
-use crate::core::metrics::{CoreBenchmarkReport, CoreBenchmarkStatus};
-use crate::storage::{CoreBenchmarkStorage, default_core_benchmark_storage};
 use crate::test_document;
 use axum::{
-    extract::{Path, State, Query, WebSocketUpgrade, ws::{Message, WebSocket}},
+    extract::{
+        ws::{Message, WebSocket},
+        Path, Query, State, WebSocketUpgrade,
+    },
     response::IntoResponse,
     Json,
 };
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use futures::{StreamExt, SinkExt};
 
 type SharedState = Arc<RwLock<AppState>>;
 
@@ -106,7 +109,8 @@ pub async fn get_providers(State(state): State<SharedState>) -> impl IntoRespons
 
 pub async fn get_available_providers(State(state): State<SharedState>) -> impl IntoResponse {
     let state = state.read().await;
-    let available: Vec<_> = state.available_providers
+    let available: Vec<_> = state
+        .available_providers
         .iter()
         .filter(|p| p.available)
         .cloned()
@@ -137,19 +141,20 @@ pub async fn create_suite(
     Json(req): Json<CreateSuiteRequest>,
 ) -> impl IntoResponse {
     let mut state = state.write().await;
-    
-    let categories: Vec<TestCategoryId> = req.categories
+
+    let categories: Vec<TestCategoryId> = req
+        .categories
         .into_iter()
         .map(TestCategoryId::new)
         .collect();
-    
+
     let suite = BenchmarkSuite::new(req.name, req.description.unwrap_or_default())
         .with_categories(categories)
         .with_config(req.config.unwrap_or_default());
-    
+
     let id = suite.id.clone();
     state.suites.insert(id.clone(), suite.clone());
-    
+
     (axum::http::StatusCode::CREATED, Json(suite))
 }
 
@@ -170,11 +175,15 @@ pub async fn update_suite(
     Json(req): Json<CreateSuiteRequest>,
 ) -> impl IntoResponse {
     let mut state = state.write().await;
-    
+
     if let Some(suite) = state.suites.get_mut(&id) {
         suite.name = req.name;
         suite.description = req.description.unwrap_or_default();
-        suite.categories = req.categories.into_iter().map(TestCategoryId::new).collect();
+        suite.categories = req
+            .categories
+            .into_iter()
+            .map(TestCategoryId::new)
+            .collect();
         if let Some(config) = req.config {
             suite.config = config;
         }
@@ -216,37 +225,49 @@ pub async fn start_run(
     Json(req): Json<StartRunRequest>,
 ) -> impl IntoResponse {
     let mut state_guard = state.write().await;
-    
+
     let suite = match state_guard.suites.get(&req.suite_id) {
         Some(s) => s.clone(),
-        None => return (axum::http::StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Suite not found" }))).into_response(),
+        None => {
+            return (
+                axum::http::StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Suite not found" })),
+            )
+                .into_response()
+        }
     };
-    
+
     let config = req.config_override.unwrap_or(suite.config.clone());
     let mut run = SuiteRunResult::new(suite.id.clone(), config.clone());
     let run_id = run.run_id.clone();
-    
-    run.status = RunStatus::Running { 
-        progress: 0.0, 
-        current_test: "Initializing...".into() 
+
+    run.status = RunStatus::Running {
+        progress: 0.0,
+        current_test: "Initializing...".into(),
     };
-    
+
     state_guard.runs.insert(run_id.clone(), run.clone());
-    
+
     // Broadcast run started
-    state_guard.broadcast_update(RunUpdate::RunStarted { run_id: run_id.clone() });
-    
+    state_guard.broadcast_update(RunUpdate::RunStarted {
+        run_id: run_id.clone(),
+    });
+
     // Spawn background task to run the benchmark
     let state_clone = state.clone();
     let run_id_clone = run_id.clone();
     tokio::spawn(async move {
         run_benchmark(state_clone, run_id_clone, suite, config).await;
     });
-    
-    (axum::http::StatusCode::ACCEPTED, Json(serde_json::json!({ 
-        "run_id": run_id,
-        "status": "started"
-    }))).into_response()
+
+    (
+        axum::http::StatusCode::ACCEPTED,
+        Json(serde_json::json!({
+            "run_id": run_id,
+            "status": "started"
+        })),
+    )
+        .into_response()
 }
 
 pub async fn get_run(
@@ -297,12 +318,12 @@ pub async fn get_test_result(
     Query(query): Query<TestResultQuery>,
 ) -> impl IntoResponse {
     let state = state.read().await;
-    
+
     let run = match state.runs.get(&run_id) {
         Some(r) => r,
         None => return (axum::http::StatusCode::NOT_FOUND, "Run not found").into_response(),
     };
-    
+
     // Search for the test result
     for (provider_key, provider_results) in &run.results_by_provider {
         if let Some(ref filter) = query.provider {
@@ -310,7 +331,7 @@ pub async fn get_test_result(
                 continue;
             }
         }
-        
+
         for category_results in provider_results.results_by_category.values() {
             for result in &category_results.tests {
                 if result.test_id == test_id {
@@ -319,22 +340,60 @@ pub async fn get_test_result(
             }
         }
     }
-    
+
     (axum::http::StatusCode::NOT_FOUND, "Test result not found").into_response()
 }
 
 // ============================================================================
-// Document Handler
+// Document Handlers
 // ============================================================================
+
+/// List available benchmark documents
+pub async fn list_documents() -> impl IntoResponse {
+    let docs = crate::documents::DOCUMENTS.list();
+    Json(docs)
+}
+
+/// Get a specific benchmark document
+pub async fn get_document(Path(id): Path<String>) -> impl IntoResponse {
+    match crate::documents::DOCUMENTS.get(&id) {
+        Some(def) => {
+            let doc = def.build();
+            let snapshot = DocumentSnapshot::from_document(&doc);
+            let ucm = def.to_ucm_json(&doc);
+            let markdown = match ucp_translator_markdown::render_markdown(&doc) {
+                Ok(md) => md,
+                Err(e) => format!("Error rendering markdown: {}", e),
+            };
+            Json(serde_json::json!({
+                "ucm": ucm,
+                "description": def.prompt_text(),
+                "snapshot": snapshot,
+                "markdown": markdown,
+            }))
+            .into_response()
+        }
+        None => (
+            axum::http::StatusCode::NOT_FOUND,
+            "Document not found",
+        )
+            .into_response(),
+    }
+}
 
 pub async fn get_test_document() -> impl IntoResponse {
     let doc = test_document::create_test_document();
     let snapshot = DocumentSnapshot::from_document(&doc);
     let ucm = test_document::document_ucm_json(&doc);
+    let markdown = match ucp_translator_markdown::render_markdown(&doc) {
+        Ok(md) => md,
+        Err(e) => format!("Error rendering markdown: {}", e),
+    };
     Json(serde_json::json!({
         "ucm": ucm,
         "description": test_document::document_description(),
         "snapshot": snapshot,
+        "markdown": markdown,
     }))
 }
 
@@ -351,13 +410,13 @@ pub async fn websocket_handler(
 
 async fn handle_websocket(socket: WebSocket, state: SharedState) {
     let (mut sender, mut receiver) = socket.split();
-    
+
     // Subscribe to run updates
     let mut rx = {
         let state = state.read().await;
         state.subscribe_to_updates()
     };
-    
+
     // Send updates to the client
     let send_task = tokio::spawn(async move {
         while let Ok(update) = rx.recv().await {
@@ -367,14 +426,14 @@ async fn handle_websocket(socket: WebSocket, state: SharedState) {
             }
         }
     });
-    
+
     // Handle incoming messages (for future use)
     let recv_task = tokio::spawn(async move {
         while let Some(Ok(_msg)) = receiver.next().await {
             // Handle client messages if needed
         }
     });
-    
+
     tokio::select! {
         _ = send_task => {},
         _ = recv_task => {},
@@ -391,22 +450,35 @@ async fn run_benchmark(
     suite: BenchmarkSuite,
     config: BenchmarkSuiteConfig,
 ) {
-    use crate::suite::result::{DetailedTestResult, ExecutionContext};
-    use crate::suite::{ProviderResults, CategoryResults};
-    use crate::provider::{GroqProvider, CerebrasProvider, OpenRouterProvider, MockProvider, LlmProvider};
     use crate::agent::BenchmarkAgent;
+    use crate::provider::{
+        CerebrasProvider, GroqProvider, LlmProvider, MockProvider, OpenRouterProvider,
+    };
+    use crate::suite::result::{DetailedTestResult, ExecutionContext};
+    use crate::suite::{CategoryResults, ProviderResults};
     use std::sync::Arc;
-    
+
     let registry = {
         let state = state.read().await;
         state.registry.clone()
     };
-    
-    // Get test cases for selected categories
-    let test_cases = registry.get_tests_for_categories(&suite.categories);
+
+    // Get test cases for selected categories, filtered by document when provided
+    let selected_document_id = config.document_id.clone();
+    let selected_cases = registry.get_tests_for_categories(&suite.categories);
+    let test_cases: Vec<&crate::test_cases::TestCase> = selected_cases
+        .into_iter()
+        .filter(|case| {
+            if let Some(ref doc_id) = selected_document_id {
+                &case.document_id == doc_id
+            } else {
+                true
+            }
+        })
+        .collect();
     let total_tests = test_cases.len() * config.matrix.pairs.len();
     let mut completed = 0;
-    
+
     for pair in config.matrix.enabled_pairs() {
         let provider: Arc<dyn LlmProvider> = match pair.provider_id.as_str() {
             "groq" => {
@@ -433,7 +505,7 @@ async fn run_benchmark(
             "mock" => Arc::new(MockProvider::new(&pair.model_id)),
             _ => continue,
         };
-        
+
         let provider_key = pair.full_id();
         let mut provider_results = ProviderResults {
             provider_id: pair.provider_id.clone(),
@@ -446,10 +518,14 @@ async fn run_benchmark(
             total_latency_ms: 0,
             avg_latency_ms: 0,
         };
-        
-        let doc_def = crate::documents::DOCUMENTS.default().expect("No default document");
+
+        let doc_def = selected_document_id
+            .as_deref()
+            .and_then(|id| crate::documents::DOCUMENTS.get(id))
+            .or_else(|| crate::documents::DOCUMENTS.default())
+            .expect("No document definition available");
         let mut agent = BenchmarkAgent::new(provider.clone(), doc_def, config.execute_commands);
-        
+
         for test_case in &test_cases {
             // Check if run was cancelled
             {
@@ -460,7 +536,7 @@ async fn run_benchmark(
                     }
                 }
             }
-            
+
             // Update progress
             completed += 1;
             let progress = completed as f32 / total_tests as f32;
@@ -478,10 +554,10 @@ async fn run_benchmark(
                     current_test: test_case.id.clone(),
                 });
             }
-            
+
             // Run the test
             let result = agent.run_test(test_case).await;
-            
+
             // Convert to detailed result
             let mut detailed = DetailedTestResult::new(
                 test_case.id.clone(),
@@ -489,7 +565,7 @@ async fn run_benchmark(
                 pair.provider_id.clone(),
                 pair.model_id.clone(),
             );
-            
+
             detailed.latency_ms = result.latency_ms;
             detailed.input_tokens = result.input_tokens;
             detailed.output_tokens = result.output_tokens;
@@ -499,7 +575,7 @@ async fn run_benchmark(
             detailed.execute_success = result.execute_success;
             detailed.semantic_score = result.semantic_score;
             detailed.efficiency_score = result.efficiency_score;
-            
+
             detailed.context = ExecutionContext {
                 test_description: test_case.description.clone(),
                 task_prompt: test_case.prompt.clone(),
@@ -511,22 +587,27 @@ async fn run_benchmark(
                 expected_pattern: result.expected_pattern.clone(),
                 pattern_matched: None,
             };
-            
+
             if let Some(ref msg) = result.error_message {
                 detailed.error = Some(crate::suite::result::TestError {
                     category: match result.error_category {
-                        Some(crate::metrics::ErrorCategory::ParseError) => crate::suite::result::ErrorCategory::ParseError,
-                        Some(crate::metrics::ErrorCategory::ExecutionError) => crate::suite::result::ErrorCategory::ExecutionError,
+                        Some(crate::metrics::ErrorCategory::ParseError) => {
+                            crate::suite::result::ErrorCategory::ParseError
+                        }
+                        Some(crate::metrics::ErrorCategory::ExecutionError) => {
+                            crate::suite::result::ErrorCategory::ExecutionError
+                        }
                         _ => crate::suite::result::ErrorCategory::ProviderError,
                     },
                     message: msg.clone(),
                     details: None,
                 });
             }
-            
+
             // Add to category results
             let category_id = TestCategoryId::new(&test_case.command_type);
-            let category_results = provider_results.results_by_category
+            let category_results = provider_results
+                .results_by_category
                 .entry(category_id.clone())
                 .or_insert_with(|| CategoryResults {
                     category_id,
@@ -537,7 +618,7 @@ async fn run_benchmark(
                     avg_latency_ms: 0,
                     total_cost_usd: 0.0,
                 });
-            
+
             if detailed.success {
                 category_results.passed += 1;
                 provider_results.passed += 1;
@@ -545,14 +626,14 @@ async fn run_benchmark(
                 category_results.failed += 1;
                 provider_results.failed += 1;
             }
-            
+
             category_results.total_cost_usd += detailed.cost_usd;
             provider_results.total_cost_usd += detailed.cost_usd;
             provider_results.total_latency_ms += detailed.latency_ms;
             provider_results.total_tests += 1;
-            
+
             category_results.tests.push(detailed);
-            
+
             // Broadcast test completed
             {
                 let state = state.read().await;
@@ -562,40 +643,45 @@ async fn run_benchmark(
                     success: result.is_success(),
                 });
             }
-            
+
             // Reset agent for next test
             agent.reset();
         }
-        
+
         // Calculate averages
         if provider_results.total_tests > 0 {
-            provider_results.avg_latency_ms = provider_results.total_latency_ms / provider_results.total_tests as u64;
+            provider_results.avg_latency_ms =
+                provider_results.total_latency_ms / provider_results.total_tests as u64;
         }
-        
+
         for cat_results in provider_results.results_by_category.values_mut() {
             let total = cat_results.passed + cat_results.failed;
             if total > 0 {
                 cat_results.success_rate = cat_results.passed as f32 / total as f32;
-                cat_results.avg_latency_ms = cat_results.tests.iter().map(|t| t.latency_ms).sum::<u64>() / total as u64;
+                cat_results.avg_latency_ms =
+                    cat_results.tests.iter().map(|t| t.latency_ms).sum::<u64>() / total as u64;
             }
         }
-        
+
         // Store provider results
         {
             let mut state = state.write().await;
             if let Some(run) = state.runs.get_mut(&run_id) {
-                run.results_by_provider.insert(provider_key, provider_results);
+                run.results_by_provider
+                    .insert(provider_key, provider_results);
             }
         }
     }
-    
+
     // Mark run as completed
     {
         let mut state = state.write().await;
         if let Some(run) = state.runs.get_mut(&run_id) {
             run.mark_completed();
         }
-        state.broadcast_update(RunUpdate::RunCompleted { run_id: run_id.clone() });
+        state.broadcast_update(RunUpdate::RunCompleted {
+            run_id: run_id.clone(),
+        });
     }
 }
 
@@ -625,11 +711,13 @@ pub async fn get_core_input(Path(id): Path<String>) -> impl IntoResponse {
 pub async fn list_core_categories() -> impl IntoResponse {
     let categories: Vec<_> = InputCategory::all()
         .iter()
-        .map(|c| serde_json::json!({
-            "id": format!("{:?}", c),
-            "name": c.display_name(),
-            "input_count": CORE_INPUTS.by_category(*c).len(),
-        }))
+        .map(|c| {
+            serde_json::json!({
+                "id": format!("{:?}", c),
+                "name": c.display_name(),
+                "input_count": CORE_INPUTS.by_category(*c).len(),
+            })
+        })
         .collect();
     Json(categories)
 }
@@ -647,7 +735,11 @@ pub async fn get_core_category_inputs(Path(id): Path<String>) -> impl IntoRespon
         _ => return (axum::http::StatusCode::NOT_FOUND, "Category not found").into_response(),
     };
 
-    let inputs: Vec<_> = CORE_INPUTS.by_category(category).into_iter().cloned().collect();
+    let inputs: Vec<_> = CORE_INPUTS
+        .by_category(category)
+        .into_iter()
+        .cloned()
+        .collect();
     Json(inputs).into_response()
 }
 
@@ -665,12 +757,15 @@ pub async fn start_core_benchmark(
     Json(req): Json<StartCoreBenchmarkRequest>,
 ) -> impl IntoResponse {
     // Parse categories
-    let categories = req.categories
+    let categories = req
+        .categories
         .map(|cats| {
             cats.iter()
                 .filter_map(|c| match c.to_lowercase().as_str() {
                     "markdown" => Some(InputCategory::Markdown),
-                    "markdownrender" | "markdown_render" | "ucm_to_markdown" => Some(InputCategory::MarkdownRender),
+                    "markdownrender" | "markdown_render" | "ucm_to_markdown" => {
+                        Some(InputCategory::MarkdownRender)
+                    }
                     "ucl" => Some(InputCategory::Ucl),
                     "document" => Some(InputCategory::Document),
                     "normalization" => Some(InputCategory::Normalization),
@@ -694,7 +789,11 @@ pub async fn start_core_benchmark(
     let report = CoreBenchmarkReport::new(
         &req.name,
         crate::core::metrics::CoreBenchmarkReportConfig {
-            categories: config.categories.iter().map(|c| format!("{:?}", c)).collect(),
+            categories: config
+                .categories
+                .iter()
+                .map(|c| format!("{:?}", c))
+                .collect(),
             iterations: config.iterations,
             warmup_iterations: config.warmup_iterations,
         },
@@ -718,10 +817,14 @@ pub async fn start_core_benchmark(
         run_core_benchmark(state_clone, report_id_clone, name, config).await;
     });
 
-    (axum::http::StatusCode::ACCEPTED, Json(serde_json::json!({
-        "report_id": report_id,
-        "status": "started"
-    }))).into_response()
+    (
+        axum::http::StatusCode::ACCEPTED,
+        Json(serde_json::json!({
+            "report_id": report_id,
+            "status": "started"
+        })),
+    )
+        .into_response()
 }
 
 /// List active core benchmark runs.
@@ -756,7 +859,7 @@ pub async fn get_core_test_result(
     Path((run_id, test_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
     let state = state.read().await;
-    
+
     let report = match state.core_runs.get(&run_id) {
         Some(r) => r.clone(),
         None => {
@@ -764,7 +867,9 @@ pub async fn get_core_test_result(
             let storage = default_core_benchmark_storage();
             match storage.load(&run_id) {
                 Ok(r) => r,
-                Err(_) => return (axum::http::StatusCode::NOT_FOUND, "Run not found").into_response(),
+                Err(_) => {
+                    return (axum::http::StatusCode::NOT_FOUND, "Run not found").into_response()
+                }
             }
         }
     };
@@ -786,7 +891,8 @@ pub async fn list_core_history() -> impl IntoResponse {
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to load history: {}", e),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -798,7 +904,8 @@ pub async fn delete_core_run(Path(id): Path<String>) -> impl IntoResponse {
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to delete: {}", e),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -812,8 +919,7 @@ async fn run_core_benchmark(
     let (tx, _) = tokio::sync::broadcast::channel(100);
 
     // Create runner with updates channel
-    let runner = CoreBenchmarkRunner::new(config)
-        .with_updates(tx.clone());
+    let runner = CoreBenchmarkRunner::new(config).with_updates(tx.clone());
 
     // Subscribe to updates
     let mut rx = tx.subscribe();
@@ -828,7 +934,11 @@ async fn run_core_benchmark(
             let mut state_guard = state_for_updates.write().await;
 
             match &update {
-                RunnerUpdate::Progress { progress, current_test, .. } => {
+                RunnerUpdate::Progress {
+                    progress,
+                    current_test,
+                    ..
+                } => {
                     if let Some(report) = state_guard.core_runs.get_mut(&report_id_for_updates) {
                         report.mark_running(current_test.clone(), *progress);
                     }
@@ -838,7 +948,9 @@ async fn run_core_benchmark(
                         current_test: current_test.clone(),
                     });
                 }
-                RunnerUpdate::TestCompleted { test_id, success, .. } => {
+                RunnerUpdate::TestCompleted {
+                    test_id, success, ..
+                } => {
                     state_guard.broadcast_core_update(CoreBenchmarkUpdate::TestCompleted {
                         report_id: report_id_for_updates.clone(),
                         test_id: test_id.clone(),
@@ -856,7 +968,9 @@ async fn run_core_benchmark(
     // Store results
     {
         let mut state_guard = state.write().await;
-        state_guard.core_runs.insert(report_id.clone(), report.clone());
+        state_guard
+            .core_runs
+            .insert(report_id.clone(), report.clone());
 
         // Persist to storage
         let storage = default_core_benchmark_storage();
@@ -898,12 +1012,12 @@ pub async fn get_playground_document(Path(id): Path<String>) -> impl IntoRespons
             let doc = def.build();
             let snapshot = DocumentSnapshot::from_document(&doc);
             let ucm = def.to_ucm_json(&doc);
-            
+
             let markdown = match ucp_translator_markdown::render_markdown(&doc) {
                 Ok(md) => md,
                 Err(e) => format!("Error rendering markdown: {}", e),
             };
-            
+
             let payload = PlaygroundDocumentDetail {
                 summary: DocumentSummary {
                     id: def.id.to_string(),
@@ -916,7 +1030,7 @@ pub async fn get_playground_document(Path(id): Path<String>) -> impl IntoRespons
                 ucm,
                 markdown,
             };
-            
+
             Json(payload).into_response()
         }
         None => (axum::http::StatusCode::NOT_FOUND, "Document not found").into_response(),
@@ -962,11 +1076,11 @@ pub struct PlaygroundChatResponse {
 }
 
 /// Send a chat message in playground and get response.
-pub async fn playground_chat(
-    Json(req): Json<PlaygroundChatRequest>,
-) -> impl IntoResponse {
+pub async fn playground_chat(Json(req): Json<PlaygroundChatRequest>) -> impl IntoResponse {
     use crate::agent::BenchmarkAgent;
-    use crate::provider::{GroqProvider, CerebrasProvider, OpenRouterProvider, MockProvider, LlmProvider};
+    use crate::provider::{
+        CerebrasProvider, GroqProvider, LlmProvider, MockProvider, OpenRouterProvider,
+    };
     use crate::test_document;
     use std::sync::Arc;
 
@@ -974,49 +1088,63 @@ pub async fn playground_chat(
     let doc_def = match crate::documents::DOCUMENTS.get(&req.document_id) {
         Some(def) => def,
         None => {
-            return (axum::http::StatusCode::NOT_FOUND, Json(serde_json::json!({
-                "error": "Document not found"
-            }))).into_response();
+            return (
+                axum::http::StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": "Document not found"
+                })),
+            )
+                .into_response();
         }
     };
 
     // Create provider
     let provider: Arc<dyn LlmProvider> = match req.provider_id.as_str() {
-        "groq" => {
-            match std::env::var("GROQ_API_KEY") {
-                Ok(key) => Arc::new(GroqProvider::new(key, req.model_id.clone())),
-                Err(_) => {
-                    return (axum::http::StatusCode::BAD_REQUEST, Json(serde_json::json!({
+        "groq" => match std::env::var("GROQ_API_KEY") {
+            Ok(key) => Arc::new(GroqProvider::new(key, req.model_id.clone())),
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
                         "error": "GROQ_API_KEY not set"
-                    }))).into_response();
-                }
+                    })),
+                )
+                    .into_response();
             }
-        }
-        "cerebras" => {
-            match std::env::var("CEREBRAS_API_KEY") {
-                Ok(key) => Arc::new(CerebrasProvider::new(key, req.model_id.clone())),
-                Err(_) => {
-                    return (axum::http::StatusCode::BAD_REQUEST, Json(serde_json::json!({
+        },
+        "cerebras" => match std::env::var("CEREBRAS_API_KEY") {
+            Ok(key) => Arc::new(CerebrasProvider::new(key, req.model_id.clone())),
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
                         "error": "CEREBRAS_API_KEY not set"
-                    }))).into_response();
-                }
+                    })),
+                )
+                    .into_response();
             }
-        }
-        "openrouter" => {
-            match std::env::var("OPENROUTER_API_KEY") {
-                Ok(key) => Arc::new(OpenRouterProvider::new(key, req.model_id.clone())),
-                Err(_) => {
-                    return (axum::http::StatusCode::BAD_REQUEST, Json(serde_json::json!({
+        },
+        "openrouter" => match std::env::var("OPENROUTER_API_KEY") {
+            Ok(key) => Arc::new(OpenRouterProvider::new(key, req.model_id.clone())),
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
                         "error": "OPENROUTER_API_KEY not set"
-                    }))).into_response();
-                }
+                    })),
+                )
+                    .into_response();
             }
-        }
+        },
         "mock" => Arc::new(MockProvider::new(&req.model_id)),
         _ => {
-            return (axum::http::StatusCode::BAD_REQUEST, Json(serde_json::json!({
-                "error": "Unknown provider"
-            }))).into_response();
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "Unknown provider"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -1078,9 +1206,13 @@ DELETE <block_id> CASCADE
     let response = match provider.complete(request).await {
         Ok(r) => r,
         Err(e) => {
-            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                "error": e.to_string()
-            }))).into_response();
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": e.to_string()
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -1097,27 +1229,33 @@ DELETE <block_id> CASCADE
     };
 
     // Execute if requested
-    let (document_before, document_after, diff, execute_success) = if req.execute_commands && parse_success {
-        let doc_before = doc_def.to_ucm_json(agent.document());
-        let execute_result = if let Ok(ref cmds) = parse_result {
-            agent.execute_and_validate_for_playground(cmds)
-        } else {
-            Err("Parse failed".to_string())
-        };
-        let doc_after = doc_def.to_ucm_json(agent.document());
+    let (document_before, document_after, diff, execute_success) =
+        if req.execute_commands && parse_success {
+            let doc_before = doc_def.to_ucm_json(agent.document());
+            let execute_result = if let Ok(ref cmds) = parse_result {
+                agent.execute_and_validate_for_playground(cmds)
+            } else {
+                Err("Parse failed".to_string())
+            };
+            let doc_after = doc_def.to_ucm_json(agent.document());
 
-        let diff_json = if let Ok(ref cmds) = parse_result {
-            Some(serde_json::json!({
-                "commands": cmds.iter().map(|c| format!("{:?}", c)).collect::<Vec<_>>()
-            }))
-        } else {
-            None
-        };
+            let diff_json = if let Ok(ref cmds) = parse_result {
+                Some(serde_json::json!({
+                    "commands": cmds.iter().map(|c| format!("{:?}", c)).collect::<Vec<_>>()
+                }))
+            } else {
+                None
+            };
 
-        (Some(doc_before), Some(doc_after), diff_json, Some(execute_result.is_ok()))
-    } else {
-        (None, None, None, None)
-    };
+            (
+                Some(doc_before),
+                Some(doc_after),
+                diff_json,
+                Some(execute_result.is_ok()),
+            )
+        } else {
+            (None, None, None, None)
+        };
 
     let message_id = uuid::Uuid::new_v4().to_string();
 

@@ -8,29 +8,73 @@ use ucm_core::{Block, BlockId, Content, Document};
 pub mod ids {
     use ucm_core::BlockId;
 
-    pub fn root() -> BlockId { BlockId::root() }
+    pub fn root() -> BlockId {
+        BlockId::root()
+    }
 
-    pub fn metadata() -> BlockId { BlockId::from_hex("000000000001").unwrap() }
-    pub fn intro() -> BlockId { BlockId::from_hex("000000000010").unwrap() }
-    pub fn intro_hook() -> BlockId { BlockId::from_hex("000000000011").unwrap() }
-    pub fn intro_context() -> BlockId { BlockId::from_hex("000000000012").unwrap() }
-    pub fn intro_thesis() -> BlockId { BlockId::from_hex("000000000013").unwrap() }
-    pub fn body() -> BlockId { BlockId::from_hex("000000000020").unwrap() }
-    pub fn section1() -> BlockId { BlockId::from_hex("000000000021").unwrap() }
-    pub fn section1_heading() -> BlockId { BlockId::from_hex("000000000022").unwrap() }
-    pub fn section1_para() -> BlockId { BlockId::from_hex("000000000023").unwrap() }
-    pub fn section1_code() -> BlockId { BlockId::from_hex("000000000024").unwrap() }
-    pub fn section1_table() -> BlockId { BlockId::from_hex("000000000025").unwrap() }
-    pub fn section2() -> BlockId { BlockId::from_hex("000000000031").unwrap() }
-    pub fn section2_heading() -> BlockId { BlockId::from_hex("000000000032").unwrap() }
-    pub fn section2_math() -> BlockId { BlockId::from_hex("000000000033").unwrap() }
-    pub fn section3() -> BlockId { BlockId::from_hex("000000000041").unwrap() }
-    pub fn section3_heading() -> BlockId { BlockId::from_hex("000000000042").unwrap() }
-    pub fn section3_list() -> BlockId { BlockId::from_hex("000000000043").unwrap() }
-    pub fn conclusion() -> BlockId { BlockId::from_hex("000000000050").unwrap() }
-    pub fn conclusion_summary() -> BlockId { BlockId::from_hex("000000000051").unwrap() }
-    pub fn conclusion_cta() -> BlockId { BlockId::from_hex("000000000052").unwrap() }
-    pub fn references() -> BlockId { BlockId::from_hex("000000000060").unwrap() }
+    pub fn metadata() -> BlockId {
+        BlockId::from_hex("000000000001").unwrap()
+    }
+    pub fn intro() -> BlockId {
+        BlockId::from_hex("000000000010").unwrap()
+    }
+    pub fn intro_hook() -> BlockId {
+        BlockId::from_hex("000000000011").unwrap()
+    }
+    pub fn intro_context() -> BlockId {
+        BlockId::from_hex("000000000012").unwrap()
+    }
+    pub fn intro_thesis() -> BlockId {
+        BlockId::from_hex("000000000013").unwrap()
+    }
+    pub fn body() -> BlockId {
+        BlockId::from_hex("000000000020").unwrap()
+    }
+    pub fn section1() -> BlockId {
+        BlockId::from_hex("000000000021").unwrap()
+    }
+    pub fn section1_heading() -> BlockId {
+        BlockId::from_hex("000000000022").unwrap()
+    }
+    pub fn section1_para() -> BlockId {
+        BlockId::from_hex("000000000023").unwrap()
+    }
+    pub fn section1_code() -> BlockId {
+        BlockId::from_hex("000000000024").unwrap()
+    }
+    pub fn section1_table() -> BlockId {
+        BlockId::from_hex("000000000025").unwrap()
+    }
+    pub fn section2() -> BlockId {
+        BlockId::from_hex("000000000031").unwrap()
+    }
+    pub fn section2_heading() -> BlockId {
+        BlockId::from_hex("000000000032").unwrap()
+    }
+    pub fn section2_math() -> BlockId {
+        BlockId::from_hex("000000000033").unwrap()
+    }
+    pub fn section3() -> BlockId {
+        BlockId::from_hex("000000000041").unwrap()
+    }
+    pub fn section3_heading() -> BlockId {
+        BlockId::from_hex("000000000042").unwrap()
+    }
+    pub fn section3_list() -> BlockId {
+        BlockId::from_hex("000000000043").unwrap()
+    }
+    pub fn conclusion() -> BlockId {
+        BlockId::from_hex("000000000050").unwrap()
+    }
+    pub fn conclusion_summary() -> BlockId {
+        BlockId::from_hex("000000000051").unwrap()
+    }
+    pub fn conclusion_cta() -> BlockId {
+        BlockId::from_hex("000000000052").unwrap()
+    }
+    pub fn references() -> BlockId {
+        BlockId::from_hex("000000000060").unwrap()
+    }
 }
 /// Convert the canonical document into a JSON-friendly representation
 pub fn document_ucm_json(doc: &Document) -> Value {
@@ -127,7 +171,9 @@ pub fn create_test_document() -> Document {
 
     let s1_code = Block::with_id(
         ids::section1_code(),
-        Content::code("python", r#"import numpy as np
+        Content::code(
+            "python",
+            r#"import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -138,7 +184,8 @@ X = data.drop('target', axis=1)
 y = data['target']
 
 # Split into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)"#),
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)"#,
+        ),
     );
     doc.add_block(s1_code, &ids::section1()).ok();
 
@@ -146,9 +193,17 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)"#),
         ids::section1_table(),
         Content::table(vec![
             vec!["Library".into(), "Version".into(), "Purpose".into()],
-            vec!["numpy".into(), "1.24.0".into(), "Numerical computing".into()],
+            vec![
+                "numpy".into(),
+                "1.24.0".into(),
+                "Numerical computing".into(),
+            ],
             vec!["pandas".into(), "2.0.0".into(), "Data manipulation".into()],
-            vec!["scikit-learn".into(), "1.3.0".into(), "ML algorithms".into()],
+            vec![
+                "scikit-learn".into(),
+                "1.3.0".into(),
+                "ML algorithms".into(),
+            ],
         ]),
     );
     doc.add_block(s1_table, &ids::section1()).ok();
@@ -176,10 +231,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)"#),
     let section3 = Block::with_id(ids::section3(), Content::text("Section 3: Best Practices"));
     doc.add_block(section3, &ids::body()).ok();
 
-    let s3_heading = Block::with_id(
-        ids::section3_heading(),
-        Content::text("Key Considerations"),
-    );
+    let s3_heading = Block::with_id(ids::section3_heading(), Content::text("Key Considerations"));
     doc.add_block(s3_heading, &ids::section3()).ok();
 
     let s3_list = Block::with_id(

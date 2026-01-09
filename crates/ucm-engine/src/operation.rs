@@ -144,7 +144,9 @@ impl Operation {
             Operation::Append { parent_id, .. } => {
                 format!("APPEND to {}", parent_id)
             }
-            Operation::Delete { block_id, cascade, .. } => {
+            Operation::Delete {
+                block_id, cascade, ..
+            } => {
                 if *cascade {
                     format!("DELETE {} CASCADE", block_id)
                 } else {

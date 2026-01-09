@@ -120,7 +120,7 @@ impl EdgeType {
             EdgeType::NextSibling => Some(EdgeType::PreviousSibling),
             EdgeType::Supports => None,
             EdgeType::Contradicts => Some(EdgeType::Contradicts), // Symmetric
-            EdgeType::SiblingOf => Some(EdgeType::SiblingOf), // Symmetric
+            EdgeType::SiblingOf => Some(EdgeType::SiblingOf),     // Symmetric
             _ => None,
         }
     }
@@ -163,9 +163,9 @@ impl EdgeType {
             "version_of" => Some(EdgeType::VersionOf),
             "alternative_of" => Some(EdgeType::AlternativeOf),
             "translation_of" => Some(EdgeType::TranslationOf),
-            s if s.starts_with("custom:") => {
-                Some(EdgeType::Custom(s.strip_prefix("custom:").unwrap().to_string()))
-            }
+            s if s.starts_with("custom:") => Some(EdgeType::Custom(
+                s.strip_prefix("custom:").unwrap().to_string(),
+            )),
             _ => None,
         }
     }

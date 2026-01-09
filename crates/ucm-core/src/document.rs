@@ -309,7 +309,12 @@ impl Document {
     }
 
     /// Add a block at a specific position
-    pub fn add_block_at(&mut self, block: Block, parent: &BlockId, index: usize) -> Result<BlockId> {
+    pub fn add_block_at(
+        &mut self,
+        block: Block,
+        parent: &BlockId,
+        index: usize,
+    ) -> Result<BlockId> {
         if !self.blocks.contains_key(parent) {
             return Err(Error::BlockNotFound(parent.to_string()));
         }
@@ -415,7 +420,12 @@ impl Document {
     }
 
     /// Move a block to a specific position under a parent
-    pub fn move_block_at(&mut self, id: &BlockId, new_parent: &BlockId, index: usize) -> Result<()> {
+    pub fn move_block_at(
+        &mut self,
+        id: &BlockId,
+        new_parent: &BlockId,
+        index: usize,
+    ) -> Result<()> {
         if !self.blocks.contains_key(id) {
             return Err(Error::BlockNotFound(id.to_string()));
         }

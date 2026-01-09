@@ -39,6 +39,7 @@ export interface SuiteConfig {
   execute_commands: boolean
   capture_debug_info: boolean
   capture_document_snapshots: boolean
+  document_id?: string | null
 }
 
 export interface ProviderModelPair {
@@ -129,6 +130,7 @@ export interface DocumentSnapshot {
   captured_at: string
   block_count: number
   blocks: Record<string, BlockSnapshot>
+  metadata?: Record<string, unknown> | null
 }
 
 export interface BlockSnapshot {
@@ -138,6 +140,9 @@ export interface BlockSnapshot {
   label: string | null
   parent_id: string | null
   children_count: number
+  semantic_role?: string | null
+  role_category?: string | null
+  heading_level?: number | null
 }
 
 export interface DocumentDiff {
@@ -190,6 +195,7 @@ export interface DocumentResponse {
   ucm: unknown
   description: string
   snapshot: DocumentSnapshot
+  markdown: string
 }
 
 // API functions
@@ -274,6 +280,14 @@ export interface PlaygroundDocumentDetail {
   llm_description: string
   snapshot: DocumentSnapshot
   ucm: unknown
+  markdown: string
+}
+
+export interface BenchmarkDocumentSummary {
+  id: string
+  name: string
+  summary: string
+  tags: string[]
 }
 
 export interface PlaygroundChatRequest {
@@ -314,11 +328,36 @@ export async function fetchPlaygroundDocument(id: string): Promise<PlaygroundDoc
   return res.json()
 }
 
+export async function fetchDocuments(): Promise<BenchmarkDocumentSummary[]> {
+  const res = await fetch(`${API_BASE}/documents`)
+  return res.json()
+}
+
+export async function fetchDocumentById(id: string): Promise<DocumentResponse> {
+  const res = await fetch(`${API_BASE}/documents/${id}`)
+  if (!res.ok) {
+    throw new Error('Document not found')
+  }
+  return res.json()
+}
+
 export async function sendPlaygroundChat(request: PlaygroundChatRequest): Promise<PlaygroundChatResponse> {
   const res = await fetch(`${API_BASE}/playground/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   })
+  if (!res.ok) {
+    let message = `Request failed with status ${res.status}`
+    try {
+      const data = await res.json()
+      if (typeof data === 'object' && data !== null && 'error' in data) {
+        message = String((data as { error: unknown }).error)
+      }
+    } catch {
+      message = await res.text()
+    }
+    throw new Error(message || 'Failed to send playground chat request')
+  }
   return res.json()
 }

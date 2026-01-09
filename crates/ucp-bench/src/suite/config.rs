@@ -94,7 +94,11 @@ impl MatrixConfig {
         self
     }
 
-    pub fn add_provider_models(mut self, provider: impl Into<String>, models: Vec<impl Into<String>>) -> Self {
+    pub fn add_provider_models(
+        mut self,
+        provider: impl Into<String>,
+        models: Vec<impl Into<String>>,
+    ) -> Self {
         let provider = provider.into();
         for model in models {
             self.pairs.push(ProviderModelPair {
@@ -110,18 +114,18 @@ impl MatrixConfig {
     /// Create a matrix from available providers
     pub fn from_available_providers() -> Self {
         Self::new()
-            .add_provider_models("groq", vec![
-                "llama-3.1-8b-instant",
-                "llama-3.3-70b-versatile",
-            ])
-            .add_provider_models("cerebras", vec![
-                "llama3.1-8b",
-                "llama-3.3-70b",
-            ])
-            .add_provider_models("openrouter", vec![
-                "meta-llama/llama-3.1-8b-instruct",
-                "anthropic/claude-3.5-sonnet",
-            ])
+            .add_provider_models(
+                "groq",
+                vec!["llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
+            )
+            .add_provider_models("cerebras", vec!["llama3.1-8b", "llama-3.3-70b"])
+            .add_provider_models(
+                "openrouter",
+                vec![
+                    "meta-llama/llama-3.1-8b-instruct",
+                    "anthropic/claude-3.5-sonnet",
+                ],
+            )
     }
 
     pub fn enabled_pairs(&self) -> impl Iterator<Item = &ProviderModelPair> {

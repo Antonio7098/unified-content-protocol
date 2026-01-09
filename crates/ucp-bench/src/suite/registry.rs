@@ -1,9 +1,9 @@
 //! Test registry for managing test cases and categories.
 
-use crate::test_cases::{TestCase, generate_test_cases};
-use super::category::{TestCategory, TestCategoryId, build_standard_categories};
-use std::collections::HashMap;
+use super::category::{build_standard_categories, TestCategory, TestCategoryId};
+use crate::test_cases::{generate_test_cases, TestCase};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Registry of all available test categories and cases
 #[derive(Debug, Clone)]
@@ -31,7 +31,8 @@ impl TestRegistry {
         let all_cases = generate_test_cases();
         for case in all_cases {
             let category_id = TestCategoryId::new(&case.command_type);
-            registry.test_cases
+            registry
+                .test_cases
                 .entry(category_id)
                 .or_insert_with(Vec::new)
                 .push(case);
@@ -106,7 +107,8 @@ impl TestRegistry {
         RegistrySummary {
             total_categories: self.categories.len(),
             total_tests: self.total_test_count(),
-            categories: self.categories
+            categories: self
+                .categories
                 .values()
                 .map(|c| CategorySummary {
                     id: c.id.clone(),

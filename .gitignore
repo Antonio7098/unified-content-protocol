@@ -30,3 +30,5 @@ benchmark_*.txt
 # Temporary files
 *.tmp
 *.temp
+
+notes.txt

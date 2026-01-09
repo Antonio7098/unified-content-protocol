@@ -1,5 +1,5 @@
 //! Modular test suite system for benchmarking.
-//! 
+//!
 //! This module provides a flexible, extensible architecture for defining
 //! and running benchmark test suites with support for:
 //! - Modular test categories (EDIT, DELETE, APPEND, etc.)
@@ -9,13 +9,13 @@
 
 pub mod category;
 pub mod config;
-pub mod result;
 pub mod registry;
+pub mod result;
 
 pub use category::{TestCategory, TestCategoryId};
-pub use config::{BenchmarkSuiteConfig, ProviderModelPair, MatrixConfig};
-pub use result::{DetailedTestResult, DocumentSnapshot, ExecutionContext};
+pub use config::{BenchmarkSuiteConfig, MatrixConfig, ProviderModelPair};
 pub use registry::TestRegistry;
+pub use result::{DetailedTestResult, DocumentSnapshot, ExecutionContext};
 
 use crate::provider::LlmProvider;
 use crate::test_cases::TestCase;
@@ -164,7 +164,10 @@ impl SuiteRunResult {
     }
 
     pub fn mark_running(&mut self, current_test: String, progress: f32) {
-        self.status = RunStatus::Running { progress, current_test };
+        self.status = RunStatus::Running {
+            progress,
+            current_test,
+        };
     }
 
     pub fn mark_completed(&mut self) {
@@ -180,7 +183,7 @@ impl SuiteRunResult {
 
     fn calculate_summary(&mut self) {
         let mut summary = SuiteSummary::default();
-        
+
         for provider_results in self.results_by_provider.values() {
             summary.total_tests += provider_results.total_tests;
             summary.total_passed += provider_results.passed;
@@ -197,7 +200,8 @@ impl SuiteRunResult {
             summary.total_duration_ms = (completed - self.started_at).num_milliseconds() as u64;
         }
 
-        summary.categories_tested = self.results_by_provider
+        summary.categories_tested = self
+            .results_by_provider
             .values()
             .flat_map(|p| p.results_by_category.keys())
             .collect::<std::collections::HashSet<_>>()

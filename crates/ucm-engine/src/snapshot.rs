@@ -134,8 +134,7 @@ impl From<SerializableDocument> for Document {
             })
             .collect();
 
-        let metadata: DocumentMetadata =
-            serde_json::from_value(s.metadata).unwrap_or_default();
+        let metadata: DocumentMetadata = serde_json::from_value(s.metadata).unwrap_or_default();
 
         let mut doc = Document::new(DocumentId::new(s.id));
         doc.root = root;
@@ -289,7 +288,8 @@ mod tests {
         doc.add_block(Block::new(Content::text("Hello"), Some("intro")), &root)
             .unwrap();
 
-        mgr.create("v1", &doc, Some("First version".into())).unwrap();
+        mgr.create("v1", &doc, Some("First version".into()))
+            .unwrap();
 
         let restored = mgr.restore("v1").unwrap();
         assert_eq!(restored.block_count(), doc.block_count());

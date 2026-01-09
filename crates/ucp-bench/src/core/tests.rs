@@ -92,17 +92,15 @@ impl CoreBenchmark for MarkdownBenchmark {
 
         for _ in 0..iterations {
             match parse_markdown(&input.input) {
-                Ok(doc) => {
-                    match render_markdown(&doc) {
-                        Ok(rendered) => {
-                            last_rendered = rendered;
-                            last_doc = Some(doc);
-                        }
-                        Err(e) => {
-                            return result.with_error(format!("Render error: {}", e));
-                        }
+                Ok(doc) => match render_markdown(&doc) {
+                    Ok(rendered) => {
+                        last_rendered = rendered;
+                        last_doc = Some(doc);
                     }
-                }
+                    Err(e) => {
+                        return result.with_error(format!("Render error: {}", e));
+                    }
+                },
                 Err(e) => {
                     return result.with_error(format!("Parse error: {}", e));
                 }
@@ -140,7 +138,8 @@ impl CoreBenchmark for MarkdownBenchmark {
                 .blocks
                 .iter()
                 .map(|(id, block)| {
-                    let block_value = serde_json::to_value(block).unwrap_or(serde_json::Value::Null);
+                    let block_value =
+                        serde_json::to_value(block).unwrap_or(serde_json::Value::Null);
                     (id.to_string(), block_value)
                 })
                 .collect::<std::collections::HashMap<String, serde_json::Value>>();
@@ -152,8 +151,9 @@ impl CoreBenchmark for MarkdownBenchmark {
                 "structure": structure_map,
                 "blocks": blocks,
             });
-            
-            let ucm_str = serde_json::to_string_pretty(&ucm_json).unwrap_or_else(|_| "Failed to serialize".to_string());
+
+            let ucm_str = serde_json::to_string_pretty(&ucm_json)
+                .unwrap_or_else(|_| "Failed to serialize".to_string());
             format!(
                 "Document with {} blocks\nRoot: {}\nStructure entries: {}\n\nUCM JSON:\n{}",
                 doc.block_count(),
@@ -196,7 +196,10 @@ impl MarkdownBenchmark {
             }
 
             // Check for content types
-            let has_code = doc.blocks.values().any(|b| matches!(b.content, ucm_core::Content::Code(_)));
+            let has_code = doc
+                .blocks
+                .values()
+                .any(|b| matches!(b.content, ucm_core::Content::Code(_)));
             if expected.has_code {
                 if has_code {
                     checks.push(ValidationCheck::pass("has_code"));
@@ -205,7 +208,10 @@ impl MarkdownBenchmark {
                 }
             }
 
-            let has_tables = doc.blocks.values().any(|b| matches!(b.content, ucm_core::Content::Table(_)));
+            let has_tables = doc
+                .blocks
+                .values()
+                .any(|b| matches!(b.content, ucm_core::Content::Table(_)));
             if expected.has_tables {
                 if has_tables {
                     checks.push(ValidationCheck::pass("has_tables"));
@@ -219,7 +225,11 @@ impl MarkdownBenchmark {
         if doc.block_count() > 0 {
             checks.push(ValidationCheck::pass("non_empty_document"));
         } else {
-            checks.push(ValidationCheck::fail("non_empty_document", "> 0 blocks", "0 blocks"));
+            checks.push(ValidationCheck::fail(
+                "non_empty_document",
+                "> 0 blocks",
+                "0 blocks",
+            ));
         }
 
         ValidationResult::success().with_checks(checks)
@@ -281,12 +291,16 @@ impl CoreBenchmark for MarkdownRenderBenchmark {
 
         // Validation
         let mut checks = Vec::new();
-        
+
         // Check that output is non-empty
         if !last_rendered.is_empty() {
             checks.push(ValidationCheck::pass("non_empty_output"));
         } else {
-            checks.push(ValidationCheck::fail("non_empty_output", "non-empty", "empty"));
+            checks.push(ValidationCheck::fail(
+                "non_empty_output",
+                "non-empty",
+                "empty",
+            ));
         }
 
         // Check that rendered output contains expected content
@@ -363,8 +377,11 @@ impl CoreBenchmark for UclBenchmark {
             match ucl_parser::Parser::new(&input.input).parse_commands_only() {
                 Ok(commands) => {
                     command_count = commands.len();
-                    last_output = format!("Parsed {} commands:\n{}", commands.len(),
-                        commands.iter()
+                    last_output = format!(
+                        "Parsed {} commands:\n{}",
+                        commands.len(),
+                        commands
+                            .iter()
                             .take(5)
                             .map(|c| format!("  - {:?}", c))
                             .collect::<Vec<_>>()
@@ -480,7 +497,11 @@ impl CoreBenchmark for DocumentBenchmark {
                         let _ = doc.get_block(target_id);
                     }
                 }
-                output = format!("Performed {} lookups in {} block document", lookup_count * iterations as usize, block_count);
+                output = format!(
+                    "Performed {} lookups in {} block document",
+                    lookup_count * iterations as usize,
+                    block_count
+                );
                 structure = format!("Document: {} blocks, Target: middle block", block_count);
             }
             _ => {
@@ -715,14 +736,13 @@ impl CoreBenchmark for TableBenchmark {
         let duration = start.elapsed();
         let perf = PerformanceMetrics::from_duration(duration, iterations);
 
-        let output = format!(
-            "Created {}x{} table ({} cells)",
-            rows, cols, rows * cols
-        );
+        let output = format!("Created {}x{} table ({} cells)", rows, cols, rows * cols);
 
         let structure = format!(
             "Rows: {}\nColumns: {}\nTotal cells: {}",
-            rows, cols, rows * cols
+            rows,
+            cols,
+            rows * cols
         );
 
         let validation = ValidationResult::success().with_checks(vec![
@@ -790,7 +810,9 @@ impl CoreBenchmark for CodeBlockBenchmark {
         let line_count = code.lines().count();
         let structure = format!(
             "Language: {}\nLines: {}\nCharacters: {}",
-            lang, line_count, code.len()
+            lang,
+            line_count,
+            code.len()
         );
 
         let validation = ValidationResult::success().with_checks(vec![

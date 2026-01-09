@@ -181,14 +181,16 @@ impl BenchmarkMetrics {
             latencies.push(result.latency_ms);
 
             // By command
-            metrics.by_command
+            metrics
+                .by_command
                 .entry(result.command_type.clone())
                 .or_insert_with(CommandMetrics::new)
                 .add_result(result);
 
             // By model
             let model_key = format!("{}/{}", result.provider, result.model);
-            metrics.by_model
+            metrics
+                .by_model
                 .entry(model_key)
                 .or_insert_with(ModelMetrics::new)
                 .add_result(result);
@@ -269,16 +271,24 @@ impl CommandMetrics {
 
         // Running average for semantic score
         let n = self.total as f64;
-        self.avg_semantic_score = self.avg_semantic_score * (n - 1.0) / n
-            + result.semantic_score as f64 / n;
+        self.avg_semantic_score =
+            self.avg_semantic_score * (n - 1.0) / n + result.semantic_score as f64 / n;
     }
 
     pub fn success_rate(&self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.passed as f64 / self.total as f64 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.passed as f64 / self.total as f64
+        }
     }
 
     pub fn avg_latency_ms(&self) -> u64 {
-        if self.total == 0 { 0 } else { self.total_latency_ms / self.total as u64 }
+        if self.total == 0 {
+            0
+        } else {
+            self.total_latency_ms / self.total as u64
+        }
     }
 }
 
@@ -334,11 +344,19 @@ impl ModelMetrics {
     }
 
     pub fn success_rate(&self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.passed as f64 / self.total as f64 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.passed as f64 / self.total as f64
+        }
     }
 
     pub fn avg_latency_ms(&self) -> u64 {
-        if self.total == 0 { 0 } else { self.total_latency_ms / self.total as u64 }
+        if self.total == 0 {
+            0
+        } else {
+            self.total_latency_ms / self.total as u64
+        }
     }
 }
 
@@ -365,7 +383,14 @@ mod tests {
         let results = vec![
             TestResult::success("t1", "EDIT", "gpt-4o", "openai"),
             TestResult::success("t2", "EDIT", "gpt-4o", "openai"),
-            TestResult::failure("t3", "APPEND", "gpt-4o", "openai", ErrorCategory::ParseError, "bad syntax"),
+            TestResult::failure(
+                "t3",
+                "APPEND",
+                "gpt-4o",
+                "openai",
+                ErrorCategory::ParseError,
+                "bad syntax",
+            ),
         ];
 
         let metrics = BenchmarkMetrics::from_results(&results);

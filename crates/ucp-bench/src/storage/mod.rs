@@ -3,10 +3,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
 use crate::report::BenchmarkReport;
 use crate::suite::SuiteRunResult;
+use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 
 const DEFAULT_STORAGE_ENV: &str = "UCP_BENCH_STORAGE_DIR";
 const DEFAULT_STORAGE_DIR: &str = "benchmarks/history";
@@ -61,7 +61,8 @@ impl FileBenchmarkStorage {
 
     fn ensure_root_exists(&self) -> Result<()> {
         if !self.root.exists() {
-            fs::create_dir_all(&self.root).context("failed to create benchmark storage directory")?;
+            fs::create_dir_all(&self.root)
+                .context("failed to create benchmark storage directory")?;
         }
         Ok(())
     }
@@ -140,7 +141,8 @@ impl SuiteRunStorage {
 
     fn ensure_runs_dir(&self) -> Result<()> {
         if !self.runs_dir().exists() {
-            fs::create_dir_all(self.runs_dir()).context("failed to create suite run storage directory")?;
+            fs::create_dir_all(self.runs_dir())
+                .context("failed to create suite run storage directory")?;
         }
         Ok(())
     }
@@ -148,8 +150,8 @@ impl SuiteRunStorage {
     pub fn save_run(&self, run: &SuiteRunResult) -> Result<PathBuf> {
         self.ensure_runs_dir()?;
         let path = self.runs_dir().join(format!("{}.json", run.run_id));
-        let contents = serde_json::to_vec_pretty(run)
-            .context("failed to serialize suite run to json")?;
+        let contents =
+            serde_json::to_vec_pretty(run).context("failed to serialize suite run to json")?;
         fs::write(&path, contents).context("failed to write suite run artifact")?;
         Ok(path)
     }
@@ -164,10 +166,12 @@ impl SuiteRunStorage {
                 continue;
             }
 
-            match fs::read(&path).map_err(anyhow::Error::from).and_then(|bytes| {
-                serde_json::from_slice::<SuiteRunResult>(&bytes)
-                    .context("failed to parse suite run json")
-            }) {
+            match fs::read(&path)
+                .map_err(anyhow::Error::from)
+                .and_then(|bytes| {
+                    serde_json::from_slice::<SuiteRunResult>(&bytes)
+                        .context("failed to parse suite run json")
+                }) {
                 Ok(run) => runs.push(run),
                 Err(err) => {
                     tracing::warn!("Skipping invalid suite run file {:?}: {}", path, err);
@@ -220,7 +224,8 @@ impl CoreBenchmarkStorage {
     fn ensure_dir(&self) -> Result<()> {
         let dir = self.benchmarks_dir();
         if !dir.exists() {
-            fs::create_dir_all(&dir).context("failed to create core benchmark storage directory")?;
+            fs::create_dir_all(&dir)
+                .context("failed to create core benchmark storage directory")?;
         }
         Ok(())
     }
@@ -234,7 +239,9 @@ impl CoreBenchmarkStorage {
         fs::write(&path, contents).context("failed to write core benchmark report")?;
 
         // Also write summary markdown
-        let summary_path = self.benchmarks_dir().join(format!("{}.md", report.report_id));
+        let summary_path = self
+            .benchmarks_dir()
+            .join(format!("{}.md", report.report_id));
         fs::write(&summary_path, report.summary())
             .context("failed to write core benchmark summary")?;
 
@@ -252,17 +259,21 @@ impl CoreBenchmarkStorage {
         self.ensure_dir()?;
         let mut reports = Vec::new();
 
-        for entry in fs::read_dir(self.benchmarks_dir()).context("failed to read core benchmark directory")? {
+        for entry in fs::read_dir(self.benchmarks_dir())
+            .context("failed to read core benchmark directory")?
+        {
             let entry = entry?;
             let path = entry.path();
             if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
                 continue;
             }
 
-            match fs::read(&path).map_err(anyhow::Error::from).and_then(|bytes| {
-                serde_json::from_slice::<CoreBenchmarkReport>(&bytes)
-                    .context("failed to parse core benchmark report")
-            }) {
+            match fs::read(&path)
+                .map_err(anyhow::Error::from)
+                .and_then(|bytes| {
+                    serde_json::from_slice::<CoreBenchmarkReport>(&bytes)
+                        .context("failed to parse core benchmark report")
+                }) {
                 Ok(report) => reports.push(report),
                 Err(err) => {
                     tracing::warn!("Skipping invalid core benchmark file {:?}: {}", path, err);
@@ -276,7 +287,10 @@ impl CoreBenchmarkStorage {
 
     pub fn list_summaries(&self) -> Result<Vec<CoreBenchmarkSummary>> {
         let reports = self.load_all()?;
-        Ok(reports.into_iter().map(CoreBenchmarkSummary::from).collect())
+        Ok(reports
+            .into_iter()
+            .map(CoreBenchmarkSummary::from)
+            .collect())
     }
 
     pub fn delete(&self, report_id: &str) -> Result<()> {

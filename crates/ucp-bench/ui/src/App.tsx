@@ -82,19 +82,21 @@ function App() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="flex min-h-screen bg-gray-50">
         <Sidebar />
-        <main className="flex-1 p-8">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/new" element={<NewBenchmark />} />
-            <Route path="/core" element={<CoreBenchmark />} />
-            <Route path="/playground" element={<Playground />} />
-            <Route path="/tests" element={<TestCatalog />} />
-            <Route path="/document" element={<DocumentViewer />} />
-            <Route path="/tests/:testId" element={<TestDetails />} />
-            <Route path="/history" element={<RunHistory />} />
-            <Route path="/run/:runId" element={<RunDetails />} />
-            <Route path="/run/:runId/test/:testId" element={<TestDetails />} />
-          </Routes>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-6xl">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/new" element={<NewBenchmark />} />
+              <Route path="/core" element={<CoreBenchmark />} />
+              <Route path="/playground" element={<Playground />} />
+              <Route path="/tests" element={<TestCatalog />} />
+              <Route path="/document" element={<DocumentViewer />} />
+              <Route path="/tests/:testId" element={<TestDetails />} />
+              <Route path="/history" element={<RunHistory />} />
+              <Route path="/run/:runId" element={<RunDetails />} />
+              <Route path="/run/:runId/test/:testId" element={<TestDetails />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </BrowserRouter>
