@@ -39,23 +39,46 @@ class TextFormat(str, Enum):
 
 class SemanticRole(str, Enum):
     """Semantic roles for blocks."""
+    # Headings
     HEADING1 = "heading1"
     HEADING2 = "heading2"
     HEADING3 = "heading3"
     HEADING4 = "heading4"
     HEADING5 = "heading5"
     HEADING6 = "heading6"
+
+    # Content structure
     PARAGRAPH = "paragraph"
     QUOTE = "quote"
     LIST = "list"
+
+    # Technical content
     CODE = "code"
     TABLE = "table"
+    EQUATION = "equation"
+
+    # Document structure
     TITLE = "title"
     SUBTITLE = "subtitle"
     ABSTRACT = "abstract"
+    SECTION = "section"
+
+    # Narrative structure
     INTRO = "intro"
     BODY = "body"
     CONCLUSION = "conclusion"
+
+    # Callouts and special sections
+    NOTE = "note"
+    WARNING = "warning"
+    TIP = "tip"
+    SIDEBAR = "sidebar"
+    CALLOUT = "callout"
+
+    # Meta elements
+    METADATA = "metadata"
+    CITATION = "citation"
+    FOOTNOTE = "footnote"
 
 
 class EdgeType(str, Enum):
@@ -267,6 +290,11 @@ class ValidationIssue:
     def warning(cls, code: str, message: str, block_id: Optional[str] = None) -> "ValidationIssue":
         return cls(severity=ValidationSeverity.WARNING, code=code, message=message, block_id=block_id)
 
+    @classmethod
+    def info(cls, code: str, message: str, block_id: Optional[str] = None) -> "ValidationIssue":
+        """Create an INFO severity issue."""
+        return cls(severity=ValidationSeverity.INFO, code=code, message=message, block_id=block_id)
+
 
 @dataclass
 class ValidationResult:
@@ -288,6 +316,10 @@ class ValidationResult:
 
     def warnings(self) -> List[ValidationIssue]:
         return [i for i in self.issues if i.severity == ValidationSeverity.WARNING]
+
+    def infos(self) -> List[ValidationIssue]:
+        """Get all INFO severity issues."""
+        return [i for i in self.issues if i.severity == ValidationSeverity.INFO]
 
     def merge(self, other: "ValidationResult") -> None:
         self.issues.extend(other.issues)

@@ -136,6 +136,184 @@ Full type hint support:
 from ucp import Document, Block, ContentType, SemanticRole, Capability
 ```
 
+## Deterministic Block IDs
+
+Block identifiers now follow the canonical `blk_XXXXXXXXXXXX` pattern (root is
+always `blk_000000000000`). IDs are computed as:
+
+1. Normalize content to NFC.
+2. SHA-256 hash `content || semantic_role || namespace`.
+3. Take the first 12 hex characters and prefix with `blk_`.
+
+This matches the reference implementation, ensuring Python documents can round
+trip with Rust/TypeScript.
+
+```python
+from ucp import Block, SemanticRole
+
+heading = Block.new("Overview", role=SemanticRole.HEADING2)
+print(heading.id)  # e.g. blk_a1c3b8f1d2e4
+```
+
+## Error Handling
+
+The SDK raises descriptive exceptions for invalid operations:
+
+```python
+import ucp
+from ucp import Document
+
+doc = ucp.create()
+
+# Block not found
+try:
+    doc.delete_block("blk_nonexistent")
+except KeyError as e:
+    print(e)  # "Block not found: blk_nonexistent"
+
+# Cannot delete root
+try:
+    doc.delete_block(doc.root_id)
+except ValueError as e:
+    print(e)  # "Cannot delete the root block"
+
+# Cannot move into self
+try:
+    block_id = doc.add_block(doc.root_id, "Test")
+    doc.move_block(block_id, block_id)
+except ValueError as e:
+    print(e)  # "Cannot move a block into itself or its descendants"
+```
+
+### Validation
+
+```python
+result = doc.validate()
+
+if not result.valid:
+    for issue in result.issues:
+        print(f"[{issue.severity}] {issue.code}: {issue.message}")
+        # [error] E201: Document structure contains a cycle
+        # [warning] E203: Block blk_123 is unreachable from root
+```
+
+### Error Codes
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| E001 | Error | Block not found |
+| E201 | Error | Cycle detected in document |
+| E203 | Warning | Orphaned/unreachable block |
+| E400 | Error | Block count limit exceeded |
+| E402 | Error | Block size limit exceeded |
+| E403 | Error | Nesting depth limit exceeded |
+| E404 | Error | Edge count limit exceeded |
+
+## Observability
+
+The SDK includes built-in observability features:
+
+```python
+import ucp
+from ucp import get_logger, on_event, trace, record_metric
+
+# Logging
+logger = get_logger()
+logger.info("Starting document processing")
+
+# Event subscription
+@on_event("block_added")
+def handle_block_added(event):
+    print(f"Block {event.block_id} added")
+
+# Tracing
+with trace("parse_document") as span:
+    doc = ucp.parse(markdown_content)
+    span.set_attribute("block_count", len(doc.blocks))
+
+# Metrics
+record_metric("documents_parsed", 1)
+```
+
+## Snapshots and Transactions
+
+```python
+import ucp
+from ucp import transaction
+
+doc = ucp.create()
+
+# Create a snapshot
+snapshot_mgr = ucp.SnapshotManager()
+snapshot_mgr.create("before_changes", doc)
+
+# Use transactions for atomic operations
+with transaction(doc) as txn:
+    doc.add_block(doc.root_id, "Block 1")
+    doc.add_block(doc.root_id, "Block 2")
+    # Commits automatically on success
+    # Rolls back on exception
+
+# Restore from snapshot
+restored_doc = snapshot_mgr.restore("before_changes")
+```
+
+## Async Support
+
+For async applications:
+
+```python
+import asyncio
+import ucp
+
+async def process_documents():
+    # Most operations are synchronous but can be wrapped
+    doc = await asyncio.to_thread(ucp.parse, large_markdown)
+    return doc
+```
+
+## Conformance
+
+This SDK implements the UCP specification. See `docs/conformance/README.md` for the full specification and test vectors.
+
+Run the Python conformance suite with:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/conformance/test_conformance.py
+```
+
+All 26 reference tests pass against the current SDK.
+
+## UCL Execution Summary
+
+`execute_ucl` now returns an `ExecutionSummary` that exposes the aggregated status
+and affected blocks:
+
+```python
+import ucp
+
+doc = ucp.create()
+summary = ucp.execute_ucl(doc, 'APPEND blk_000000000000 text :: "Hello"')
+
+if summary.success:
+    print("Blocks touched:", summary.affected_blocks)
+```
+
+Individual `ExecutionResult` objects remain available via `summary.results`.
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Run conformance tests
+pytest tests/conformance/
+```
+
 ## License
 
 MIT

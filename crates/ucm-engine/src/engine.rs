@@ -1,6 +1,6 @@
 //! Main transformation engine.
 
-use crate::operation::{EditOperator, Operation, OperationResult, PruneCondition};
+use crate::operation::{EditOperator, MoveTarget, Operation, OperationResult, PruneCondition};
 use crate::snapshot::SnapshotManager;
 use crate::transaction::{TransactionId, TransactionManager};
 use crate::validate::{ValidationPipeline, ValidationResult};
@@ -193,6 +193,10 @@ impl Engine {
                 index,
             } => self.execute_move(doc, &block_id, &new_parent, index),
 
+            Operation::MoveToTarget { block_id, target } => {
+                self.execute_move_to_target(doc, &block_id, target)
+            }
+
             Operation::Append {
                 parent_id,
                 content,
@@ -343,6 +347,47 @@ impl Engine {
             None => doc.move_block(block_id, new_parent)?,
         }
         Ok(OperationResult::success(vec![block_id.clone()]))
+    }
+
+    fn execute_move_to_target(
+        &self,
+        doc: &mut Document,
+        block_id: &ucm_core::BlockId,
+        target: MoveTarget,
+    ) -> Result<OperationResult> {
+        match target {
+            MoveTarget::ToParent { parent_id, index } => {
+                self.execute_move(doc, block_id, &parent_id, index)
+            }
+            MoveTarget::Before { sibling_id } => {
+                // Find sibling's parent and index
+                let parent_id = doc
+                    .parent(&sibling_id)
+                    .cloned()
+                    .ok_or_else(|| Error::BlockNotFound(sibling_id.to_string()))?;
+                let siblings = doc.children(&parent_id);
+                let sibling_index = siblings
+                    .iter()
+                    .position(|id| id == &sibling_id)
+                    .ok_or_else(|| Error::Internal("Sibling not found in parent".into()))?;
+                doc.move_block_at(block_id, &parent_id, sibling_index)?;
+                Ok(OperationResult::success(vec![block_id.clone()]))
+            }
+            MoveTarget::After { sibling_id } => {
+                // Find sibling's parent and index
+                let parent_id = doc
+                    .parent(&sibling_id)
+                    .cloned()
+                    .ok_or_else(|| Error::BlockNotFound(sibling_id.to_string()))?;
+                let siblings = doc.children(&parent_id);
+                let sibling_index = siblings
+                    .iter()
+                    .position(|id| id == &sibling_id)
+                    .ok_or_else(|| Error::Internal("Sibling not found in parent".into()))?;
+                doc.move_block_at(block_id, &parent_id, sibling_index + 1)?;
+                Ok(OperationResult::success(vec![block_id.clone()]))
+            }
+        }
     }
 
     fn execute_append(
@@ -595,5 +640,75 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.success));
         assert_eq!(doc.block_count(), 3); // root + 2 new blocks
+    }
+
+    #[test]
+    fn test_move_before_target() {
+        let engine = Engine::new();
+        let mut doc = Document::new(DocumentId::new("test"));
+        let root = doc.root.clone();
+
+        let block_a = doc
+            .add_block(Block::new(Content::text("A"), None), &root)
+            .unwrap();
+        let block_b = doc
+            .add_block(Block::new(Content::text("B"), None), &root)
+            .unwrap();
+        let block_c = doc
+            .add_block(Block::new(Content::text("C"), None), &root)
+            .unwrap();
+
+        let result = engine
+            .execute(
+                &mut doc,
+                Operation::MoveToTarget {
+                    block_id: block_c.clone(),
+                    target: MoveTarget::Before {
+                        sibling_id: block_a.clone(),
+                    },
+                },
+            )
+            .unwrap();
+
+        assert!(result.success);
+        let children = doc.children(&root);
+        assert_eq!(children[0], block_c);
+        assert_eq!(children[1], block_a);
+        assert_eq!(children[2], block_b);
+    }
+
+    #[test]
+    fn test_move_after_target() {
+        let engine = Engine::new();
+        let mut doc = Document::new(DocumentId::new("test"));
+        let root = doc.root.clone();
+
+        let block_a = doc
+            .add_block(Block::new(Content::text("A"), None), &root)
+            .unwrap();
+        let block_b = doc
+            .add_block(Block::new(Content::text("B"), None), &root)
+            .unwrap();
+        let block_c = doc
+            .add_block(Block::new(Content::text("C"), None), &root)
+            .unwrap();
+
+        let result = engine
+            .execute(
+                &mut doc,
+                Operation::MoveToTarget {
+                    block_id: block_a.clone(),
+                    target: MoveTarget::After {
+                        sibling_id: block_c.clone(),
+                    },
+                },
+            )
+            .unwrap();
+
+        assert!(result.success);
+        let children = doc.children(&root);
+        assert_eq!(children[0], block_b);
+        assert_eq!(children[1], block_c);
+        assert_eq!(children[2], block_a);
     }
 }

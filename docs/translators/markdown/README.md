@@ -80,6 +80,37 @@ let doc = parser.parse(markdown)?;
 | `> quote` | Text | `quote` |
 | `\| table \|` | Table | `table` |
 
+### Inline Formatting
+
+**Important**: Inline formatting (bold, italic, inline code, links) is **preserved as raw text**, not parsed into separate elements.
+
+```markdown
+This is **bold** and *italic* text with `code`.
+```
+
+Is stored as a single text block containing the literal markdown characters:
+```
+"This is **bold** and *italic* text with `code`."
+```
+
+This design choice:
+- Preserves fidelity during round-trip conversion
+- Keeps the block structure simple
+- Delegates inline rendering to consuming applications
+
+### List Marker Preservation
+
+List markers (ordered and unordered) are stored in the raw text content:
+
+```markdown
+- First item
+- Second item
+1. Numbered item
+2. Another numbered
+```
+
+The list content is stored with markers intact, ensuring round-trip fidelity.
+
 ### Heading Hierarchy
 
 The parser creates a hierarchical structure based on heading levels:

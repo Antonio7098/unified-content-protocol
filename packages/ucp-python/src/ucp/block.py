@@ -6,6 +6,8 @@ This module implements the Block class following Single Responsibility Principle
 
 from __future__ import annotations
 
+import hashlib
+import unicodedata
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -19,20 +21,43 @@ from .types import (
 )
 
 
-_block_counter = 0
+_id_counter = 0
+ROOT_BLOCK_ID = "blk_000000000000"
 
 
-def generate_block_id() -> str:
-    """Generate a unique block ID."""
-    global _block_counter
-    _block_counter += 1
-    return f"blk_{_block_counter:012x}"
+def _next_namespace() -> str:
+    """Generate a monotonically increasing namespace suffix."""
+    global _id_counter
+    _id_counter += 1
+    return f"{_id_counter:012x}"
+
+
+def generate_block_id(
+    content: Optional[str] = None,
+    role: Optional[str] = None,
+    namespace: Optional[str] = None,
+) -> str:
+    """Generate a deterministic block ID following the UCP spec."""
+    if (content is None or content == "") and role is None and namespace is None:
+        return ROOT_BLOCK_ID
+
+    normalized = unicodedata.normalize("NFC", content or "")
+    payload = normalized.encode("utf-8")
+
+    if role:
+        payload += role.encode("utf-8")
+
+    if namespace:
+        payload += namespace.encode("utf-8")
+
+    digest = hashlib.sha256(payload).hexdigest()[:12]
+    return f"blk_{digest}"
 
 
 def reset_block_counter() -> None:
     """Reset block counter (useful for testing)."""
-    global _block_counter
-    _block_counter = 0
+    global _id_counter
+    _id_counter = 0
 
 
 @dataclass
@@ -60,7 +85,7 @@ class Block:
         """Create a new block with generated ID."""
         metadata = BlockMetadata(semantic_role=role, label=label)
         return cls(
-            id=generate_block_id(),
+            id=generate_block_id(content, role.value if role else None, _next_namespace()),
             content=content,
             content_type=content_type,
             metadata=metadata,
@@ -99,6 +124,11 @@ class Block:
     @property
     def role(self) -> Optional[SemanticRole]:
         """Get semantic role."""
+        return self.metadata.semantic_role
+
+    @property
+    def semantic_role(self) -> Optional[SemanticRole]:
+        """Alias for semantic role to align with spec."""
         return self.metadata.semantic_role
 
     @property
@@ -181,3 +211,17 @@ class Block:
                 if edge_type is None or edge.edge_type == edge_type:
                     return True
         return False
+
+    # -------------------------------------------------------------------------
+    # Hashability (for use in sets and as dict keys)
+    # -------------------------------------------------------------------------
+
+    def __hash__(self) -> int:
+        """Hash based on block ID for use in sets and as dict keys."""
+        return hash(self.id)
+
+    def __eq__(self, other: object) -> bool:
+        """Equality based on block ID."""
+        if not isinstance(other, Block):
+            return NotImplemented
+        return self.id == other.id

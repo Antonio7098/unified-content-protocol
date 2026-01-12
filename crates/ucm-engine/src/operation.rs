@@ -3,6 +3,17 @@
 use serde::{Deserialize, Serialize};
 use ucm_core::{BlockId, Content, EdgeType};
 
+/// Target for move operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MoveTarget {
+    /// Move to a parent at optional index
+    ToParent { parent_id: BlockId, index: Option<usize> },
+    /// Move before a sibling
+    Before { sibling_id: BlockId },
+    /// Move after a sibling
+    After { sibling_id: BlockId },
+}
+
 /// Operations that can be applied to a document
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Operation {
@@ -14,11 +25,17 @@ pub enum Operation {
         operator: EditOperator,
     },
 
-    /// Move a block to a new parent
+    /// Move a block to a new parent (legacy)
     Move {
         block_id: BlockId,
         new_parent: BlockId,
         index: Option<usize>,
+    },
+
+    /// Move a block with flexible target
+    MoveToTarget {
+        block_id: BlockId,
+        target: MoveTarget,
     },
 
     /// Append a new block
@@ -140,6 +157,21 @@ impl Operation {
                 ..
             } => {
                 format!("MOVE {} TO {}", block_id, new_parent)
+            }
+            Operation::MoveToTarget { block_id, target } => match target {
+                MoveTarget::ToParent { parent_id, index } => {
+                    if let Some(idx) = index {
+                        format!("MOVE {} TO {} AT {}", block_id, parent_id, idx)
+                    } else {
+                        format!("MOVE {} TO {}", block_id, parent_id)
+                    }
+                }
+                MoveTarget::Before { sibling_id } => {
+                    format!("MOVE {} BEFORE {}", block_id, sibling_id)
+                }
+                MoveTarget::After { sibling_id } => {
+                    format!("MOVE {} AFTER {}", block_id, sibling_id)
+                }
             }
             Operation::Append { parent_id, .. } => {
                 format!("APPEND to {}", parent_id)

@@ -514,6 +514,7 @@ Block::new(content, None)
 
 ## See Also
 
+- [Semantic Roles](./semantic-roles.md) - Complete semantic role reference
 - [Blocks](./blocks.md) - Block structure
 - [ID Generation](./id-generation.md) - Content hashing
 - [Documents](./documents.md) - Document indices

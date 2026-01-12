@@ -10,7 +10,18 @@ Build LLM-powered content manipulation with minimal code.
 npm install @ucp-core/core
 # or
 bun add @ucp-core/core
+# or
+yarn add @ucp-core/core
 ```
+
+## Features
+
+- **Document Model** - Graph-based content representation with blocks and edges
+- **Markdown Parsing** - Convert markdown to structured documents
+- **LLM Integration** - Prompt builders and ID mapping for token efficiency
+- **Validation** - Comprehensive document validation with error codes
+- **Snapshots** - Version control for documents
+- **Transactions** - Atomic operations with rollback support
 
 ## Quick Start
 
@@ -152,6 +163,96 @@ import type {
   Capability 
 } from '@ucp-core/core'
 ```
+
+## Error Handling
+
+The SDK throws descriptive errors for invalid operations:
+
+```typescript
+import { createDocument, addBlock, deleteBlock, moveBlock } from '@ucp-core/core'
+
+const doc = createDocument()
+
+try {
+  // Block not found
+  deleteBlock(doc, 'blk_nonexistent')
+} catch (error) {
+  console.error(error.message) // "Block not found: blk_nonexistent"
+}
+
+try {
+  // Cannot delete root
+  deleteBlock(doc, doc.root)
+} catch (error) {
+  console.error(error.message) // "Cannot delete the root block"
+}
+
+try {
+  // Cannot move into self
+  const id = addBlock(doc, doc.root, 'Test')
+  moveBlock(doc, id, id)
+} catch (error) {
+  console.error(error.message) // "Cannot move a block into itself or its descendants"
+}
+```
+
+### Validation Errors
+
+```typescript
+import { validateDocument, DEFAULT_LIMITS } from '@ucp-core/core'
+
+const result = validateDocument(doc)
+
+if (!result.valid) {
+  for (const issue of result.issues) {
+    console.log(`[${issue.severity}] ${issue.code}: ${issue.message}`)
+    // [error] E201: Document structure contains a cycle
+    // [warning] E203: Block blk_123 is unreachable from root
+  }
+}
+```
+
+### Error Codes
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| E001 | Error | Block not found |
+| E201 | Error | Cycle detected in document |
+| E203 | Warning | Orphaned/unreachable block |
+| E400 | Error | Block count limit exceeded |
+| E402 | Error | Block size limit exceeded |
+| E403 | Error | Nesting depth limit exceeded |
+| E404 | Error | Edge count limit exceeded |
+
+## Bundling
+
+### Webpack / Vite
+
+The SDK works out of the box with modern bundlers:
+
+```typescript
+// ESM import
+import { parse, render, createDocument } from '@ucp-core/core'
+```
+
+### Node.js
+
+Requires Node.js 18+ for native ES modules:
+
+```typescript
+// package.json: "type": "module"
+import { parse } from '@ucp-core/core'
+```
+
+Or use dynamic import:
+
+```javascript
+const ucp = await import('@ucp-core/core')
+```
+
+## Conformance
+
+This SDK implements the UCP specification. See `docs/conformance/README.md` for the full specification and test vectors.
 
 ## License
 

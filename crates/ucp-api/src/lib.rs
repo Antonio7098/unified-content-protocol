@@ -135,13 +135,32 @@ impl UcpClient {
                             let new_parent: BlockId = parent_id
                                 .parse()
                                 .map_err(|_| Error::InvalidBlockId(parent_id.clone()))?;
-                            ops.push(Operation::Move {
+                            ops.push(Operation::MoveToTarget {
                                 block_id,
-                                new_parent,
-                                index,
+                                target: ucm_engine::MoveTarget::ToParent {
+                                    parent_id: new_parent,
+                                    index,
+                                },
                             });
                         }
-                        _ => {} // TODO: handle Before/After
+                        ucl_parser::MoveTarget::Before { sibling_id } => {
+                            let sibling: BlockId = sibling_id
+                                .parse()
+                                .map_err(|_| Error::InvalidBlockId(sibling_id.clone()))?;
+                            ops.push(Operation::MoveToTarget {
+                                block_id,
+                                target: ucm_engine::MoveTarget::Before { sibling_id: sibling },
+                            });
+                        }
+                        ucl_parser::MoveTarget::After { sibling_id } => {
+                            let sibling: BlockId = sibling_id
+                                .parse()
+                                .map_err(|_| Error::InvalidBlockId(sibling_id.clone()))?;
+                            ops.push(Operation::MoveToTarget {
+                                block_id,
+                                target: ucm_engine::MoveTarget::After { sibling_id: sibling },
+                            });
+                        }
                     }
                 }
                 ucl_parser::Command::Prune(p) => {

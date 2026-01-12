@@ -135,7 +135,6 @@ APPEND <parent_id> <content_type> [AT <index>] [WITH <properties>] :: <content>
 | `label` | Block label |
 | `tags` | Block tags (array) |
 | `role` | Semantic role |
-| `lang` | Language (for code) |
 
 ### Examples
 
@@ -150,7 +149,7 @@ APPEND blk_parent text WITH label="intro" tags=["important"] :: "Introduction"
 APPEND blk_parent text AT 0 :: "First child"
 
 // Code block
-APPEND blk_parent code WITH lang="rust" :: "fn main() {
+APPEND blk_parent code :: "fn main() {
     println!(\"Hello!\");
 }"
 

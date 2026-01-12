@@ -125,8 +125,9 @@ for result in &results {
 let json = client.to_json(&doc).unwrap();
 println!("{}", json);
 
-// Pretty-printed JSON
-let pretty = client.to_json_pretty(&doc).unwrap();
+// Pretty-print if needed
+let pretty: serde_json::Value = serde_json::from_str(&json).unwrap();
+println!("{}", serde_json::to_string_pretty(&pretty).unwrap());
 ```
 
 ## Complete Example
@@ -191,7 +192,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     
     // Serialize
-    let json = client.to_json_pretty(&doc)?;
+    let json = client.to_json(&doc)?;
     println!("\nDocument JSON:\n{}", json);
     
     Ok(())

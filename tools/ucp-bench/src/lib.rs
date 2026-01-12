@@ -15,13 +15,16 @@ pub mod agent;
 pub mod api;
 pub mod core;
 pub mod dev_tools;
+pub mod documents;
 pub mod metrics;
+pub mod report;
 pub mod provider;
 pub mod runner;
 pub mod storage;
 pub mod suite;
 pub mod test_cases;
 pub mod test_document;
+pub mod tokenizer;
 
 pub use agent::BenchmarkAgent;
 pub use documents::{DocumentDefinition, DocumentRegistry};

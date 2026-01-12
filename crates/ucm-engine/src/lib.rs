@@ -15,7 +15,7 @@ pub mod transaction;
 pub mod validate;
 
 pub use engine::Engine;
-pub use operation::{EditOperator, Operation, OperationResult, PruneCondition};
+pub use operation::{EditOperator, MoveTarget, Operation, OperationResult, PruneCondition};
 pub use snapshot::{Snapshot, SnapshotId, SnapshotManager};
 pub use transaction::{Transaction, TransactionId, TransactionManager, TransactionState};
 pub use validate::{ValidationPipeline, ValidationResult};

@@ -64,9 +64,11 @@ All documentation lives in [`/docs`](./docs/index.md) and is structured for dire
 ## Example Snippet
 
 ```rust
+use serde_json::Value;
 use ucp_api::UcpClient;
 use ucm_core::{Content, Document};
-n main() -> Result<(), Box<dyn std::error::Error>> {
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = UcpClient::new();
     let mut doc = client.create_document();
     let root = doc.root.clone();
@@ -82,8 +84,12 @@ use ucm_core::{Content, Document};
         println!("Document is valid");
     }
 
-    let json = client.to_json_pretty(&doc)?;
+    let json = client.to_json(&doc)?;
     println!("{}", json);
+
+    // Pretty-print if desired
+    let pretty: Value = serde_json::from_str(&json)?;
+    println!("{}", serde_json::to_string_pretty(&pretty)?);
     Ok(())
 }
 ```

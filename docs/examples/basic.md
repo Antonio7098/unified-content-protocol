@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     
     // Serialize to JSON
-    let json = client.to_json_pretty(&doc)?;
+    let json = client.to_json(&doc)?;
     println!("{}", json);
     
     Ok(())
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         APPEND blk_ff00000000000000000000 text WITH role="paragraph" :: "This guide will help you get started with UCP."
         
         // Add a code example
-        APPEND blk_ff00000000000000000000 code WITH lang="bash" :: "cargo add ucp-api"
+        APPEND blk_ff00000000000000000000 code :: "cargo add ucp-api"
     "#)?;
     
     println!("Executed {} commands", results.len());
@@ -392,7 +392,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.add_code(&mut doc, &root, "rust", "fn main() {}")?;
     
     // Serialize document to JSON
-    let json = client.to_json_pretty(&doc)?;
+    let json = client.to_json(&doc)?;
     println!("Document JSON:\n{}", json);
     
     // Serialize individual block
@@ -404,8 +404,104 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Example 11: Python SDK - Semantic Roles
+
+```python
+from ucp import (
+    create, parse, Block, SemanticRole,
+    ValidationResult, ValidationIssue, ValidationSeverity
+)
+
+# Create a document with semantic roles
+doc = create()
+
+# Add blocks with various semantic roles
+doc.add_block(doc.root_id, "My Document", role=SemanticRole.TITLE)
+doc.add_block(doc.root_id, "Welcome to this guide", role=SemanticRole.INTRO)
+
+# Use callout roles for important content
+doc.add_block(doc.root_id, "Remember to save your work", role=SemanticRole.NOTE)
+doc.add_block(doc.root_id, "This action cannot be undone!", role=SemanticRole.WARNING)
+doc.add_block(doc.root_id, "Pro tip: Use keyboard shortcuts", role=SemanticRole.TIP)
+
+# Technical content
+doc.add_block(doc.root_id, "E = mc^2", role=SemanticRole.EQUATION)
+doc.add_block(doc.root_id, "[1] Author, Title, 2024", role=SemanticRole.CITATION)
+
+print(f"Created document with {len(doc.blocks)} blocks")
+
+# List all blocks with their roles
+for block_id, block in doc.blocks.items():
+    role_name = block.role.value if block.role else "none"
+    print(f"  {block_id[:12]}... - {role_name}: {block.content[:30]}")
+```
+
+## Example 12: Python SDK - Validation API
+
+```python
+from ucp import (
+    create, ValidationResult, ValidationIssue, ValidationSeverity
+)
+
+# Create validation result with different severities
+result = ValidationResult(
+    valid=True,
+    issues=[
+        ValidationIssue.error("E001", "Missing required field", block_id="blk_123"),
+        ValidationIssue.warning("W001", "Deprecated syntax used"),
+        ValidationIssue.info("I001", "Consider adding a description"),
+    ]
+)
+
+# Filter issues by severity
+errors = result.errors()
+warnings = result.warnings()
+infos = result.infos()
+
+print(f"Errors: {len(errors)}")
+print(f"Warnings: {len(warnings)}")
+print(f"Infos: {len(infos)}")
+
+# Check document validation
+doc = create()
+doc.add_block(doc.root_id, "Content")
+
+validation = doc.validate()
+if validation.valid:
+    print("Document is valid!")
+else:
+    for error in validation.errors():
+        print(f"ERROR [{error.code}]: {error.message}")
+```
+
+## Example 13: Python SDK - Block Hashability
+
+```python
+from ucp import create, Block, SemanticRole
+
+# Blocks can be used in sets and as dictionary keys
+block1 = Block.text("Hello", role=SemanticRole.PARAGRAPH)
+block2 = Block.text("World", role=SemanticRole.PARAGRAPH)
+
+# Add to set
+block_set = {block1, block2}
+print(f"Set contains {len(block_set)} blocks")
+
+# Use as dictionary key
+block_metadata = {
+    block1: {"priority": "high"},
+    block2: {"priority": "low"},
+}
+print(f"Block 1 priority: {block_metadata[block1]['priority']}")
+
+# Equality is based on block ID
+same_id_block = Block(id=block1.id, content="Different content")
+print(f"Same ID means equal: {block1 == same_id_block}")
+```
+
 ## Next Steps
 
 - [Intermediate Examples](./intermediate.md) - More complex scenarios
 - [Advanced Examples](./advanced.md) - Advanced usage patterns
 - [UCL Commands](../ucl-parser/commands.md) - UCL reference
+- [Semantic Roles](../ucm-core/semantic-roles.md) - Complete role reference

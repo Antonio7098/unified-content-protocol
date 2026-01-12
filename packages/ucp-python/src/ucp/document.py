@@ -146,12 +146,14 @@ class Document:
         # Block storage
         self.blocks: Dict[str, Block] = {root.id: root}
         
-        # Parent -> children structure
-        self.structure: Dict[str, List[str]] = {}
+        # Parent -> children structure (keep alias for compatibility)
+        self._children: Dict[str, List[str]] = {root.id: []}
+        self.structure = self._children
         
         # Indices
         self.indices = DocumentIndices()
         self.edge_index = EdgeIndex()
+        self.indices.index_block(root)
         
         # Version for optimistic concurrency
         self._version = 1
@@ -177,6 +179,11 @@ class Document:
     def block_count(self) -> int:
         """Get total number of blocks."""
         return len(self.blocks)
+
+    @property
+    def root_id(self) -> str:
+        """Alias for root block ID."""
+        return self.root
 
     def __contains__(self, block_id: str) -> bool:
         """Check if document contains a block."""
@@ -274,8 +281,10 @@ class Document:
         # Index block
         self.indices.index_block(block)
 
-        # Add to blocks
+        # Add to blocks and initialize child list
         self.blocks[block_id] = block
+        if block_id not in self.structure:
+            self.structure[block_id] = []
 
         # Add to structure
         if parent_id not in self.structure:
@@ -473,6 +482,13 @@ class Document:
     def find_blocks_by_tag(self, tag: str) -> List[str]:
         """Find all blocks with a tag."""
         return list(self.indices.find_by_tag(tag))
+
+    def get_edges(self, block_id: str) -> List[Edge]:
+        """Get all edges originating from a block."""
+        block = self.blocks.get(block_id)
+        if block is None:
+            raise ValueError(f"Block not found: {block_id}")
+        return list(block.edges)
 
     # -------------------------------------------------------------------------
     # Edge Management

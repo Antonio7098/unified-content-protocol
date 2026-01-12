@@ -520,7 +520,34 @@ class UclExecutor:
 # =============================================================================
 
 
-def execute_ucl(doc: Document, ucl: str) -> List[str]:
+class ExecutionSummary:
+    """Aggregated result of executing UCL commands."""
+
+    def __init__(self, results: List[ExecutionResult]):
+        self._results = results
+
+    @property
+    def success(self) -> bool:
+        return all(r.success for r in self._results)
+
+    @property
+    def results(self) -> List[ExecutionResult]:
+        return self._results
+
+    @property
+    def affected_blocks(self) -> List[str]:
+        blocks: List[str] = []
+        for result in self._results:
+            for block_id in result.affected_blocks:
+                if block_id not in blocks:
+                    blocks.append(block_id)
+        return blocks
+
+    def __len__(self) -> int:
+        return len(self._results)
+
+
+def execute_ucl(doc: Document, ucl: str) -> ExecutionSummary:
     """Execute UCL commands on a document.
     
     Args:
@@ -536,20 +563,14 @@ def execute_ucl(doc: Document, ucl: str) -> List[str]:
     """
     executor = UclExecutor(doc)
     results = executor.execute(ucl)
-    
-    # Check for errors
-    for result in results:
-        if not result.success:
-            raise UclExecutionError(
-                result.error or "Unknown error",
-                command=result.command_type,
-            )
-    
-    # Collect affected blocks
-    affected = []
-    for result in results:
-        for block_id in result.affected_blocks:
-            if block_id not in affected:
-                affected.append(block_id)
-    
-    return affected
+
+    summary = ExecutionSummary(results)
+    if not summary.success:
+        for result in results:
+            if not result.success:
+                raise UclExecutionError(
+                    result.error or "Unknown error",
+                    command=result.command_type,
+                )
+
+    return summary
