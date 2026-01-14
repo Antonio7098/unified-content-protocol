@@ -4,7 +4,6 @@ Regression tests for all issues identified in the Beta Test Final Report.
 These tests ensure that all fixes remain working and prevent regressions.
 """
 
-import pytest
 from ucp import (
     Block,
     SemanticRole,
