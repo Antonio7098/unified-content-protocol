@@ -69,4 +69,4 @@ jobs:
 
       - name: Run tests
         working-directory: packages/ucp-js
-        run: npm run test -- --runInBand
+        run: npm run test
