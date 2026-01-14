@@ -1,5 +1,5 @@
 {
-  "name": "@ucp-core/core",
+  "name": "ucp-js",
   "version": "0.1.0",
   "description": "Unified Content Protocol - JavaScript/TypeScript SDK for LLM content manipulation",
   "type": "module",

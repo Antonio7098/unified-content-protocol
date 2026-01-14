@@ -121,8 +121,11 @@ class MarkdownParser:
                 continue
             
             # List item (unordered or ordered)
-            list_match = self.LIST_ITEM_PATTERN.match(line) or self.NUMBERED_LIST_PATTERN.match(line)
+            unordered_match = self.LIST_ITEM_PATTERN.match(line)
+            ordered_match = self.NUMBERED_LIST_PATTERN.match(line)
+            list_match = unordered_match or ordered_match
             if list_match:
+                is_ordered = ordered_match is not None
                 list_lines: List[str] = []
                 while i < len(lines):
                     lm = self.LIST_ITEM_PATTERN.match(lines[i]) or self.NUMBERED_LIST_PATTERN.match(lines[i])
@@ -136,12 +139,22 @@ class MarkdownParser:
                         break
                 
                 parent_id = heading_stack[-1][1] if heading_stack else root
-                doc.add_block(
+                # Preserve original list marker type
+                if is_ordered:
+                    content = '\n'.join(f'{idx}. {item}' for idx, item in enumerate(list_lines, 1))
+                else:
+                    content = '\n'.join(f'- {item}' for item in list_lines)
+                
+                block_id = doc.add_block(
                     parent_id,
-                    '\n'.join(f'- {item}' for item in list_lines),
+                    content,
                     content_type=ContentType.TEXT,
                     role=SemanticRole.LIST,
                 )
+                # Store list type in metadata for round-trip fidelity
+                block = doc.get_block(block_id)
+                if block:
+                    block.metadata.custom['list_type'] = 'ordered' if is_ordered else 'unordered'
                 continue
             
             # Regular paragraph
@@ -252,12 +265,21 @@ class MarkdownRenderer:
             lines.append('')
         
         elif role == SemanticRole.LIST:
+            # Check metadata for list type preference
+            list_type = block.metadata.custom.get('list_type', 'unordered')
+            
             # Content might already have list markers
-            if content.startswith('-') or content.startswith('*'):
+            if content.startswith('-') or content.startswith('*') or (content and content[0].isdigit()):
                 lines.append(content)
             else:
-                for line in content.split('\n'):
-                    lines.append(f'- {line}')
+                # Apply appropriate markers based on list type
+                content_lines = content.split('\n')
+                if list_type == 'ordered':
+                    for idx, line in enumerate(content_lines, 1):
+                        lines.append(f'{idx}. {line}')
+                else:
+                    for line in content_lines:
+                        lines.append(f'- {line}')
             lines.append('')
         
         elif role == SemanticRole.PARAGRAPH or role is None:

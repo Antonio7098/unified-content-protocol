@@ -1,0 +1,73 @@
+# UCM Core
+
+**ucm-core** provides the fundamental building blocks for the Unified Content Model — the core types and traits for representing structured content in a graph-based intermediate representation.
+
+## Overview
+
+UCM Core is the foundation of the UCP ecosystem. It defines:
+
+- **Block** - The fundamental unit of content
+- **Content** - Typed content variants (text, code, table, etc.)
+- **Document** - A collection of blocks with hierarchical structure
+- **Edge** - Explicit relationships between blocks
+- **BlockId** - Content-addressed identifiers with 96-bit collision resistance
+- **Metadata** - Semantic roles, tags, and token estimates
+
+## Installation
+
+```toml
+[dependencies]
+ucm-core = "0.1"
+```
+
+## Quick Example
+
+```rust
+use ucm_core::{Block, Content, Document, DocumentId};
+
+fn main() {
+    // Create a document
+    let mut doc = Document::create();
+    let root = doc.root.clone();
+    
+    // Create and add a block
+    let block = Block::new(Content::text("Hello, UCM!"), Some("intro"))
+        .with_label("greeting")
+        .with_tag("example");
+    
+    let block_id = doc.add_block(block, &root).unwrap();
+    
+    // Query the block
+    let block = doc.get_block(&block_id).unwrap();
+    println!("Block ID: {}", block.id);
+    println!("Content type: {}", block.content_type());
+}
+```
+
+## Public API
+
+### Re-exports
+
+```rust
+pub use block::{Block, BlockState};
+pub use content::{
+    BinaryEncoding, Cell, Code, Column, CompositeLayout, Content, 
+    DataType, Dimensions, JsonSchema, LineRange, Math, MathFormat, 
+    Media, MediaSource, MediaType, Row, Table, TableSchema, Text, TextFormat,
+};
+pub use document::{Document, DocumentId, DocumentMetadata};
+pub use edge::{Edge, EdgeIndex, EdgeMetadata, EdgeType};
+pub use error::{Error, ErrorCode, Result, ValidationIssue, ValidationSeverity};
+pub use id::{BlockId, ContentHash, IdGenerator, IdGeneratorConfig};
+pub use metadata::{BlockMetadata, RoleCategory, SemanticRole, TokenEstimate, TokenModel};
+pub use version::{DocumentVersion, Version};
+```
+
+## See Also
+
+- [Blocks](../../docs/ucm-core/blocks.md) - Detailed block documentation
+- [Content Types](../../docs/ucm-core/content-types.md) - All content variants
+- [Documents](../../docs/ucm-core/documents.md) - Document operations
+- [Edges](../../docs/ucm-core/edges.md) - Relationship types
+- [ID Generation](../../docs/ucm-core/id-generation.md) - How IDs are generated
+- [Metadata](../../docs/ucm-core/metadata.md) - Semantic roles and metadata

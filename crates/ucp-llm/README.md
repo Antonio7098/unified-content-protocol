@@ -1,4 +1,4 @@
-# UCP LLM Utilities
+# UCP LLM
 
 **ucp-llm** contains helpers for turning UCM documents into LLM-friendly prompts and UCL command scaffolds. It focuses on token efficiency, deterministic mappings, and safe prompt composition.
 
@@ -10,7 +10,14 @@
 | [`PromptBuilder`](#promptbuilder) | Builds capability-scoped system instructions, task context, and rule sets for LLM agents |
 | [`presets`](#presets) | Ready-made prompt configurations (basic editing, structure manipulation, etc.) |
 
-### IdMapper
+## Installation
+
+```toml
+[dependencies]
+ucp-llm = { path = "crates/ucp-llm" }
+```
+
+## IdMapper
 
 Token budgets collapse quickly when every UCL command references `blk_a1b2…`. `IdMapper` provides a deterministic mapping so prompts can use `1`, `2`, `3`, … instead. Key APIs:
 
@@ -37,7 +44,7 @@ Highlights:
 - `document_to_prompt` helper for hierarchical summaries
 - `estimate_token_savings` for quick what-if analysis
 
-### PromptBuilder
+## PromptBuilder
 
 `PromptBuilder` assembles the system/task instructions LLMs need to safely emit UCL.
 
@@ -57,7 +64,7 @@ let final_prompt = builder.build_prompt(doc_context, "Update block 2 to mention 
 
 Capabilities gate which command documentation is included (`EDIT`, `APPEND`, `MOVE`, `DELETE`, `LINK`, `SNAPSHOT`, `TRANSACTION`). Short-ID mode automatically updates rule text so the model knows IDs like `1`, `2`, `3` will appear.
 
-### Presets
+## Presets
 
 ```rust
 use ucp_llm::presets;
@@ -72,18 +79,17 @@ Use these as starting points for common workflows.
 ## When to Use `ucp-llm`
 
 - Building an agent that reads a UCM document and must output UCL
-- Preparing evaluation prompts for the benchmarking suite
+- Preparing evaluation prompts for benchmarking
 - Any time you need short IDs, consistent command references, or prebuilt rule sets for LLM instructions
 
-## Dependency
+## Public API
 
-Add the crate via workspace dependency:
-
-```toml
-ucp-llm = { path = "crates/ucp-llm" }
+```rust
+pub use id_mapper::IdMapper;
+pub use prompt_builder::{PromptBuilder, UclCapability, presets};
 ```
 
 ## See Also
 
-- [Getting Started › Concepts](../getting-started/concepts.md) – background on BlockIds and deterministic IDs
-- [UCL Commands](../ucl-parser/commands.md) – reference for the actual command syntax
+- [Getting Started › Concepts](../../docs/getting-started/concepts.md) – background on BlockIds and deterministic IDs
+- [UCL Commands](../../docs/ucl-parser/commands.md) – reference for the actual command syntax

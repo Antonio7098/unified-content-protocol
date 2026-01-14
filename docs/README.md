@@ -19,7 +19,7 @@ UCP provides a token-efficient, deterministic framework for representing and tra
 │                         ucm-core                                 │
 │         (Core Types: Block, Document, Content, Edge)             │
 ├─────────────────────────────────────────────────────────────────┤
-│   ucp-translator-markdown   │        ucp-observe                 │
+│ ucp-translator-markdown   │        ucp-observe                     │
 │    (Format Translators)     │    (Observability/Metrics)         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -33,6 +33,7 @@ UCP provides a token-efficient, deterministic framework for representing and tra
 | [`ucl-parser`](./ucl-parser/README.md) | Parser for the Unified Content Language (UCL) |
 | [`ucp-api`](./ucp-api/README.md) | High-level API for application integration |
 | [`ucp-translator-markdown`](./translators/markdown/README.md) | Bidirectional Markdown conversion |
+| [`ucp-llm`](./ucp-llm/README.md) | LLM utilities (ID mapping, prompt building) |
 | [`ucp-observe`](./ucp-observe/README.md) | Observability utilities (tracing, metrics, audit) |
 
 ## Quick Start
@@ -131,6 +132,8 @@ docs/
 ├── translators/
 │   └── markdown/
 │       └── README.md
+├── ucp-llm/
+│   └── README.md
 ├── ucp-observe/
 │   └── README.md
 └── examples/

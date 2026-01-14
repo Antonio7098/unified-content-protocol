@@ -1,11 +1,11 @@
 /**
- * @ucp/core - Unified Content Protocol SDK
+ * ucp-js - Unified Content Protocol JavaScript SDK
  *
  * A developer-friendly SDK for building LLM-powered content manipulation.
  *
  * @example
  * ```typescript
- * import { ucp } from '@anthropic/ucp'
+ * import { ucp } from 'ucp-js'
  *
  * // Parse markdown into a document
  * const doc = ucp.parse('# Hello\n\nWorld')
@@ -37,8 +37,10 @@ export type ContentType = 'text' | 'code' | 'table' | 'math' | 'json' | 'media' 
 /** Semantic roles for blocks */
 export type SemanticRole =
   | 'heading1' | 'heading2' | 'heading3' | 'heading4' | 'heading5' | 'heading6'
-  | 'paragraph' | 'quote' | 'list' | 'code' | 'table'
-  | 'title' | 'subtitle' | 'abstract' | 'intro' | 'body' | 'conclusion'
+  | 'paragraph' | 'quote' | 'list' | 'code' | 'table' | 'equation'
+  | 'title' | 'subtitle' | 'abstract' | 'section' | 'intro' | 'body' | 'conclusion'
+  | 'note' | 'warning' | 'tip' | 'sidebar' | 'callout'
+  | 'metadata' | 'citation' | 'footnote'
 
 /** Edge types for block relationships */
 export type EdgeType =
