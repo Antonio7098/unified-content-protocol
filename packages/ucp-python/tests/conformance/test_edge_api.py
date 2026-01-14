@@ -4,9 +4,7 @@ Conformance tests for Edge API.
 These tests verify Edge creation, manipulation, and EdgeType functionality.
 """
 
-import pytest
 from ucp import (
-    Document,
     Edge,
     EdgeType,
     EdgeMetadata,

@@ -9,10 +9,7 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
 from typing import (
-    Any,
-    Callable,
     Dict,
     Iterator,
     List,
@@ -21,7 +18,7 @@ from typing import (
     Tuple,
 )
 
-from .block import Block, generate_block_id
+from .block import Block
 from .edge_index import EdgeIndex
 from .types import (
     ContentType,
@@ -32,7 +29,6 @@ from .types import (
     SemanticRole,
     ValidationIssue,
     ValidationResult,
-    ValidationSeverity,
 )
 
 

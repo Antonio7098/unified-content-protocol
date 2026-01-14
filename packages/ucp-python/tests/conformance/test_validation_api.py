@@ -5,13 +5,10 @@ These tests verify API consistency for ValidationResult, ValidationIssue,
 and related validation types.
 """
 
-import pytest
 from ucp import (
     ValidationResult,
     ValidationIssue,
     ValidationSeverity,
-    create,
-    ResourceLimits,
 )
 
 

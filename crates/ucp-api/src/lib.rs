@@ -149,7 +149,9 @@ impl UcpClient {
                                 .map_err(|_| Error::InvalidBlockId(sibling_id.clone()))?;
                             ops.push(Operation::MoveToTarget {
                                 block_id,
-                                target: ucm_engine::MoveTarget::Before { sibling_id: sibling },
+                                target: ucm_engine::MoveTarget::Before {
+                                    sibling_id: sibling,
+                                },
                             });
                         }
                         ucl_parser::MoveTarget::After { sibling_id } => {
@@ -158,7 +160,9 @@ impl UcpClient {
                                 .map_err(|_| Error::InvalidBlockId(sibling_id.clone()))?;
                             ops.push(Operation::MoveToTarget {
                                 block_id,
-                                target: ucm_engine::MoveTarget::After { sibling_id: sibling },
+                                target: ucm_engine::MoveTarget::After {
+                                    sibling_id: sibling,
+                                },
                             });
                         }
                     }

@@ -283,7 +283,9 @@ impl PromptBuilder {
             rules.push("Block IDs have format: blk_XXXXXXXXXXXX (12 hex chars)");
         }
 
-        rules.push("Do NOT use operators like + for string concatenation - just provide the full value");
+        rules.push(
+            "Do NOT use operators like + for string concatenation - just provide the full value",
+        );
 
         rules
     }
@@ -343,8 +345,7 @@ pub mod presets {
 
     /// Token-efficient mode with short IDs
     pub fn token_efficient() -> PromptBuilder {
-        PromptBuilder::with_all_capabilities()
-            .with_short_ids(true)
+        PromptBuilder::with_all_capabilities().with_short_ids(true)
     }
 }
 
@@ -354,8 +355,7 @@ mod tests {
 
     #[test]
     fn test_prompt_builder_basic() {
-        let builder = PromptBuilder::new()
-            .with_capability(UclCapability::Edit);
+        let builder = PromptBuilder::new().with_capability(UclCapability::Edit);
 
         let prompt = builder.build_system_prompt();
         assert!(prompt.contains("EDIT"));

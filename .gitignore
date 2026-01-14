@@ -32,3 +32,4 @@ benchmark_*.txt
 *.temp
 
 notes.txt
+.venv/

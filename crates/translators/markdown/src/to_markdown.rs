@@ -8,8 +8,8 @@
 //! derivation for blocks without heading roles.
 
 use crate::{Result, TranslatorError};
-use ucm_core::{Block, BlockId, Cell, Content, Document, MediaSource, Row};
 use ucm_core::metadata::RoleCategory;
+use ucm_core::{Block, BlockId, Cell, Content, Document, MediaSource, Row};
 
 /// Configuration for heading level derivation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +65,7 @@ impl MarkdownRenderer {
     pub fn render(&self, doc: &Document) -> Result<String> {
         let mut output = String::new();
         self.render_block(doc, &doc.root, &mut output, 0)?;
-        
+
         // Trim trailing whitespace but ensure single newline at end
         let trimmed = output.trim_end();
         if trimmed.is_empty() {
@@ -104,11 +104,7 @@ impl MarkdownRenderer {
 
     fn render_content(&self, block: &Block, output: &mut String, depth: usize) -> Result<()> {
         // Determine the effective role, considering heading mode
-        let explicit_role = block
-            .metadata
-            .semantic_role
-            .as_ref()
-            .map(|r| r.category);
+        let explicit_role = block.metadata.semantic_role.as_ref().map(|r| r.category);
 
         match &block.content {
             Content::Text(text) => {
@@ -165,7 +161,11 @@ impl MarkdownRenderer {
     }
 
     /// Determine heading level based on mode, explicit role, and depth
-    fn resolve_heading_level(&self, explicit_role: Option<RoleCategory>, depth: usize) -> Option<usize> {
+    fn resolve_heading_level(
+        &self,
+        explicit_role: Option<RoleCategory>,
+        depth: usize,
+    ) -> Option<usize> {
         match self.heading_mode {
             HeadingMode::Explicit => {
                 // Only use explicit heading roles
@@ -174,7 +174,10 @@ impl MarkdownRenderer {
             HeadingMode::Structural => {
                 // Always derive from depth (depth 1 = H1, depth 2 = H2, etc.)
                 // Only for blocks that look like headings (have heading role or are section containers)
-                if explicit_role.map(|r| self.is_heading_role(r)).unwrap_or(false) {
+                if explicit_role
+                    .map(|r| self.is_heading_role(r))
+                    .unwrap_or(false)
+                {
                     Some((depth + self.heading_offset).min(6).max(1))
                 } else {
                     None
@@ -237,9 +240,7 @@ impl MarkdownRenderer {
         }
 
         // Handle other roles
-        let role_str = explicit_role
-            .map(|r| r.as_str())
-            .unwrap_or("paragraph");
+        let role_str = explicit_role.map(|r| r.as_str()).unwrap_or("paragraph");
 
         match role_str {
             "quote" => {

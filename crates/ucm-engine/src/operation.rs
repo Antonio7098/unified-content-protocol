@@ -7,7 +7,10 @@ use ucm_core::{BlockId, Content, EdgeType};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MoveTarget {
     /// Move to a parent at optional index
-    ToParent { parent_id: BlockId, index: Option<usize> },
+    ToParent {
+        parent_id: BlockId,
+        index: Option<usize>,
+    },
     /// Move before a sibling
     Before { sibling_id: BlockId },
     /// Move after a sibling
@@ -172,7 +175,7 @@ impl Operation {
                 MoveTarget::After { sibling_id } => {
                     format!("MOVE {} AFTER {}", block_id, sibling_id)
                 }
-            }
+            },
             Operation::Append { parent_id, .. } => {
                 format!("APPEND to {}", parent_id)
             }

@@ -183,8 +183,9 @@ impl IdMapper {
                 \b(?:EDIT|APPEND|MOVE|DELETE|LINK|UNLINK|TO|BEFORE|AFTER)\s+
             )
             (?P<id>\d+)
-            "
-        ).unwrap();
+            ",
+        )
+        .unwrap();
 
         let mut result = ucl.to_string();
 
@@ -197,7 +198,10 @@ impl IdMapper {
                 let block_id = self.to_long.get(&short_id)?;
                 let full_match = cap.get(0)?;
                 let prefix = cap.name("prefix")?.as_str();
-                Some((full_match.as_str().to_string(), format!("{}{}", prefix, block_id)))
+                Some((
+                    full_match.as_str().to_string(),
+                    format!("{}{}", prefix, block_id),
+                ))
             })
             .collect();
 
@@ -213,8 +217,9 @@ impl IdMapper {
                 \b(?:references|elaborates|summarizes|contradicts|supports|requires|parent_of)\s+
             )
             (?P<id>\d+)
-            "
-        ).unwrap();
+            ",
+        )
+        .unwrap();
 
         let replacements: Vec<_> = link_target_pattern
             .captures_iter(&result.clone())
@@ -224,7 +229,10 @@ impl IdMapper {
                 let block_id = self.to_long.get(&short_id)?;
                 let full_match = cap.get(0)?;
                 let prefix = cap.name("prefix")?.as_str();
-                Some((full_match.as_str().to_string(), format!("{}{}", prefix, block_id)))
+                Some((
+                    full_match.as_str().to_string(),
+                    format!("{}{}", prefix, block_id),
+                ))
             })
             .collect();
 

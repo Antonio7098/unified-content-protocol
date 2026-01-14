@@ -7,7 +7,7 @@ This module provides O(1) edge lookups in both directions.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 from .types import Edge, EdgeType
 

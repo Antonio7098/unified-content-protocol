@@ -6,8 +6,6 @@ These tests verify IdMapper, PromptBuilder, and UclBuilder functionality.
 
 import pytest
 from ucp import (
-    Document,
-    Block,
     parse,
     create,
 )
