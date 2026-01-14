@@ -253,22 +253,22 @@ impl EdgeIndex {
     pub fn add_edge(&mut self, source: &BlockId, edge: &Edge) {
         // Add to outgoing
         self.outgoing
-            .entry(source.clone())
+            .entry(*source)
             .or_default()
-            .push((edge.edge_type.clone(), edge.target.clone()));
+            .push((edge.edge_type.clone(), edge.target));
 
         // Auto-maintain inverse edge in incoming index
         if let Some(inv) = edge.edge_type.inverse() {
             self.incoming
-                .entry(edge.target.clone())
+                .entry(edge.target)
                 .or_default()
-                .push((inv, source.clone()));
+                .push((inv, *source));
         } else {
             // Even without inverse, track in incoming for traversal
             self.incoming
-                .entry(edge.target.clone())
+                .entry(edge.target)
                 .or_default()
-                .push((edge.edge_type.clone(), source.clone()));
+                .push((edge.edge_type.clone(), *source));
         }
     }
 
@@ -336,7 +336,7 @@ impl EdgeIndex {
                 edges
                     .iter()
                     .filter(|(t, _)| t == edge_type)
-                    .map(|(_, tgt)| tgt.clone())
+                    .map(|(_, tgt)| *tgt)
                     .collect()
             })
             .unwrap_or_default()
@@ -350,7 +350,7 @@ impl EdgeIndex {
                 edges
                     .iter()
                     .filter(|(t, _)| t == edge_type)
-                    .map(|(_, src)| src.clone())
+                    .map(|(_, src)| *src)
                     .collect()
             })
             .unwrap_or_default()

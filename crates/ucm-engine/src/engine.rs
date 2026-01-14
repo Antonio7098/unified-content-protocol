@@ -273,7 +273,7 @@ impl Engine {
                     _ => {}
                 }
                 block.version.increment();
-                return Ok(OperationResult::success(vec![block_id.clone()]));
+                return Ok(OperationResult::success(vec![*block_id]));
             }
         }
 
@@ -326,7 +326,7 @@ impl Engine {
                 }
             }
             block.version.increment();
-            return Ok(OperationResult::success(vec![block_id.clone()]));
+            return Ok(OperationResult::success(vec![*block_id]));
         }
 
         Ok(OperationResult::failure(format!(
@@ -346,7 +346,7 @@ impl Engine {
             Some(idx) => doc.move_block_at(block_id, new_parent, idx)?,
             None => doc.move_block(block_id, new_parent)?,
         }
-        Ok(OperationResult::success(vec![block_id.clone()]))
+        Ok(OperationResult::success(vec![*block_id]))
     }
 
     fn execute_move_to_target(
@@ -371,7 +371,7 @@ impl Engine {
                     .position(|id| id == &sibling_id)
                     .ok_or_else(|| Error::Internal("Sibling not found in parent".into()))?;
                 doc.move_block_at(block_id, &parent_id, sibling_index)?;
-                Ok(OperationResult::success(vec![block_id.clone()]))
+                Ok(OperationResult::success(vec![*block_id]))
             }
             MoveTarget::After { sibling_id } => {
                 // Find sibling's parent and index
@@ -385,7 +385,7 @@ impl Engine {
                     .position(|id| id == &sibling_id)
                     .ok_or_else(|| Error::Internal("Sibling not found in parent".into()))?;
                 doc.move_block_at(block_id, &parent_id, sibling_index + 1)?;
-                Ok(OperationResult::success(vec![block_id.clone()]))
+                Ok(OperationResult::success(vec![*block_id]))
             }
         }
     }
@@ -438,7 +438,7 @@ impl Engine {
             vec![doc.delete_block(block_id)?]
         };
 
-        let ids: Vec<_> = deleted.iter().map(|b| b.id.clone()).collect();
+        let ids: Vec<_> = deleted.iter().map(|b| b.id).collect();
         Ok(OperationResult::success(ids))
     }
 
@@ -454,7 +454,7 @@ impl Engine {
                     .blocks
                     .values()
                     .filter(|b| b.has_tag(&tag))
-                    .map(|b| b.id.clone())
+                    .map(|b| b.id)
                     .collect();
 
                 let mut pruned = Vec::new();
@@ -473,7 +473,7 @@ impl Engine {
             }
         };
 
-        let ids: Vec<_> = pruned.iter().map(|b| b.id.clone()).collect();
+        let ids: Vec<_> = pruned.iter().map(|b| b.id).collect();
         Ok(OperationResult::success(ids))
     }
 
@@ -492,7 +492,7 @@ impl Engine {
             return Err(Error::BlockNotFound(target.to_string()));
         }
 
-        let mut edge = Edge::new(edge_type, target.clone());
+        let mut edge = Edge::new(edge_type, *target);
         if let Some(meta) = metadata {
             if let Some(obj) = meta.as_object() {
                 for (k, v) in obj {
@@ -508,7 +508,7 @@ impl Engine {
         // Update edge index
         doc.edge_index.add_edge(source, &edge);
 
-        Ok(OperationResult::success(vec![source.clone()]))
+        Ok(OperationResult::success(vec![*source]))
     }
 
     fn execute_unlink(
@@ -526,7 +526,7 @@ impl Engine {
 
         if removed {
             doc.edge_index.remove_edge(source, target, &edge_type);
-            Ok(OperationResult::success(vec![source.clone()]))
+            Ok(OperationResult::success(vec![*source]))
         } else {
             Ok(OperationResult::failure("Edge not found"))
         }

@@ -115,7 +115,7 @@ impl Content {
         let table_rows = rows
             .into_iter()
             .map(|r| Row {
-                cells: r.into_iter().map(|c| Cell::Text(c)).collect(),
+                cells: r.into_iter().map(Cell::Text).collect(),
             })
             .collect();
 

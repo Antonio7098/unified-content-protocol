@@ -1,7 +1,7 @@
 //! High-level API for UCP.
 
 use ucl_parser::{parse, parse_commands, UclDocument};
-use ucm_core::{Block, BlockId, Content, Document, DocumentId, Error, Result};
+use ucm_core::{Block, BlockId, Content, Document, Error, Result};
 use ucm_engine::{Engine, Operation, OperationResult};
 
 /// UCP client for document manipulation

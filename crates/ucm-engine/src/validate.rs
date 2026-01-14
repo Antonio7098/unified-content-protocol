@@ -225,8 +225,8 @@ impl ValidationPipeline {
             visited: &mut HashSet<BlockId>,
             rec_stack: &mut HashSet<BlockId>,
         ) -> bool {
-            visited.insert(node.clone());
-            rec_stack.insert(node.clone());
+            visited.insert(*node);
+            rec_stack.insert(*node);
 
             if let Some(children) = structure.get(node) {
                 for child in children {

@@ -12,20 +12,15 @@ use ucm_core::metadata::RoleCategory;
 use ucm_core::{Block, BlockId, Cell, Content, Document, MediaSource, Row};
 
 /// Configuration for heading level derivation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HeadingMode {
     /// Use explicit semantic roles only (heading1, heading2, etc.)
     Explicit,
     /// Derive heading level from document structure depth
     Structural,
     /// Use explicit roles when present, fall back to structural derivation
+    #[default]
     Hybrid,
-}
-
-impl Default for HeadingMode {
-    fn default() -> Self {
-        Self::Hybrid
-    }
 }
 
 /// Markdown renderer that converts UCM to Markdown

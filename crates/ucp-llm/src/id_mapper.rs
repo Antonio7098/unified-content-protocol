@@ -70,7 +70,7 @@ impl IdMapper {
 
         // Add all other blocks in a deterministic order (sorted by ID)
         let mut block_ids: Vec<_> = doc.blocks.keys().collect();
-        block_ids.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        block_ids.sort_by_key(|a| a.to_string());
 
         for block_id in block_ids {
             if block_id != &doc.root {
@@ -89,8 +89,8 @@ impl IdMapper {
 
         let short_id = self.next_id;
         self.next_id += 1;
-        self.to_short.insert(block_id.clone(), short_id);
-        self.to_long.insert(short_id, block_id.clone());
+        self.to_short.insert(*block_id, short_id);
+        self.to_long.insert(short_id, *block_id);
         short_id
     }
 
