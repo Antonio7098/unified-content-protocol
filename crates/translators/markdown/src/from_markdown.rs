@@ -24,7 +24,7 @@ impl MarkdownParser {
         use ucm_core::BlockId;
 
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
         let lines: Vec<&str> = markdown.lines().collect();
         let mut i = 0;
 
@@ -47,13 +47,13 @@ impl MarkdownParser {
 
                 // Find the parent: look for the nearest heading of a higher level
                 let parent = if heading.level == 1 {
-                    root.clone()
+                    root
                 } else {
                     // Find parent from heading_stack (levels 1 to level-1)
-                    let mut parent_id = root.clone();
+                    let mut parent_id = root;
                     for lvl in (0..heading.level - 1).rev() {
                         if let Some(ref id) = heading_stack[lvl] {
-                            parent_id = id.clone();
+                            parent_id = *id;
                             break;
                         }
                     }
@@ -66,8 +66,12 @@ impl MarkdownParser {
 
                 // Update heading stack: set this level and clear all lower levels
                 heading_stack[heading.level - 1] = Some(block_id);
-                for lvl in heading.level..6 {
-                    heading_stack[lvl] = None;
+                for h in heading_stack
+                    .iter_mut()
+                    .skip(heading.level)
+                    .take(6 - heading.level)
+                {
+                    *h = None;
                 }
 
                 i += 1;
@@ -75,11 +79,7 @@ impl MarkdownParser {
             }
 
             // Find current parent (most recent heading or root)
-            let current_parent = heading_stack
-                .iter()
-                .rev()
-                .find_map(|h| h.clone())
-                .unwrap_or_else(|| root.clone());
+            let current_parent = heading_stack.iter().rev().find_map(|h| *h).unwrap_or(root);
 
             // Code block
             if line.starts_with("```") {

@@ -8,11 +8,10 @@ token-efficient ID mapping.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
 from .document import Document
-from .types import Capability, SemanticRole
+from .types import Capability
 
 
 # =============================================================================

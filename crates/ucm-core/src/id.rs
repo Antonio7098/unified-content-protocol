@@ -96,27 +96,25 @@ impl FromStr for BlockId {
             .strip_prefix("blk_")
             .ok_or_else(|| Error::InvalidBlockId(format!("missing 'blk_' prefix: {}", s)))?;
 
-        // Pad odd-length hex strings with a leading zero
-        let hex_normalized = if hex_part.len() % 2 == 1 {
-            format!("0{}", hex_part)
-        } else {
-            hex_part.to_string()
-        };
+        if hex_part.len() != 24 {
+            return Err(Error::InvalidBlockId(format!(
+                "expected 24 hex characters, got {}",
+                hex_part.len()
+            )));
+        }
 
-        let bytes = hex::decode(&hex_normalized)
+        let bytes = hex::decode(hex_part)
             .map_err(|e| Error::InvalidBlockId(format!("invalid hex: {}", e)))?;
 
-        if bytes.len() > 12 {
+        if bytes.len() != 12 {
             return Err(Error::InvalidBlockId(format!(
-                "expected at most 12 bytes, got {}",
+                "expected 12 bytes, got {}",
                 bytes.len()
             )));
         }
 
-        // Pad shorter hex strings (like 12 hex chars = 6 bytes) to 12 bytes
         let mut arr = [0u8; 12];
-        let start = 12 - bytes.len();
-        arr[start..].copy_from_slice(&bytes);
+        arr.copy_from_slice(&bytes);
         Ok(BlockId(arr))
     }
 }
@@ -331,7 +329,6 @@ mod hex_array_32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::content::TextFormat;
 
     #[test]
     fn test_block_id_display() {

@@ -119,9 +119,9 @@ fn normalize_code_content(code: &Code) -> String {
 }
 
 fn normalize_table_content(table: &Table) -> String {
-    let columns: Vec<String> = table.columns.iter().map(|c| normalize_column(c)).collect();
+    let columns: Vec<String> = table.columns.iter().map(normalize_column).collect();
 
-    let rows: Vec<String> = table.rows.iter().map(|r| normalize_row(r)).collect();
+    let rows: Vec<String> = table.rows.iter().map(normalize_row).collect();
 
     format!("columns:[{}],rows:[{}]", columns.join(","), rows.join(","))
 }
@@ -135,7 +135,7 @@ fn normalize_column(column: &Column) -> String {
 }
 
 fn normalize_row(row: &Row) -> String {
-    let cells: Vec<String> = row.cells.iter().map(|c| normalize_cell(c)).collect();
+    let cells: Vec<String> = row.cells.iter().map(normalize_cell).collect();
     format!("[{}]", cells.join(","))
 }
 

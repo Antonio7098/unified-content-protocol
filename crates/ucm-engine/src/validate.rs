@@ -225,8 +225,8 @@ impl ValidationPipeline {
             visited: &mut HashSet<BlockId>,
             rec_stack: &mut HashSet<BlockId>,
         ) -> bool {
-            visited.insert(node.clone());
-            rec_stack.insert(node.clone());
+            visited.insert(*node);
+            rec_stack.insert(*node);
 
             if let Some(children) = structure.get(node) {
                 for child in children {
@@ -291,7 +291,7 @@ impl Default for ValidationPipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ucm_core::{Content, DocumentId};
+    use ucm_core::Content;
 
     #[test]
     fn test_valid_document() {
@@ -307,7 +307,7 @@ mod tests {
         let validator = ValidationPipeline::new();
         let mut doc = Document::create();
 
-        let root = doc.root.clone();
+        let root = doc.root;
         let id = doc
             .add_block(Block::new(Content::text("Test"), None), &root)
             .unwrap();
@@ -326,7 +326,7 @@ mod tests {
         });
 
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
         doc.add_block(
             Block::new(Content::text("This is longer than 10 bytes"), None),
             &root,

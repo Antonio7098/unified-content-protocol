@@ -6,6 +6,9 @@ use crate::normalize::is_cjk_character;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::error::Error as StdError;
+use std::fmt;
+use std::str::FromStr;
 
 /// Block metadata
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -153,7 +156,7 @@ impl SemanticRole {
             return None;
         }
 
-        let category = RoleCategory::from_str(parts[0])?;
+        let category = RoleCategory::from_str(parts[0]).ok()?;
         let subcategory = parts.get(1).map(|s| s.to_string());
         let qualifier = parts.get(2).map(|s| s.to_string());
 
@@ -245,6 +248,17 @@ pub enum RoleCategory {
     Custom,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoleCategoryParseError(pub String);
+
+impl fmt::Display for RoleCategoryParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown role category '{}'", self.0)
+    }
+}
+
+impl StdError for RoleCategoryParseError {}
+
 impl RoleCategory {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -292,52 +306,56 @@ impl RoleCategory {
             Self::Custom => "custom",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for RoleCategory {
+    type Err = RoleCategoryParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "title" => Some(Self::Title),
-            "subtitle" => Some(Self::Subtitle),
-            "abstract" => Some(Self::Abstract),
-            "toc" | "table_of_contents" => Some(Self::TableOfContents),
-            "heading1" | "h1" => Some(Self::Heading1),
-            "heading2" | "h2" => Some(Self::Heading2),
-            "heading3" | "h3" => Some(Self::Heading3),
-            "heading4" | "h4" => Some(Self::Heading4),
-            "heading5" | "h5" => Some(Self::Heading5),
-            "heading6" | "h6" => Some(Self::Heading6),
-            "paragraph" | "para" | "p" => Some(Self::Paragraph),
-            "list" | "ul" | "ol" => Some(Self::List),
-            "intro" | "introduction" => Some(Self::Intro),
-            "intro_hook" | "hook" => Some(Self::IntroHook),
-            "intro_context" | "context" => Some(Self::IntroContext),
-            "intro_thesis" | "thesis" => Some(Self::IntroThesis),
-            "body" => Some(Self::Body),
-            "body_argument" | "argument" => Some(Self::BodyArgument),
-            "body_evidence" | "evidence" => Some(Self::BodyEvidence),
-            "body_example" | "example" => Some(Self::BodyExample),
-            "body_counterargument" | "counterargument" => Some(Self::BodyCounterargument),
-            "body_transition" | "transition" => Some(Self::BodyTransition),
-            "conclusion" => Some(Self::Conclusion),
-            "conclusion_summary" | "summary" => Some(Self::ConclusionSummary),
-            "conclusion_implication" | "implication" => Some(Self::ConclusionImplication),
-            "conclusion_cta" | "cta" | "call_to_action" => Some(Self::ConclusionCallToAction),
-            "sidebar" => Some(Self::Sidebar),
-            "callout" => Some(Self::Callout),
-            "warning" => Some(Self::Warning),
-            "note" => Some(Self::Note),
-            "quote" | "blockquote" => Some(Self::Quote),
-            "definition" => Some(Self::Definition),
-            "theorem" => Some(Self::Theorem),
-            "proof" => Some(Self::Proof),
-            "algorithm" => Some(Self::Algorithm),
-            "code" => Some(Self::Code),
-            "metadata" | "meta" => Some(Self::Metadata),
-            "citation" | "cite" => Some(Self::Citation),
-            "footnote" => Some(Self::Footnote),
-            "appendix" => Some(Self::Appendix),
-            "reference" | "ref" => Some(Self::Reference),
-            "custom" => Some(Self::Custom),
-            _ => None,
+            "title" => Ok(Self::Title),
+            "subtitle" => Ok(Self::Subtitle),
+            "abstract" => Ok(Self::Abstract),
+            "toc" | "table_of_contents" => Ok(Self::TableOfContents),
+            "heading1" | "h1" => Ok(Self::Heading1),
+            "heading2" | "h2" => Ok(Self::Heading2),
+            "heading3" | "h3" => Ok(Self::Heading3),
+            "heading4" | "h4" => Ok(Self::Heading4),
+            "heading5" | "h5" => Ok(Self::Heading5),
+            "heading6" | "h6" => Ok(Self::Heading6),
+            "paragraph" | "para" | "p" => Ok(Self::Paragraph),
+            "list" | "ul" | "ol" => Ok(Self::List),
+            "intro" | "introduction" => Ok(Self::Intro),
+            "intro_hook" | "hook" => Ok(Self::IntroHook),
+            "intro_context" | "context" => Ok(Self::IntroContext),
+            "intro_thesis" | "thesis" => Ok(Self::IntroThesis),
+            "body" => Ok(Self::Body),
+            "body_argument" | "argument" => Ok(Self::BodyArgument),
+            "body_evidence" | "evidence" => Ok(Self::BodyEvidence),
+            "body_example" | "example" => Ok(Self::BodyExample),
+            "body_counterargument" | "counterargument" => Ok(Self::BodyCounterargument),
+            "body_transition" | "transition" => Ok(Self::BodyTransition),
+            "conclusion" => Ok(Self::Conclusion),
+            "conclusion_summary" | "summary" => Ok(Self::ConclusionSummary),
+            "conclusion_implication" | "implication" => Ok(Self::ConclusionImplication),
+            "conclusion_cta" | "cta" | "call_to_action" => Ok(Self::ConclusionCallToAction),
+            "sidebar" => Ok(Self::Sidebar),
+            "callout" => Ok(Self::Callout),
+            "warning" => Ok(Self::Warning),
+            "note" => Ok(Self::Note),
+            "quote" | "blockquote" => Ok(Self::Quote),
+            "definition" => Ok(Self::Definition),
+            "theorem" => Ok(Self::Theorem),
+            "proof" => Ok(Self::Proof),
+            "algorithm" => Ok(Self::Algorithm),
+            "code" => Ok(Self::Code),
+            "metadata" | "meta" => Ok(Self::Metadata),
+            "citation" | "cite" => Ok(Self::Citation),
+            "footnote" => Ok(Self::Footnote),
+            "appendix" => Ok(Self::Appendix),
+            "reference" | "ref" => Ok(Self::Reference),
+            "custom" => Ok(Self::Custom),
+            _ => Err(RoleCategoryParseError(s.to_string())),
         }
     }
 }

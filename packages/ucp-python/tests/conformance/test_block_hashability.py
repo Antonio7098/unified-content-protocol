@@ -5,8 +5,7 @@ These tests verify that Block objects can be used in sets and as dictionary keys
 which is essential for IdMapper and other utilities.
 """
 
-import pytest
-from ucp import Block, Document, create, SemanticRole
+from ucp import Block, create, SemanticRole
 
 
 class TestBlockHashability:
@@ -110,4 +109,4 @@ class TestBlockHashability:
         # Should not raise, but should return False for incompatible types
         assert block != "not a block"
         assert block != 42
-        assert block != None
+        assert block is not None

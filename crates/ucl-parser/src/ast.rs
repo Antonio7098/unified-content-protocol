@@ -58,7 +58,7 @@ pub enum ContentType {
 }
 
 impl ContentType {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse_content_type(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "text" => Some(Self::Text),
             "table" => Some(Self::Table),
@@ -224,23 +224,29 @@ impl Path {
             segments: vec![PathSegment::Property(name.to_string())],
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        self.segments
-            .iter()
-            .map(|s| match s {
-                PathSegment::Property(p) => p.clone(),
-                PathSegment::Index(i) => format!("[{}]", i),
-                PathSegment::Slice { start, end } => match (start, end) {
-                    (Some(s), Some(e)) => format!("[{}:{}]", s, e),
-                    (Some(s), None) => format!("[{}:]", s),
-                    (None, Some(e)) => format!("[:{}]", e),
-                    (None, None) => "[:]".to_string(),
-                },
-                PathSegment::JsonPath(p) => format!("${}", p),
-            })
-            .collect::<Vec<_>>()
-            .join(".")
+impl std::fmt::Display for Path {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.segments
+                .iter()
+                .map(|s| match s {
+                    PathSegment::Property(p) => p.clone(),
+                    PathSegment::Index(i) => format!("[{}]", i),
+                    PathSegment::Slice { start, end } => match (start, end) {
+                        (Some(s), Some(e)) => format!("[{}:{}]", s, e),
+                        (Some(s), None) => format!("[{}:]", s),
+                        (None, Some(e)) => format!("[:{}]", e),
+                        (None, None) => "[:]".to_string(),
+                    },
+                    PathSegment::JsonPath(p) => format!("${}", p),
+                })
+                .collect::<Vec<_>>()
+                .join(".")
+        )
     }
 }
 

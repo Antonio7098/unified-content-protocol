@@ -7,10 +7,7 @@ defined in docs/conformance/README.md.
 
 import pytest
 from ucp import (
-    Document,
-    Block,
     ContentType,
-    SemanticRole,
     EdgeType,
     parse,
     render,

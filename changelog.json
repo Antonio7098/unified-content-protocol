@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "version": "v0.1.0",
+      "date": "2025-01-14",
+      "changes": [
+        "Initial release of Unified Content Protocol workspace",
+        "Core Rust crates (ucm-core, ucm-engine, ucl-parser, ucp-api, ucp-observe, ucp-llm)",
+        "Markdown translator crate",
+        "Python SDK (ucp-content) initial publish",
+        "JavaScript SDK (@ucp-core/core) initial publish",
+        "Comprehensive docs and tooling"
+      ]
+    }
+  ]
+}

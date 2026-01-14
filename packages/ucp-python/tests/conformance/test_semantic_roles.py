@@ -5,7 +5,6 @@ These tests verify that all expected semantic roles are defined and can be
 used with blocks and documents.
 """
 
-import pytest
 from ucp import SemanticRole, Block, create
 
 

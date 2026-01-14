@@ -70,7 +70,7 @@ impl IdMapper {
 
         // Add all other blocks in a deterministic order (sorted by ID)
         let mut block_ids: Vec<_> = doc.blocks.keys().collect();
-        block_ids.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        block_ids.sort_by_key(|a| a.to_string());
 
         for block_id in block_ids {
             if block_id != &doc.root {
@@ -89,8 +89,8 @@ impl IdMapper {
 
         let short_id = self.next_id;
         self.next_id += 1;
-        self.to_short.insert(block_id.clone(), short_id);
-        self.to_long.insert(short_id, block_id.clone());
+        self.to_short.insert(*block_id, short_id);
+        self.to_long.insert(short_id, *block_id);
         short_id
     }
 
@@ -183,8 +183,9 @@ impl IdMapper {
                 \b(?:EDIT|APPEND|MOVE|DELETE|LINK|UNLINK|TO|BEFORE|AFTER)\s+
             )
             (?P<id>\d+)
-            "
-        ).unwrap();
+            ",
+        )
+        .unwrap();
 
         let mut result = ucl.to_string();
 
@@ -197,7 +198,10 @@ impl IdMapper {
                 let block_id = self.to_long.get(&short_id)?;
                 let full_match = cap.get(0)?;
                 let prefix = cap.name("prefix")?.as_str();
-                Some((full_match.as_str().to_string(), format!("{}{}", prefix, block_id)))
+                Some((
+                    full_match.as_str().to_string(),
+                    format!("{}{}", prefix, block_id),
+                ))
             })
             .collect();
 
@@ -213,8 +217,9 @@ impl IdMapper {
                 \b(?:references|elaborates|summarizes|contradicts|supports|requires|parent_of)\s+
             )
             (?P<id>\d+)
-            "
-        ).unwrap();
+            ",
+        )
+        .unwrap();
 
         let replacements: Vec<_> = link_target_pattern
             .captures_iter(&result.clone())
@@ -224,7 +229,10 @@ impl IdMapper {
                 let block_id = self.to_long.get(&short_id)?;
                 let full_match = cap.get(0)?;
                 let prefix = cap.name("prefix")?.as_str();
-                Some((full_match.as_str().to_string(), format!("{}{}", prefix, block_id)))
+                Some((
+                    full_match.as_str().to_string(),
+                    format!("{}{}", prefix, block_id),
+                ))
             })
             .collect();
 
@@ -338,7 +346,7 @@ mod tests {
     #[test]
     fn test_id_mapper() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let block1 = Block::new(Content::text("Hello"), Some("heading1"));
         let id1 = doc.add_block(block1, &root).unwrap();
@@ -424,7 +432,7 @@ mod tests {
     #[test]
     fn test_token_savings() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         // Add several blocks
         for i in 0..10 {
@@ -436,7 +444,7 @@ mod tests {
 
         // Create a prompt with multiple block references
         let mut prompt = String::new();
-        for (block_id, _) in &mapper.to_short {
+        for block_id in mapper.to_short.keys() {
             prompt.push_str(&format!("Block {} has content. ", block_id));
         }
 

@@ -260,20 +260,22 @@ impl<'a> Parser<'a> {
         } else {
             (Some(self.expect_block_id()?), None)
         };
-        let casc = self
-            .check(TokenKind::Cascade)
-            .then(|| {
+        let casc = if self.check(TokenKind::Cascade) {
+            {
                 self.advance();
                 true
-            })
-            .unwrap_or(false);
-        let pres = self
-            .check(TokenKind::PreserveChildren)
-            .then(|| {
+            }
+        } else {
+            false
+        };
+        let pres = if self.check(TokenKind::PreserveChildren) {
+            {
                 self.advance();
                 true
-            })
-            .unwrap_or(false);
+            }
+        } else {
+            false
+        };
         Ok(Command::Delete(DeleteCommand {
             block_id: bid,
             cascade: casc,
@@ -293,13 +295,14 @@ impl<'a> Parser<'a> {
         } else {
             PruneTarget::Unreachable
         };
-        let dry = self
-            .check(TokenKind::DryRun)
-            .then(|| {
+        let dry = if self.check(TokenKind::DryRun) {
+            {
                 self.advance();
                 true
-            })
-            .unwrap_or(false);
+            }
+        } else {
+            false
+        };
         Ok(Command::Prune(PruneCommand {
             target: tgt,
             dry_run: dry,

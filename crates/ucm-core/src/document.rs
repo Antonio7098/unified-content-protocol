@@ -109,10 +109,7 @@ impl DocumentIndices {
 
         // Index by tags
         for tag in &block.metadata.tags {
-            self.by_tag
-                .entry(tag.clone())
-                .or_default()
-                .insert(id.clone());
+            self.by_tag.entry(tag.clone()).or_default().insert(*id);
         }
 
         // Index by semantic role
@@ -120,18 +117,18 @@ impl DocumentIndices {
             self.by_role
                 .entry(role.category.as_str().to_string())
                 .or_default()
-                .insert(id.clone());
+                .insert(*id);
         }
 
         // Index by content type
         self.by_content_type
             .entry(block.content_type().to_string())
             .or_default()
-            .insert(id.clone());
+            .insert(*id);
 
         // Index by label
         if let Some(label) = &block.metadata.label {
-            self.by_label.insert(label.clone(), id.clone());
+            self.by_label.insert(label.clone(), *id);
         }
     }
 
@@ -223,10 +220,10 @@ impl Document {
     /// Create a new empty document
     pub fn new(id: DocumentId) -> Self {
         let root = Block::root();
-        let root_id = root.id.clone();
+        let root_id = root.id;
 
         let mut blocks = HashMap::new();
-        blocks.insert(root_id.clone(), root);
+        blocks.insert(root_id, root);
 
         Self {
             id,
@@ -285,7 +282,7 @@ impl Document {
             return Err(Error::BlockNotFound(parent.to_string()));
         }
 
-        let id = block.id.clone();
+        let id = block.id;
 
         // Index edges
         for edge in &block.edges {
@@ -296,13 +293,10 @@ impl Document {
         self.indices.index_block(&block);
 
         // Add to blocks
-        self.blocks.insert(id.clone(), block);
+        self.blocks.insert(id, block);
 
         // Add to structure
-        self.structure
-            .entry(parent.clone())
-            .or_default()
-            .push(id.clone());
+        self.structure.entry(*parent).or_default().push(id);
 
         self.touch();
         Ok(id)
@@ -319,18 +313,18 @@ impl Document {
             return Err(Error::BlockNotFound(parent.to_string()));
         }
 
-        let id = block.id.clone();
+        let id = block.id;
 
         for edge in &block.edges {
             self.edge_index.add_edge(&id, edge);
         }
 
         self.indices.index_block(&block);
-        self.blocks.insert(id.clone(), block);
+        self.blocks.insert(id, block);
 
-        let children = self.structure.entry(parent.clone()).or_default();
+        let children = self.structure.entry(*parent).or_default();
         let insert_idx = index.min(children.len());
-        children.insert(insert_idx, id.clone());
+        children.insert(insert_idx, id);
 
         self.touch();
         Ok(id)
@@ -410,10 +404,7 @@ impl Document {
         }
 
         self.remove_from_structure(id);
-        self.structure
-            .entry(new_parent.clone())
-            .or_default()
-            .push(id.clone());
+        self.structure.entry(*new_parent).or_default().push(*id);
 
         self.touch();
         Ok(())
@@ -438,9 +429,9 @@ impl Document {
         }
 
         self.remove_from_structure(id);
-        let children = self.structure.entry(new_parent.clone()).or_default();
+        let children = self.structure.entry(*new_parent).or_default();
         let insert_idx = index.min(children.len());
-        children.insert(insert_idx, id.clone());
+        children.insert(insert_idx, *id);
 
         self.touch();
         Ok(())
@@ -448,7 +439,7 @@ impl Document {
 
     /// Check if a block is an ancestor of another
     pub fn is_ancestor(&self, potential_ancestor: &BlockId, block: &BlockId) -> bool {
-        let mut current = Some(block.clone());
+        let mut current = Some(*block);
         while let Some(id) = current {
             if &id == potential_ancestor {
                 return true;
@@ -461,13 +452,13 @@ impl Document {
     /// Get all descendants of a block
     pub fn descendants(&self, id: &BlockId) -> Vec<BlockId> {
         let mut result = Vec::new();
-        let mut stack = vec![id.clone()];
+        let mut stack = vec![*id];
 
         while let Some(current) = stack.pop() {
             if let Some(children) = self.structure.get(&current) {
                 for child in children {
-                    result.push(child.clone());
-                    stack.push(child.clone());
+                    result.push(*child);
+                    stack.push(*child);
                 }
             }
         }
@@ -482,13 +473,13 @@ impl Document {
         }
 
         let mut visited = HashSet::new();
-        let mut stack = vec![self.root.clone()];
+        let mut stack = vec![self.root];
 
         while let Some(current) = stack.pop() {
             if &current == id {
                 return true;
             }
-            if visited.insert(current.clone()) {
+            if visited.insert(current) {
                 if let Some(children) = self.structure.get(&current) {
                     stack.extend(children.iter().cloned());
                 }
@@ -501,10 +492,10 @@ impl Document {
     /// Find all orphaned blocks
     pub fn find_orphans(&self) -> Vec<BlockId> {
         let mut reachable = HashSet::new();
-        let mut stack = vec![self.root.clone()];
+        let mut stack = vec![self.root];
 
         while let Some(current) = stack.pop() {
-            if reachable.insert(current.clone()) {
+            if reachable.insert(current) {
                 if let Some(children) = self.structure.get(&current) {
                     stack.extend(children.iter().cloned());
                 }
@@ -606,8 +597,8 @@ impl Document {
             visited: &mut HashSet<BlockId>,
             rec_stack: &mut HashSet<BlockId>,
         ) -> bool {
-            visited.insert(node.clone());
-            rec_stack.insert(node.clone());
+            visited.insert(*node);
+            rec_stack.insert(*node);
 
             if let Some(children) = structure.get(node) {
                 for child in children {
@@ -663,8 +654,9 @@ mod tests {
     fn test_add_block() {
         let mut doc = Document::create();
         let block = Block::new(Content::text("Hello"), Some("intro"));
+        let root = doc.root;
 
-        let id = doc.add_block(block, &doc.root.clone()).unwrap();
+        let id = doc.add_block(block, &root).unwrap();
         assert_eq!(doc.block_count(), 2);
         assert!(doc.is_reachable(&id));
     }
@@ -672,7 +664,7 @@ mod tests {
     #[test]
     fn test_move_block() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let parent1 = doc
             .add_block(Block::new(Content::text("Parent 1"), None), &root)
@@ -695,7 +687,7 @@ mod tests {
     #[test]
     fn test_cycle_detection() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let a = doc
             .add_block(Block::new(Content::text("A"), None), &root)
@@ -712,7 +704,7 @@ mod tests {
     #[test]
     fn test_orphan_detection() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let block = Block::new(Content::text("Test"), None);
         let id = doc.add_block(block, &root).unwrap();
@@ -726,7 +718,7 @@ mod tests {
     #[test]
     fn test_cascade_delete() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let parent = doc
             .add_block(Block::new(Content::text("Parent"), None), &root)
@@ -748,7 +740,7 @@ mod tests {
     #[test]
     fn test_indices() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let block = Block::new(Content::text("Test"), None)
             .with_tag("important")

@@ -284,7 +284,7 @@ mod tests {
         let mut mgr = SnapshotManager::new();
         let mut doc = Document::new(DocumentId::new("test"));
 
-        let root = doc.root.clone();
+        let root = doc.root;
         doc.add_block(Block::new(Content::text("Hello"), Some("intro")), &root)
             .unwrap();
 
