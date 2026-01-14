@@ -654,8 +654,9 @@ mod tests {
     fn test_add_block() {
         let mut doc = Document::create();
         let block = Block::new(Content::text("Hello"), Some("intro"));
+        let root = doc.root;
 
-        let id = doc.add_block(block, &doc.root.clone()).unwrap();
+        let id = doc.add_block(block, &root).unwrap();
         assert_eq!(doc.block_count(), 2);
         assert!(doc.is_reachable(&id));
     }
@@ -663,7 +664,7 @@ mod tests {
     #[test]
     fn test_move_block() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let parent1 = doc
             .add_block(Block::new(Content::text("Parent 1"), None), &root)
@@ -686,7 +687,7 @@ mod tests {
     #[test]
     fn test_cycle_detection() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let a = doc
             .add_block(Block::new(Content::text("A"), None), &root)
@@ -703,7 +704,7 @@ mod tests {
     #[test]
     fn test_orphan_detection() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let block = Block::new(Content::text("Test"), None);
         let id = doc.add_block(block, &root).unwrap();
@@ -717,7 +718,7 @@ mod tests {
     #[test]
     fn test_cascade_delete() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let parent = doc
             .add_block(Block::new(Content::text("Parent"), None), &root)
@@ -739,7 +740,7 @@ mod tests {
     #[test]
     fn test_indices() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let block = Block::new(Content::text("Test"), None)
             .with_tag("important")

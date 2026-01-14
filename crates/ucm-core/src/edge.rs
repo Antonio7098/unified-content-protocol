@@ -7,6 +7,9 @@ use crate::id::BlockId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::error::Error as StdError;
+use std::fmt;
+use std::str::FromStr;
 
 /// An edge represents an explicit relationship between blocks
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -141,35 +144,51 @@ impl EdgeType {
                 | EdgeType::NextSibling
         )
     }
+}
 
-    /// Parse from string
-    pub fn from_str(s: &str) -> Option<Self> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EdgeTypeParseError(pub String);
+
+impl fmt::Display for EdgeTypeParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown edge type '{}'", self.0)
+    }
+}
+
+impl StdError for EdgeTypeParseError {}
+
+impl FromStr for EdgeType {
+    type Err = EdgeTypeParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "derived_from" => Some(EdgeType::DerivedFrom),
-            "supersedes" => Some(EdgeType::Supersedes),
-            "transformed_from" => Some(EdgeType::TransformedFrom),
-            "references" => Some(EdgeType::References),
-            "cited_by" => Some(EdgeType::CitedBy),
-            "links_to" => Some(EdgeType::LinksTo),
-            "supports" => Some(EdgeType::Supports),
-            "contradicts" => Some(EdgeType::Contradicts),
-            "elaborates" => Some(EdgeType::Elaborates),
-            "summarizes" => Some(EdgeType::Summarizes),
-            "parent_of" => Some(EdgeType::ParentOf),
-            "child_of" => Some(EdgeType::ChildOf),
-            "sibling_of" => Some(EdgeType::SiblingOf),
-            "previous_sibling" => Some(EdgeType::PreviousSibling),
-            "next_sibling" => Some(EdgeType::NextSibling),
-            "version_of" => Some(EdgeType::VersionOf),
-            "alternative_of" => Some(EdgeType::AlternativeOf),
-            "translation_of" => Some(EdgeType::TranslationOf),
-            s if s.starts_with("custom:") => Some(EdgeType::Custom(
+            "derived_from" => Ok(EdgeType::DerivedFrom),
+            "supersedes" => Ok(EdgeType::Supersedes),
+            "transformed_from" => Ok(EdgeType::TransformedFrom),
+            "references" => Ok(EdgeType::References),
+            "cited_by" => Ok(EdgeType::CitedBy),
+            "links_to" => Ok(EdgeType::LinksTo),
+            "supports" => Ok(EdgeType::Supports),
+            "contradicts" => Ok(EdgeType::Contradicts),
+            "elaborates" => Ok(EdgeType::Elaborates),
+            "summarizes" => Ok(EdgeType::Summarizes),
+            "parent_of" => Ok(EdgeType::ParentOf),
+            "child_of" => Ok(EdgeType::ChildOf),
+            "sibling_of" => Ok(EdgeType::SiblingOf),
+            "previous_sibling" => Ok(EdgeType::PreviousSibling),
+            "next_sibling" => Ok(EdgeType::NextSibling),
+            "version_of" => Ok(EdgeType::VersionOf),
+            "alternative_of" => Ok(EdgeType::AlternativeOf),
+            "translation_of" => Ok(EdgeType::TranslationOf),
+            s if s.starts_with("custom:") => Ok(EdgeType::Custom(
                 s.strip_prefix("custom:").unwrap().to_string(),
             )),
-            _ => None,
+            _ => Err(EdgeTypeParseError(s.to_string())),
         }
     }
+}
 
+impl EdgeType {
     /// Convert to string
     pub fn as_str(&self) -> String {
         match self {
@@ -403,10 +422,13 @@ mod tests {
 
     #[test]
     fn test_edge_type_parse() {
-        assert_eq!(EdgeType::from_str("references"), Some(EdgeType::References));
         assert_eq!(
-            EdgeType::from_str("custom:my_type"),
-            Some(EdgeType::Custom("my_type".to_string()))
+            EdgeType::from_str("references").unwrap(),
+            EdgeType::References
+        );
+        assert_eq!(
+            EdgeType::from_str("custom:my_type").unwrap(),
+            EdgeType::Custom("my_type".to_string())
         );
     }
 
@@ -415,7 +437,7 @@ mod tests {
         let mut index = EdgeIndex::new();
         let source = make_id(1);
         let target = make_id(2);
-        let edge = Edge::new(EdgeType::References, target.clone());
+        let edge = Edge::new(EdgeType::References, target);
 
         index.add_edge(&source, &edge);
         assert!(index.has_edge(&source, &target, &EdgeType::References));
@@ -432,9 +454,9 @@ mod tests {
         let b = make_id(2);
         let c = make_id(3);
 
-        index.add_edge(&a, &Edge::new(EdgeType::References, b.clone()));
-        index.add_edge(&a, &Edge::new(EdgeType::References, c.clone()));
-        index.add_edge(&b, &Edge::new(EdgeType::Supports, c.clone()));
+        index.add_edge(&a, &Edge::new(EdgeType::References, b));
+        index.add_edge(&a, &Edge::new(EdgeType::References, c));
+        index.add_edge(&b, &Edge::new(EdgeType::Supports, c));
 
         let refs = index.outgoing_of_type(&a, &EdgeType::References);
         assert_eq!(refs.len(), 2);
@@ -450,8 +472,8 @@ mod tests {
         let b = make_id(2);
         let c = make_id(3);
 
-        index.add_edge(&a, &Edge::new(EdgeType::References, b.clone()));
-        index.add_edge(&b, &Edge::new(EdgeType::References, c.clone()));
+        index.add_edge(&a, &Edge::new(EdgeType::References, b));
+        index.add_edge(&b, &Edge::new(EdgeType::References, c));
 
         index.remove_block(&b);
 

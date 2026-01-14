@@ -23,8 +23,8 @@ Thumbs.db
 *.log
 
 # Benchmark results
-*.json
-*.csv
+benchmarks/**/*.json
+benchmarks/**/*.csv
 benchmark_*.txt
 
 # Temporary files

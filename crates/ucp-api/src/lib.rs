@@ -1,7 +1,9 @@
 //! High-level API for UCP.
 
+use std::str::FromStr;
+
 use ucl_parser::{parse, parse_commands, UclDocument};
-use ucm_core::{Block, BlockId, Content, Document, Error, Result};
+use ucm_core::{Block, BlockId, Content, Document, EdgeType, Error, Result};
 use ucm_engine::{Engine, Operation, OperationResult};
 
 /// UCP client for document manipulation
@@ -185,8 +187,8 @@ impl UcpClient {
                         .target_id
                         .parse()
                         .map_err(|_| Error::InvalidBlockId(l.target_id.clone()))?;
-                    let edge_type = ucm_core::EdgeType::from_str(&l.edge_type)
-                        .unwrap_or(ucm_core::EdgeType::References);
+                    let edge_type =
+                        EdgeType::from_str(&l.edge_type).unwrap_or(EdgeType::References);
                     ops.push(Operation::Link {
                         source,
                         edge_type,
@@ -231,7 +233,7 @@ mod tests {
     fn test_add_text() {
         let client = UcpClient::new();
         let mut doc = client.create_document();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let id = client
             .add_text(&mut doc, &root, "Hello, world!", Some("intro"))

@@ -249,7 +249,7 @@ mod tests {
     #[test]
     fn test_block_edges() {
         let target_id = BlockId::from_bytes([1u8; 12]);
-        let edge = Edge::new(EdgeType::References, target_id.clone());
+        let edge = Edge::new(EdgeType::References, target_id);
 
         let mut block = Block::new(Content::text("Test"), None);
         block.add_edge(edge);
@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn test_update_content() {
         let mut block = Block::new(Content::text("Original"), Some("intro"));
-        let original_id = block.id.clone();
+        let original_id = block.id;
         let original_version = block.version.counter;
 
         block.update_content(Content::text("Updated"), Some("intro"));

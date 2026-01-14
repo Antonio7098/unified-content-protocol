@@ -331,7 +331,6 @@ mod hex_array_32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::content::TextFormat;
 
     #[test]
     fn test_block_id_display() {

@@ -346,7 +346,7 @@ mod tests {
     #[test]
     fn test_id_mapper() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let block1 = Block::new(Content::text("Hello"), Some("heading1"));
         let id1 = doc.add_block(block1, &root).unwrap();
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn test_token_savings() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
 
         // Add several blocks
         for i in 0..10 {
@@ -444,7 +444,7 @@ mod tests {
 
         // Create a prompt with multiple block references
         let mut prompt = String::new();
-        for (block_id, _) in &mapper.to_short {
+        for block_id in mapper.to_short.keys() {
             prompt.push_str(&format!("Block {} has content. ", block_id));
         }
 

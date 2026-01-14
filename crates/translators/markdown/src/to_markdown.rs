@@ -173,7 +173,7 @@ impl MarkdownRenderer {
                     .map(|r| self.is_heading_role(r))
                     .unwrap_or(false)
                 {
-                    Some((depth + self.heading_offset).min(6).max(1))
+                    Some((depth + self.heading_offset).clamp(1, 6))
                 } else {
                     None
                 }
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_render_heading() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
         let block = Block::new(Content::text("Hello"), Some("title"));
         doc.add_block(block, &root).unwrap();
 
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn test_render_code() {
         let mut doc = Document::create();
-        let root = doc.root.clone();
+        let root = doc.root;
         let block = Block::new(Content::code("rust", "fn main() {}"), None);
         doc.add_block(block, &root).unwrap();
 

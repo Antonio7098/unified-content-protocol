@@ -390,6 +390,7 @@ impl Engine {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute_append(
         &self,
         doc: &mut Document,
@@ -548,7 +549,7 @@ mod tests {
     fn test_engine_append() {
         let engine = Engine::new();
         let mut doc = Document::new(DocumentId::new("test"));
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let result = engine
             .execute(
@@ -572,7 +573,7 @@ mod tests {
     fn test_engine_edit() {
         let engine = Engine::new();
         let mut doc = Document::new(DocumentId::new("test"));
-        let root = doc.root.clone();
+        let root = doc.root;
 
         // Add a block
         let block = Block::new(Content::text("Original"), None);
@@ -583,7 +584,7 @@ mod tests {
             .execute(
                 &mut doc,
                 Operation::Edit {
-                    block_id: id.clone(),
+                    block_id: id,
                     path: "content.text".into(),
                     value: serde_json::json!("Modified"),
                     operator: EditOperator::Set,
@@ -603,7 +604,7 @@ mod tests {
     fn test_engine_transaction() {
         let mut engine = Engine::new();
         let mut doc = Document::new(DocumentId::new("test"));
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let txn_id = engine.begin_transaction();
 
@@ -611,7 +612,7 @@ mod tests {
             .add_to_transaction(
                 &txn_id,
                 Operation::Append {
-                    parent_id: root.clone(),
+                    parent_id: root,
                     content: Content::text("Block 1"),
                     label: None,
                     tags: vec![],
@@ -646,7 +647,7 @@ mod tests {
     fn test_move_before_target() {
         let engine = Engine::new();
         let mut doc = Document::new(DocumentId::new("test"));
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let block_a = doc
             .add_block(Block::new(Content::text("A"), None), &root)
@@ -662,9 +663,9 @@ mod tests {
             .execute(
                 &mut doc,
                 Operation::MoveToTarget {
-                    block_id: block_c.clone(),
+                    block_id: block_c,
                     target: MoveTarget::Before {
-                        sibling_id: block_a.clone(),
+                        sibling_id: block_a,
                     },
                 },
             )
@@ -681,7 +682,7 @@ mod tests {
     fn test_move_after_target() {
         let engine = Engine::new();
         let mut doc = Document::new(DocumentId::new("test"));
-        let root = doc.root.clone();
+        let root = doc.root;
 
         let block_a = doc
             .add_block(Block::new(Content::text("A"), None), &root)
@@ -697,9 +698,9 @@ mod tests {
             .execute(
                 &mut doc,
                 Operation::MoveToTarget {
-                    block_id: block_a.clone(),
+                    block_id: block_a,
                     target: MoveTarget::After {
-                        sibling_id: block_c.clone(),
+                        sibling_id: block_c,
                     },
                 },
             )
