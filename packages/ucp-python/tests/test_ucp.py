@@ -154,8 +154,10 @@ class TestIdMapper:
 
         desc = mapper.describe(doc)
 
-        assert "[2]" in desc
-        assert "heading1" in desc
+        assert "Document structure:" in desc
+        assert "Blocks:" in desc
+        assert 'type=text' in desc
+        assert 'content="Hello"' in desc
 
 
 class TestUclBuilder:

@@ -261,12 +261,12 @@ impl IdMapper {
         // Collect all block IDs in BFS order
         let mut all_blocks = Vec::new();
         let mut queue = std::collections::VecDeque::new();
-        queue.push_back(doc.root.clone());
+        queue.push_back(doc.root);
         while let Some(block_id) = queue.pop_front() {
-            all_blocks.push(block_id.clone());
+            all_blocks.push(block_id);
             if let Some(children) = doc.structure.get(&block_id) {
                 for child in children {
-                    queue.push_back(child.clone());
+                    queue.push_back(*child);
                 }
             }
         }
