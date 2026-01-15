@@ -21,7 +21,7 @@ from .types import Capability
 
 class PromptBuilder:
     """Fluent builder for LLM prompts.
-    
+
     Example:
         prompt = (PromptBuilder()
             .edit()
@@ -116,123 +116,125 @@ class PromptBuilder:
 
     def build(self) -> str:
         """Build the prompt string.
-        
+
         Raises:
             ValueError: If no capabilities are enabled
         """
         if not self._capabilities:
             raise ValueError("At least one capability must be enabled")
-        
+
         parts: List[str] = []
-        
+
         # Header
         parts.append("# UCL Command Reference")
         parts.append("")
-        
+
         # ID format note
         if self._short_ids:
-            parts.append("Block IDs are shown as short numbers (e.g., `1`, `2`). Use these in commands.")
+            parts.append(
+                "Block IDs are shown as short numbers (e.g., `1`, `2`). Use these in commands."
+            )
             parts.append("")
-        
+
         # Capabilities
         parts.append("## Available Commands")
         parts.append("")
-        
+
         if Capability.EDIT in self._capabilities:
             parts.append("### EDIT")
             parts.append("Modify block content:")
-            parts.append('```')
+            parts.append("```")
             parts.append('EDIT <block_id> SET text = "new content"')
-            parts.append('```')
+            parts.append("```")
             if self._include_examples:
                 parts.append("Example:")
-                parts.append('```')
+                parts.append("```")
                 parts.append('EDIT 1 SET text = "Updated paragraph"')
-                parts.append('```')
+                parts.append("```")
             parts.append("")
-        
+
         if Capability.APPEND in self._capabilities:
             parts.append("### APPEND")
             parts.append("Add new block under parent:")
-            parts.append('```')
-            parts.append('APPEND <parent_id> text :: content')
+            parts.append("```")
+            parts.append("APPEND <parent_id> text :: content")
             parts.append('APPEND <parent_id> code WITH language="python" :: source code')
-            parts.append('```')
+            parts.append("```")
             if self._include_examples:
                 parts.append("Example:")
-                parts.append('```')
-                parts.append('APPEND 1 text :: This is a new paragraph.')
-                parts.append('```')
+                parts.append("```")
+                parts.append("APPEND 1 text :: This is a new paragraph.")
+                parts.append("```")
             parts.append("")
-        
+
         if Capability.MOVE in self._capabilities:
             parts.append("### MOVE")
             parts.append("Reposition a block:")
-            parts.append('```')
-            parts.append('MOVE <block_id> TO <parent_id>')
-            parts.append('MOVE <block_id> BEFORE <sibling_id>')
-            parts.append('MOVE <block_id> AFTER <sibling_id>')
-            parts.append('```')
+            parts.append("```")
+            parts.append("MOVE <block_id> TO <parent_id>")
+            parts.append("MOVE <block_id> BEFORE <sibling_id>")
+            parts.append("MOVE <block_id> AFTER <sibling_id>")
+            parts.append("```")
             if self._include_examples:
                 parts.append("Example:")
-                parts.append('```')
-                parts.append('MOVE 3 AFTER 1')
-                parts.append('```')
+                parts.append("```")
+                parts.append("MOVE 3 AFTER 1")
+                parts.append("```")
             parts.append("")
-        
+
         if Capability.DELETE in self._capabilities:
             parts.append("### DELETE")
             parts.append("Remove a block:")
-            parts.append('```')
-            parts.append('DELETE <block_id>')
-            parts.append('DELETE <block_id> CASCADE')
-            parts.append('```')
+            parts.append("```")
+            parts.append("DELETE <block_id>")
+            parts.append("DELETE <block_id> CASCADE")
+            parts.append("```")
             if self._include_examples:
                 parts.append("Example:")
-                parts.append('```')
-                parts.append('DELETE 5')
-                parts.append('```')
+                parts.append("```")
+                parts.append("DELETE 5")
+                parts.append("```")
             parts.append("")
-        
+
         if Capability.LINK in self._capabilities:
             parts.append("### LINK / UNLINK")
             parts.append("Create/remove relationships:")
-            parts.append('```')
-            parts.append('LINK <source_id> references <target_id>')
-            parts.append('UNLINK <source_id> references <target_id>')
-            parts.append('```')
+            parts.append("```")
+            parts.append("LINK <source_id> references <target_id>")
+            parts.append("UNLINK <source_id> references <target_id>")
+            parts.append("```")
             parts.append("Edge types: references, supports, contradicts, elaborates, summarizes")
             if self._include_examples:
                 parts.append("Example:")
-                parts.append('```')
-                parts.append('LINK 2 supports 1')
-                parts.append('```')
+                parts.append("```")
+                parts.append("LINK 2 supports 1")
+                parts.append("```")
             parts.append("")
-        
+
         if Capability.TRANSACTION in self._capabilities:
             parts.append("### ATOMIC")
             parts.append("Group commands atomically:")
-            parts.append('```')
-            parts.append('ATOMIC {')
+            parts.append("```")
+            parts.append("ATOMIC {")
             parts.append('  EDIT 1 SET text = "updated"')
-            parts.append('  APPEND 1 text :: new child')
-            parts.append('}')
-            parts.append('```')
+            parts.append("  APPEND 1 text :: new child")
+            parts.append("}")
+            parts.append("```")
             parts.append("")
-        
+
         # Constraints
         if self._constraints:
             parts.append("## Constraints")
             for constraint in self._constraints:
                 parts.append(f"- {constraint}")
             parts.append("")
-        
+
         # Context
         if self._context:
             parts.append("## Context")
             parts.append(self._context)
             parts.append("")
-        
+
         # Output format
         parts.append("## Response Format")
         if self._format == "ucl":
@@ -241,7 +243,7 @@ class PromptBuilder:
             parts.append("Respond with JSON containing a `commands` array.")
         else:
             parts.append("Respond with UCL commands in a code block.")
-        
+
         return "\n".join(parts)
 
 
@@ -252,9 +254,9 @@ class PromptBuilder:
 
 class IdMapper:
     """Maps between full block IDs and short numeric IDs.
-    
+
     This significantly reduces token usage when working with LLMs.
-    
+
     Example:
         mapper = IdMapper(doc)
         short_text = mapper.shorten(long_text)  # blk_123abc -> 1
@@ -278,7 +280,7 @@ class IdMapper:
         """Build ID mappings from document."""
         # Start with root
         self._add_mapping(self._doc.root)
-        
+
         # BFS through structure
         queue = [self._doc.root]
         while queue:
@@ -287,7 +289,7 @@ class IdMapper:
                 if child not in self._id_to_short:
                     self._add_mapping(child)
                     queue.append(child)
-        
+
         # Add any remaining blocks not in structure
         for block_id in self._doc.blocks:
             if block_id not in self._id_to_short:
@@ -328,7 +330,7 @@ class IdMapper:
         result = text
         for short, block_id in sorted(self._short_to_id.items(), reverse=True):
             # Match short ID as whole word
-            pattern = rf'\b{short}\b'
+            pattern = rf"\b{short}\b"
             result = re.sub(pattern, block_id, result)
         return result
 
@@ -376,17 +378,16 @@ class IdMapper:
             short_id = self._id_to_short.get(block_id)
             content_type = block.content_type.value if block.content_type else "text"
             # Escape content for display
-            escaped_content = block.content.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+            escaped_content = (
+                block.content.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            )
             lines.append(f'{short_id} type={content_type} content="{escaped_content}"')
 
         return "\n".join(lines)
 
     def get_mappings(self) -> List[Dict[str, object]]:
         """Get the mapping table (for debugging)."""
-        return [
-            {"short": short, "long": long}
-            for short, long in sorted(self._short_to_id.items())
-        ]
+        return [{"short": short, "long": long} for short, long in sorted(self._short_to_id.items())]
 
 
 # =============================================================================
@@ -396,7 +397,7 @@ class IdMapper:
 
 class UclBuilder:
     """Programmatic builder for UCL commands.
-    
+
     Example:
         ucl = (UclBuilder()
             .edit("blk_1", "text", "new content")
@@ -410,13 +411,13 @@ class UclBuilder:
 
     def edit(self, block_id: str, content: str, path: str = "text") -> "UclBuilder":
         """Add EDIT command.
-        
+
         Args:
             block_id: Block to edit
             content: New content value
             path: Property path (default: "text")
         """
-        escaped = content.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+        escaped = content.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
         self._commands.append(f'EDIT {block_id} SET {path} = "{escaped}"')
         return self
 
@@ -428,7 +429,7 @@ class UclBuilder:
         **properties: str,
     ) -> "UclBuilder":
         """Add APPEND command.
-        
+
         Args:
             parent_id: Parent block ID
             content: Content to append
@@ -439,44 +440,44 @@ class UclBuilder:
         if properties:
             prop_parts = [f'{k}="{v}"' for k, v in properties.items()]
             props = " WITH " + " ".join(prop_parts)
-        self._commands.append(f'APPEND {parent_id} {content_type}{props} :: {content}')
+        self._commands.append(f"APPEND {parent_id} {content_type}{props} :: {content}")
         return self
 
     def move_to(self, block_id: str, parent_id: str, index: Optional[int] = None) -> "UclBuilder":
         """Add MOVE TO command."""
         idx = f" INDEX {index}" if index is not None else ""
-        self._commands.append(f'MOVE {block_id} TO {parent_id}{idx}')
+        self._commands.append(f"MOVE {block_id} TO {parent_id}{idx}")
         return self
 
     def move_before(self, block_id: str, sibling_id: str) -> "UclBuilder":
         """Add MOVE BEFORE command."""
-        self._commands.append(f'MOVE {block_id} BEFORE {sibling_id}')
+        self._commands.append(f"MOVE {block_id} BEFORE {sibling_id}")
         return self
 
     def move_after(self, block_id: str, sibling_id: str) -> "UclBuilder":
         """Add MOVE AFTER command."""
-        self._commands.append(f'MOVE {block_id} AFTER {sibling_id}')
+        self._commands.append(f"MOVE {block_id} AFTER {sibling_id}")
         return self
 
     def delete(self, block_id: str, cascade: bool = False) -> "UclBuilder":
         """Add DELETE command."""
         casc = " CASCADE" if cascade else ""
-        self._commands.append(f'DELETE {block_id}{casc}')
+        self._commands.append(f"DELETE {block_id}{casc}")
         return self
 
     def link(self, source_id: str, edge_type: str, target_id: str) -> "UclBuilder":
         """Add LINK command."""
-        self._commands.append(f'LINK {source_id} {edge_type} {target_id}')
+        self._commands.append(f"LINK {source_id} {edge_type} {target_id}")
         return self
 
     def unlink(self, source_id: str, edge_type: str, target_id: str) -> "UclBuilder":
         """Add UNLINK command."""
-        self._commands.append(f'UNLINK {source_id} {edge_type} {target_id}')
+        self._commands.append(f"UNLINK {source_id} {edge_type} {target_id}")
         return self
 
     def prune(self, condition: str = "unreachable") -> "UclBuilder":
         """Add PRUNE command."""
-        self._commands.append(f'PRUNE {condition}')
+        self._commands.append(f"PRUNE {condition}")
         return self
 
     def atomic(self) -> "UclBuilder":
@@ -494,14 +495,14 @@ class UclBuilder:
         """Build UCL command string."""
         if not self._commands:
             return ""
-        
+
         if self._atomic:
             lines = ["ATOMIC {"]
             for cmd in self._commands:
                 lines.append(f"  {cmd}")
             lines.append("}")
             return "\n".join(lines)
-        
+
         return "\n".join(self._commands)
 
     def command_count(self) -> int:

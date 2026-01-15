@@ -119,7 +119,7 @@ def generate_document_id() -> str:
 
 class Document:
     """A UCM document is a collection of blocks with hierarchical structure.
-    
+
     Documents maintain:
     - A tree structure of blocks (parent-child relationships)
     - Secondary indices for fast lookup
@@ -134,23 +134,23 @@ class Document:
     ) -> None:
         self.id = doc_id or generate_document_id()
         self.metadata = metadata or DocumentMetadata()
-        
+
         # Create root block
         root = Block.root()
         self.root = root.id
-        
+
         # Block storage
         self.blocks: Dict[str, Block] = {root.id: root}
-        
+
         # Parent -> children structure (keep alias for compatibility)
         self._children: Dict[str, List[str]] = {root.id: []}
         self.structure = self._children
-        
+
         # Indices
         self.indices = DocumentIndices()
         self.edge_index = EdgeIndex()
         self.indices.index_block(root)
-        
+
         # Version for optimistic concurrency
         self._version = 1
 
@@ -249,7 +249,7 @@ class Document:
         index: Optional[int] = None,
     ) -> str:
         """Add a new block to the document.
-        
+
         Args:
             parent_id: ID of the parent block
             content: Block content
@@ -257,10 +257,10 @@ class Document:
             role: Semantic role
             label: Optional label
             index: Position in parent's children (None = append)
-            
+
         Returns:
             The new block's ID
-            
+
         Raises:
             ValueError: If parent not found
         """
@@ -285,7 +285,7 @@ class Document:
         # Add to structure
         if parent_id not in self.structure:
             self.structure[parent_id] = []
-        
+
         if index is None or index < 0 or index >= len(self.structure[parent_id]):
             self.structure[parent_id].append(block_id)
         else:
@@ -301,14 +301,14 @@ class Document:
 
     def edit_block(self, block_id: str, content: str) -> None:
         """Update the content of a block.
-        
+
         Raises:
             ValueError: If block not found
         """
         block = self.blocks.get(block_id)
         if block is None:
             raise ValueError(f"Block not found: {block_id}")
-        
+
         block.update_content(content)
         self._touch()
 
@@ -319,12 +319,12 @@ class Document:
         index: Optional[int] = None,
     ) -> None:
         """Move a block to a new parent.
-        
+
         Args:
             block_id: ID of block to move
             new_parent_id: ID of new parent
             index: Position in new parent's children
-            
+
         Raises:
             ValueError: If block/parent not found or invalid move
         """
@@ -371,11 +371,11 @@ class Document:
 
     def delete_block(self, block_id: str, *, cascade: bool = True) -> None:
         """Delete a block.
-        
+
         Args:
             block_id: ID of block to delete
             cascade: If True, delete all descendants. If False, reparent children.
-            
+
         Raises:
             ValueError: If block not found or is root
         """
@@ -452,7 +452,7 @@ class Document:
         block = self.blocks.get(block_id)
         if block is None:
             raise ValueError(f"Block not found: {block_id}")
-        
+
         if tag not in block.tags:
             block.add_tag(tag)
             self.indices.by_tag[tag].add(block_id)
@@ -463,7 +463,7 @@ class Document:
         block = self.blocks.get(block_id)
         if block is None:
             raise ValueError(f"Block not found: {block_id}")
-        
+
         block.remove_tag(tag)
         self.indices.by_tag[tag].discard(block_id)
         self._touch()
@@ -560,7 +560,7 @@ class Document:
         """Find blocks that are not reachable from root."""
         reachable = {self.root}
         queue = [self.root]
-        
+
         while queue:
             current = queue.pop(0)
             for child in self.children(current):
@@ -579,7 +579,7 @@ class Document:
                 self.indices.remove_block(block)
                 self.edge_index.remove_block(block_id)
                 del self.blocks[block_id]
-        
+
         if orphans:
             self._touch()
         return orphans
@@ -595,27 +595,33 @@ class Document:
 
         # Check block count
         if self.block_count() > limits.max_block_count:
-            result.issues.append(ValidationIssue.error(
-                "E400",
-                f"Document has {self.block_count()} blocks, max is {limits.max_block_count}",
-            ))
+            result.issues.append(
+                ValidationIssue.error(
+                    "E400",
+                    f"Document has {self.block_count()} blocks, max is {limits.max_block_count}",
+                )
+            )
             result.valid = False
 
         # Check for cycles
         if self._has_cycles():
-            result.issues.append(ValidationIssue.error(
-                "E201",
-                "Document structure contains a cycle",
-            ))
+            result.issues.append(
+                ValidationIssue.error(
+                    "E201",
+                    "Document structure contains a cycle",
+                )
+            )
             result.valid = False
 
         # Check nesting depth
         max_depth = self._max_depth()
         if max_depth > limits.max_nesting_depth:
-            result.issues.append(ValidationIssue.error(
-                "E403",
-                f"Max nesting depth is {limits.max_nesting_depth}, document has {max_depth}",
-            ))
+            result.issues.append(
+                ValidationIssue.error(
+                    "E403",
+                    f"Max nesting depth is {limits.max_nesting_depth}, document has {max_depth}",
+                )
+            )
             result.valid = False
 
         # Validate each block
@@ -626,11 +632,13 @@ class Document:
         # Check for orphans (warning)
         orphans = self.find_orphans()
         for orphan in orphans:
-            result.issues.append(ValidationIssue.warning(
-                "E203",
-                f"Block {orphan} is unreachable from root",
-                block_id=orphan,
-            ))
+            result.issues.append(
+                ValidationIssue.warning(
+                    "E203",
+                    f"Block {orphan} is unreachable from root",
+                    block_id=orphan,
+                )
+            )
 
         return result
 
@@ -641,28 +649,34 @@ class Document:
         # Check block size
         size = block.size_bytes()
         if size > limits.max_block_size:
-            issues.append(ValidationIssue.error(
-                "E402",
-                f"Block {block.id} has size {size}, max is {limits.max_block_size}",
-                block_id=block.id,
-            ))
+            issues.append(
+                ValidationIssue.error(
+                    "E402",
+                    f"Block {block.id} has size {size}, max is {limits.max_block_size}",
+                    block_id=block.id,
+                )
+            )
 
         # Check edge count
         if len(block.edges) > limits.max_edges_per_block:
-            issues.append(ValidationIssue.error(
-                "E404",
-                f"Block {block.id} has {len(block.edges)} edges, max is {limits.max_edges_per_block}",
-                block_id=block.id,
-            ))
+            issues.append(
+                ValidationIssue.error(
+                    "E404",
+                    f"Block {block.id} has {len(block.edges)} edges, max is {limits.max_edges_per_block}",
+                    block_id=block.id,
+                )
+            )
 
         # Check edge targets exist
         for edge in block.edges:
             if edge.target not in self.blocks:
-                issues.append(ValidationIssue.error(
-                    "E001",
-                    f"Block {block.id} has edge to non-existent block {edge.target}",
-                    block_id=block.id,
-                ))
+                issues.append(
+                    ValidationIssue.error(
+                        "E001",
+                        f"Block {block.id} has edge to non-existent block {edge.target}",
+                        block_id=block.id,
+                    )
+                )
 
         return ValidationResult.failure(issues) if issues else ValidationResult.success()
 
@@ -689,6 +703,7 @@ class Document:
 
     def _max_depth(self) -> int:
         """Compute maximum nesting depth."""
+
         def depth_from(node: str, current: int) -> int:
             children = self.children(node)
             if not children:
@@ -704,7 +719,7 @@ class Document:
     def rebuild_indices(self) -> None:
         """Rebuild all indices from current state."""
         self.indices.rebuild(self.blocks)
-        
+
         self.edge_index.clear()
         for block in self.blocks.values():
             for edge in block.edges:

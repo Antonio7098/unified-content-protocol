@@ -225,13 +225,15 @@ class TestPromptBuilder:
 
     def test_fluent_chaining(self):
         """Methods can be chained fluently."""
-        prompt = (PromptBuilder()
+        prompt = (
+            PromptBuilder()
             .edit()
             .append()
             .move()
             .with_short_ids()
             .with_constraints(["rule1", "rule2"])
-            .build())
+            .build()
+        )
 
         assert "EDIT" in prompt
         assert "APPEND" in prompt

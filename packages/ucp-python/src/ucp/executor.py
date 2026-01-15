@@ -28,6 +28,7 @@ from .types import ContentType, EdgeType, SemanticRole
 
 class UclParseError(Exception):
     """Raised when UCL parsing fails."""
+
     def __init__(self, message: str, line: Optional[int] = None):
         self.line = line
         super().__init__(f"Line {line}: {message}" if line else message)
@@ -35,6 +36,7 @@ class UclParseError(Exception):
 
 class UclExecutionError(Exception):
     """Raised when UCL execution fails."""
+
     def __init__(self, message: str, command: Optional[str] = None):
         self.command = command
         super().__init__(f"[{command}] {message}" if command else message)
@@ -48,6 +50,7 @@ class UclExecutionError(Exception):
 @dataclass
 class EditCommand:
     """EDIT command."""
+
     block_id: str
     path: str
     value: str
@@ -57,6 +60,7 @@ class EditCommand:
 @dataclass
 class AppendCommand:
     """APPEND command."""
+
     parent_id: str
     content_type: str
     content: str
@@ -67,6 +71,7 @@ class AppendCommand:
 @dataclass
 class MoveCommand:
     """MOVE command."""
+
     block_id: str
     mode: str  # TO, BEFORE, AFTER
     target_id: str
@@ -76,6 +81,7 @@ class MoveCommand:
 @dataclass
 class DeleteCommand:
     """DELETE command."""
+
     block_id: str
     cascade: bool = False
 
@@ -83,6 +89,7 @@ class DeleteCommand:
 @dataclass
 class LinkCommand:
     """LINK command."""
+
     source_id: str
     edge_type: str
     target_id: str
@@ -91,6 +98,7 @@ class LinkCommand:
 @dataclass
 class UnlinkCommand:
     """UNLINK command."""
+
     source_id: str
     edge_type: str
     target_id: str
@@ -99,10 +107,19 @@ class UnlinkCommand:
 @dataclass
 class PruneCommand:
     """PRUNE command."""
+
     condition: str = "unreachable"
 
 
-UclCommand = EditCommand | AppendCommand | MoveCommand | DeleteCommand | LinkCommand | UnlinkCommand | PruneCommand
+UclCommand = (
+    EditCommand
+    | AppendCommand
+    | MoveCommand
+    | DeleteCommand
+    | LinkCommand
+    | UnlinkCommand
+    | PruneCommand
+)
 
 
 # =============================================================================
@@ -119,27 +136,27 @@ class UclParser:
         re.IGNORECASE,
     )
     APPEND_PATTERN = re.compile(
-        r'^APPEND\s+(?P<parent>\S+)\s+(?P<ctype>\w+)(?P<props>\s+WITH\s+[^:]+)?\s*::\s*(?P<content>.+)$',
+        r"^APPEND\s+(?P<parent>\S+)\s+(?P<ctype>\w+)(?P<props>\s+WITH\s+[^:]+)?\s*::\s*(?P<content>.+)$",
         re.IGNORECASE,
     )
     MOVE_PATTERN = re.compile(
-        r'^MOVE\s+(?P<block>\S+)\s+(?P<mode>TO|BEFORE|AFTER)\s+(?P<target>\S+)(?:\s+INDEX\s+(?P<index>\d+))?$',
+        r"^MOVE\s+(?P<block>\S+)\s+(?P<mode>TO|BEFORE|AFTER)\s+(?P<target>\S+)(?:\s+INDEX\s+(?P<index>\d+))?$",
         re.IGNORECASE,
     )
     DELETE_PATTERN = re.compile(
-        r'^DELETE\s+(?P<block>\S+)(?P<cascade>\s+CASCADE)?$',
+        r"^DELETE\s+(?P<block>\S+)(?P<cascade>\s+CASCADE)?$",
         re.IGNORECASE,
     )
     LINK_PATTERN = re.compile(
-        r'^LINK\s+(?P<source>\S+)\s+(?P<edge_type>\w+)\s+(?P<target>\S+)$',
+        r"^LINK\s+(?P<source>\S+)\s+(?P<edge_type>\w+)\s+(?P<target>\S+)$",
         re.IGNORECASE,
     )
     UNLINK_PATTERN = re.compile(
-        r'^UNLINK\s+(?P<source>\S+)\s+(?P<edge_type>\w+)\s+(?P<target>\S+)$',
+        r"^UNLINK\s+(?P<source>\S+)\s+(?P<edge_type>\w+)\s+(?P<target>\S+)$",
         re.IGNORECASE,
     )
     PRUNE_PATTERN = re.compile(
-        r'^PRUNE(?:\s+(?P<condition>\w+))?$',
+        r"^PRUNE(?:\s+(?P<condition>\w+))?$",
         re.IGNORECASE,
     )
     PROP_PATTERN = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
@@ -148,7 +165,7 @@ class UclParser:
         """Parse UCL string into commands."""
         lines = self._extract_lines(ucl)
         commands: List[UclCommand] = []
-        
+
         for i, line in enumerate(lines, 1):
             try:
                 cmd = self._parse_line(line)
@@ -156,21 +173,21 @@ class UclParser:
                     commands.append(cmd)
             except Exception as e:
                 raise UclParseError(str(e), line=i)
-        
+
         return commands
 
     def _extract_lines(self, ucl: str) -> List[str]:
         """Extract command lines, handling ATOMIC blocks and comments."""
         lines: List[str] = []
         atomic_depth = 0
-        
+
         for raw in ucl.splitlines():
             stripped = raw.strip()
-            
+
             # Skip empty lines and comments
             if not stripped or stripped.startswith("#"):
                 continue
-            
+
             # Handle ATOMIC blocks
             if stripped.upper() == "ATOMIC {":
                 atomic_depth += 1
@@ -178,15 +195,15 @@ class UclParser:
             if stripped == "}" and atomic_depth > 0:
                 atomic_depth -= 1
                 continue
-            
+
             lines.append(stripped)
-        
+
         return lines
 
     def _parse_line(self, line: str) -> Optional[UclCommand]:
         """Parse a single command line."""
         upper = line.upper()
-        
+
         if upper.startswith("EDIT "):
             return self._parse_edit(line)
         elif upper.startswith("APPEND "):
@@ -218,10 +235,10 @@ class UclParser:
         match = self.APPEND_PATTERN.match(line)
         if not match:
             raise UclParseError(f"Malformed APPEND command: {line}")
-        
+
         props_str = match.group("props") or ""
         properties = dict(self.PROP_PATTERN.findall(props_str))
-        
+
         return AppendCommand(
             parent_id=match.group("parent"),
             content_type=match.group("ctype").lower(),
@@ -233,7 +250,7 @@ class UclParser:
         match = self.MOVE_PATTERN.match(line)
         if not match:
             raise UclParseError(f"Malformed MOVE command: {line}")
-        
+
         index_str = match.group("index")
         return MoveCommand(
             block_id=match.group("block"),
@@ -291,6 +308,7 @@ class UclParser:
 @dataclass
 class ExecutionResult:
     """Result of executing a UCL command."""
+
     success: bool
     command_type: str
     affected_blocks: List[str] = field(default_factory=list)
@@ -309,39 +327,45 @@ class UclExecutor:
         with _tracer.span("ucl.execute", ucl_length=len(ucl)):
             try:
                 commands = self._parser.parse(ucl)
-                
-                emit_event(UclEvent(
-                    event_type=EventType.UCL_PARSED.value,
-                    command=ucl,
-                    data={"command_count": len(commands)},
-                ))
-                
+
+                emit_event(
+                    UclEvent(
+                        event_type=EventType.UCL_PARSED.value,
+                        command=ucl,
+                        data={"command_count": len(commands)},
+                    )
+                )
+
             except UclParseError as e:
-                emit_event(UclEvent(
-                    event_type=EventType.UCL_ERROR.value,
-                    command=ucl,
-                    success=False,
-                    error_message=str(e),
-                ))
+                emit_event(
+                    UclEvent(
+                        event_type=EventType.UCL_ERROR.value,
+                        command=ucl,
+                        success=False,
+                        error_message=str(e),
+                    )
+                )
                 raise
 
             results: List[ExecutionResult] = []
             for cmd in commands:
                 result = self._execute_command(cmd)
                 results.append(result)
-                
+
                 if not result.success:
                     break  # Stop on first error
 
             _metrics.increment("ucl.commands_executed", len(results))
-            
-            emit_event(UclEvent(
-                event_type=EventType.UCL_EXECUTED.value,
-                command=ucl,
-                success=all(r.success for r in results),
-                affected_blocks=[b for r in results for b in r.affected_blocks],
-            ))
-            
+
+            emit_event(
+                UclEvent(
+                    event_type=EventType.UCL_EXECUTED.value,
+                    command=ucl,
+                    success=all(r.success for r in results),
+                    affected_blocks=[b for r in results for b in r.affected_blocks],
+                )
+            )
+
             return results
 
     def _execute_command(self, cmd: UclCommand) -> ExecutionResult:
@@ -387,13 +411,13 @@ class UclExecutor:
 
     def _exec_edit(self, cmd: EditCommand) -> ExecutionResult:
         block_id = self._resolve_id(cmd.block_id)
-        
+
         # Currently only support text path
         if cmd.path.lower() == "text":
             self.doc.edit_block(block_id, cmd.value)
         else:
             raise UclExecutionError(f"Unsupported edit path: {cmd.path}")
-        
+
         return ExecutionResult(
             success=True,
             command_type="edit",
@@ -402,13 +426,13 @@ class UclExecutor:
 
     def _exec_append(self, cmd: AppendCommand) -> ExecutionResult:
         parent_id = self._resolve_id(cmd.parent_id)
-        
+
         # Map content type
         try:
             content_type = ContentType(cmd.content_type)
         except ValueError:
             content_type = ContentType.TEXT
-        
+
         # Get role from properties
         role = None
         if "role" in cmd.properties:
@@ -416,7 +440,7 @@ class UclExecutor:
                 role = SemanticRole(cmd.properties["role"])
             except ValueError:
                 pass
-        
+
         new_id = self.doc.add_block(
             parent_id,
             cmd.content,
@@ -425,7 +449,7 @@ class UclExecutor:
             label=cmd.properties.get("label"),
             index=cmd.index,
         )
-        
+
         return ExecutionResult(
             success=True,
             command_type="append",
@@ -435,7 +459,7 @@ class UclExecutor:
     def _exec_move(self, cmd: MoveCommand) -> ExecutionResult:
         block_id = self._resolve_id(cmd.block_id)
         target_id = self._resolve_id(cmd.target_id)
-        
+
         if cmd.mode == "TO":
             self.doc.move_block(block_id, target_id, index=cmd.index)
         else:
@@ -443,18 +467,18 @@ class UclExecutor:
             parent_id = self.doc.parent(target_id)
             if parent_id is None:
                 raise UclExecutionError(f"Target {target_id} has no parent")
-            
+
             siblings = self.doc.children(parent_id)
             try:
                 sibling_index = siblings.index(target_id)
             except ValueError:
                 raise UclExecutionError(f"Target {target_id} not found in parent's children")
-            
+
             if cmd.mode == "AFTER":
                 sibling_index += 1
-            
+
             self.doc.move_block(block_id, parent_id, index=sibling_index)
-        
+
         return ExecutionResult(
             success=True,
             command_type="move",
@@ -464,7 +488,7 @@ class UclExecutor:
     def _exec_delete(self, cmd: DeleteCommand) -> ExecutionResult:
         block_id = self._resolve_id(cmd.block_id)
         self.doc.delete_block(block_id, cascade=cmd.cascade)
-        
+
         return ExecutionResult(
             success=True,
             command_type="delete",
@@ -474,13 +498,13 @@ class UclExecutor:
     def _exec_link(self, cmd: LinkCommand) -> ExecutionResult:
         source_id = self._resolve_id(cmd.source_id)
         target_id = self._resolve_id(cmd.target_id)
-        
+
         edge_type = EdgeType.from_str(cmd.edge_type)
         if edge_type is None:
             raise UclExecutionError(f"Unknown edge type: {cmd.edge_type}")
-        
+
         self.doc.add_edge(source_id, edge_type, target_id)
-        
+
         return ExecutionResult(
             success=True,
             command_type="link",
@@ -490,13 +514,13 @@ class UclExecutor:
     def _exec_unlink(self, cmd: UnlinkCommand) -> ExecutionResult:
         source_id = self._resolve_id(cmd.source_id)
         target_id = self._resolve_id(cmd.target_id)
-        
+
         edge_type = EdgeType.from_str(cmd.edge_type)
         if edge_type is None:
             raise UclExecutionError(f"Unknown edge type: {cmd.edge_type}")
-        
+
         self.doc.remove_edge(source_id, edge_type, target_id)
-        
+
         return ExecutionResult(
             success=True,
             command_type="unlink",
@@ -549,14 +573,14 @@ class ExecutionSummary:
 
 def execute_ucl(doc: Document, ucl: str) -> ExecutionSummary:
     """Execute UCL commands on a document.
-    
+
     Args:
         doc: The document to modify
         ucl: UCL command string
-        
+
     Returns:
         List of affected block IDs
-        
+
     Raises:
         UclParseError: If parsing fails
         UclExecutionError: If execution fails

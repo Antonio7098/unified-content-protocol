@@ -23,6 +23,7 @@ from .observability import EventType, UcpEvent, emit_event
 @dataclass
 class Snapshot:
     """A snapshot of document state."""
+
     id: str
     description: Optional[str] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -33,6 +34,7 @@ class Snapshot:
 @dataclass
 class SnapshotInfo:
     """Summary information about a snapshot."""
+
     id: str
     description: Optional[str]
     created_at: datetime
@@ -48,14 +50,16 @@ class SnapshotInfo:
 def serialize_document(doc: Document) -> str:
     """Serialize a document to JSON string."""
     from .block import Block
-    
+
     def serialize_block(block: Block) -> Dict[str, Any]:
         return {
             "id": block.id,
             "content": block.content,
             "content_type": block.content_type.value,
             "metadata": {
-                "semantic_role": block.metadata.semantic_role.value if block.metadata.semantic_role else None,
+                "semantic_role": block.metadata.semantic_role.value
+                if block.metadata.semantic_role
+                else None,
                 "label": block.metadata.label,
                 "tags": block.metadata.tags,
                 "summary": block.metadata.summary,
@@ -78,7 +82,7 @@ def serialize_document(doc: Document) -> str:
             ],
             "children": block.children,
         }
-    
+
     serialized = {
         "id": doc.id,
         "root": doc.root,
@@ -95,7 +99,7 @@ def serialize_document(doc: Document) -> str:
         "structure": doc.structure,
         "blocks": {bid: serialize_block(b) for bid, b in doc.blocks.items()},
     }
-    
+
     return json.dumps(serialized)
 
 
@@ -111,9 +115,9 @@ def deserialize_document(data: str) -> Document:
         EdgeType,
         SemanticRole,
     )
-    
+
     parsed = json.loads(data)
-    
+
     # Create document metadata
     meta_data = parsed.get("metadata", {})
     metadata = DocumentMetadata(
@@ -127,18 +131,18 @@ def deserialize_document(data: str) -> Document:
         metadata.created_at = datetime.fromisoformat(meta_data["created_at"])
     if meta_data.get("modified_at"):
         metadata.modified_at = datetime.fromisoformat(meta_data["modified_at"])
-    
+
     # Create document
     doc = Document(doc_id=parsed["id"], metadata=metadata)
     doc.root = parsed["root"]
     doc._version = parsed.get("version", 1)
     doc.structure = {k: list(v) for k, v in parsed.get("structure", {}).items()}
-    
+
     # Deserialize blocks
     doc.blocks.clear()
     for bid, block_data in parsed.get("blocks", {}).items():
         block_meta = block_data.get("metadata", {})
-        
+
         # Create block metadata
         role = None
         if block_meta.get("semantic_role"):
@@ -146,7 +150,7 @@ def deserialize_document(data: str) -> Document:
                 role = SemanticRole(block_meta["semantic_role"])
             except ValueError:
                 pass
-        
+
         bm = BlockMetadata(
             semantic_role=role,
             label=block_meta.get("label"),
@@ -158,7 +162,7 @@ def deserialize_document(data: str) -> Document:
             bm.created_at = datetime.fromisoformat(block_meta["created_at"])
         if block_meta.get("modified_at"):
             bm.modified_at = datetime.fromisoformat(block_meta["modified_at"])
-        
+
         # Create edges
         edges = []
         for edge_data in block_data.get("edges", []):
@@ -177,13 +181,13 @@ def deserialize_document(data: str) -> Document:
                 if edge_data.get("created_at"):
                     edge.created_at = datetime.fromisoformat(edge_data["created_at"])
                 edges.append(edge)
-        
+
         # Create block
         try:
             content_type = ContentType(block_data.get("content_type", "text"))
         except ValueError:
             content_type = ContentType.TEXT
-        
+
         block = Block(
             id=bid,
             content=block_data.get("content", ""),
@@ -193,10 +197,10 @@ def deserialize_document(data: str) -> Document:
             children=block_data.get("children", []),
         )
         doc.blocks[bid] = block
-    
+
     # Rebuild indices
     doc.rebuild_indices()
-    
+
     return doc
 
 
@@ -219,60 +223,64 @@ class SnapshotManager:
         description: Optional[str] = None,
     ) -> str:
         """Create a snapshot of the document.
-        
+
         Args:
             name: Snapshot name/ID
             doc: Document to snapshot
             description: Optional description
-            
+
         Returns:
             Snapshot ID
         """
         # Evict oldest if at capacity
         if len(self._snapshots) >= self._max_snapshots:
             self._evict_oldest()
-        
+
         data = serialize_document(doc)
-        
+
         snapshot = Snapshot(
             id=name,
             description=description,
             document_version=doc.version,
             data=data,
         )
-        
+
         self._snapshots[name] = snapshot
-        
-        emit_event(UcpEvent(
-            event_type=EventType.SNAPSHOT_CREATED.value,
-            data={"snapshot_id": name, "document_id": doc.id},
-        ))
-        
+
+        emit_event(
+            UcpEvent(
+                event_type=EventType.SNAPSHOT_CREATED.value,
+                data={"snapshot_id": name, "document_id": doc.id},
+            )
+        )
+
         return name
 
     def restore(self, name: str) -> Document:
         """Restore a document from a snapshot.
-        
+
         Args:
             name: Snapshot name/ID
-            
+
         Returns:
             Restored document
-            
+
         Raises:
             KeyError: If snapshot not found
         """
         if name not in self._snapshots:
             raise KeyError(f"Snapshot not found: {name}")
-        
+
         snapshot = self._snapshots[name]
         doc = deserialize_document(snapshot.data)
-        
-        emit_event(UcpEvent(
-            event_type=EventType.SNAPSHOT_RESTORED.value,
-            data={"snapshot_id": name, "document_id": doc.id},
-        ))
-        
+
+        emit_event(
+            UcpEvent(
+                event_type=EventType.SNAPSHOT_RESTORED.value,
+                data={"snapshot_id": name, "document_id": doc.id},
+            )
+        )
+
         return doc
 
     def get(self, name: str) -> Optional[Snapshot]:
@@ -284,14 +292,14 @@ class SnapshotManager:
         snapshot = self._snapshots.get(name)
         if not snapshot:
             return None
-        
+
         # Count blocks from serialized data
         try:
             parsed = json.loads(snapshot.data)
             block_count = len(parsed.get("blocks", {}))
         except Exception:
             block_count = 0
-        
+
         return SnapshotInfo(
             id=snapshot.id,
             description=snapshot.description,
@@ -328,7 +336,7 @@ class SnapshotManager:
         """Evict the oldest snapshot."""
         if not self._snapshots:
             return
-        
+
         oldest_name = min(
             self._snapshots.keys(),
             key=lambda k: self._snapshots[k].created_at,

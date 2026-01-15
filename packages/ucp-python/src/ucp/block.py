@@ -63,9 +63,10 @@ def reset_block_counter() -> None:
 @dataclass
 class Block:
     """A content block in the document.
-    
+
     Blocks are immutable content units with metadata and relationships.
     """
+
     id: str
     content: str
     content_type: ContentType = ContentType.TEXT
@@ -192,8 +193,7 @@ class Block:
         """Remove an edge by target and type. Returns True if removed."""
         original_len = len(self.edges)
         self.edges = [
-            e for e in self.edges
-            if not (e.target == target and e.edge_type == edge_type)
+            e for e in self.edges if not (e.target == target and e.edge_type == edge_type)
         ]
         removed = len(self.edges) < original_len
         if removed:

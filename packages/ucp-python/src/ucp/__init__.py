@@ -168,10 +168,10 @@ from .observability import (
 
 def create(title: str | None = None) -> Document:
     """Create a new empty document.
-    
+
     Args:
         title: Optional document title
-        
+
     Returns:
         New Document instance
     """

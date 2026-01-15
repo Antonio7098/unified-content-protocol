@@ -71,7 +71,7 @@ class TestValidationResultMethods:
                 ValidationIssue.warning("W001", "Warning 1"),
                 ValidationIssue.info("I001", "Info 1"),
                 ValidationIssue.error("E002", "Error 2"),
-            ]
+            ],
         )
 
         errors = result.errors()
@@ -90,7 +90,7 @@ class TestValidationResultMethods:
                 ValidationIssue.warning("W001", "Warning 1"),
                 ValidationIssue.warning("W002", "Warning 2"),
                 ValidationIssue.info("I001", "Info 1"),
-            ]
+            ],
         )
 
         warnings = result.warnings()
@@ -110,7 +110,7 @@ class TestValidationResultMethods:
                 ValidationIssue.info("I001", "Info 1"),
                 ValidationIssue.info("I002", "Info 2"),
                 ValidationIssue.info("I003", "Info 3"),
-            ]
+            ],
         )
 
         infos = result.infos()
@@ -136,7 +136,7 @@ class TestValidationResultMethods:
             issues=[
                 ValidationIssue.warning("W001", "Warning"),
                 ValidationIssue.info("I001", "Info"),
-            ]
+            ],
         )
 
         assert result.errors() == []
@@ -148,7 +148,7 @@ class TestValidationResultMethods:
             issues=[
                 ValidationIssue.error("E001", "Error"),
                 ValidationIssue.info("I001", "Info"),
-            ]
+            ],
         )
 
         assert result.warnings() == []
@@ -160,7 +160,7 @@ class TestValidationResultMethods:
             issues=[
                 ValidationIssue.error("E001", "Error"),
                 ValidationIssue.warning("W001", "Warning"),
-            ]
+            ],
         )
 
         assert result.infos() == []
@@ -178,9 +178,7 @@ class TestValidationResultCreation:
 
     def test_failure_with_errors_creates_invalid(self):
         """failure() with errors creates invalid result."""
-        issues = [
-            ValidationIssue.error("E001", "Error")
-        ]
+        issues = [ValidationIssue.error("E001", "Error")]
         result = ValidationResult.failure(issues)
 
         assert result.valid is False
@@ -188,9 +186,7 @@ class TestValidationResultCreation:
 
     def test_failure_with_only_warnings_creates_valid(self):
         """failure() with only warnings creates valid result."""
-        issues = [
-            ValidationIssue.warning("W001", "Warning")
-        ]
+        issues = [ValidationIssue.warning("W001", "Warning")]
         result = ValidationResult.failure(issues)
 
         assert result.valid is True
@@ -202,14 +198,8 @@ class TestValidationResultMerge:
 
     def test_merge_combines_issues(self):
         """merge() combines issues from both results."""
-        result1 = ValidationResult(
-            valid=True,
-            issues=[ValidationIssue.warning("W001", "Warning")]
-        )
-        result2 = ValidationResult(
-            valid=True,
-            issues=[ValidationIssue.info("I001", "Info")]
-        )
+        result1 = ValidationResult(valid=True, issues=[ValidationIssue.warning("W001", "Warning")])
+        result2 = ValidationResult(valid=True, issues=[ValidationIssue.info("I001", "Info")])
 
         result1.merge(result2)
 
@@ -220,10 +210,7 @@ class TestValidationResultMerge:
     def test_merge_invalidates_if_other_invalid(self):
         """merge() sets valid=False if other is invalid."""
         result1 = ValidationResult.success()
-        result2 = ValidationResult(
-            valid=False,
-            issues=[ValidationIssue.error("E001", "Error")]
-        )
+        result2 = ValidationResult(valid=False, issues=[ValidationIssue.error("E001", "Error")])
 
         result1.merge(result2)
 
@@ -231,10 +218,7 @@ class TestValidationResultMerge:
 
     def test_merge_preserves_invalid_if_self_invalid(self):
         """merge() keeps valid=False if self was already invalid."""
-        result1 = ValidationResult(
-            valid=False,
-            issues=[ValidationIssue.error("E001", "Error")]
-        )
+        result1 = ValidationResult(valid=False, issues=[ValidationIssue.error("E001", "Error")])
         result2 = ValidationResult.success()
 
         result1.merge(result2)

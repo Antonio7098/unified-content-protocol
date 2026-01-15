@@ -156,7 +156,7 @@ class TestIdMapper:
 
         assert "Document structure:" in desc
         assert "Blocks:" in desc
-        assert 'type=text' in desc
+        assert "type=text" in desc
         assert 'content="Hello"' in desc
 
 
