@@ -19,6 +19,26 @@
   },
   "entries": [
     {
+      "version": "v0.1.2",
+      "date": "2026-01-15",
+      "changes": [
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bump workspace version to 0.1.2 to trigger publish workflow.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "packages/ucp-python/pyproject.toml",
+            "packages/ucp-js/package.json",
+            "README.md",
+            "docs/getting-started/installation.md"
+          ],
+          "bugs": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.1",
       "date": "2026-01-15",
       "changes": [
