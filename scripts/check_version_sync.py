@@ -17,40 +17,107 @@ CARGO_TOML = REPO_ROOT / "Cargo.toml"
 PYPROJECT_TOML = REPO_ROOT / "packages" / "ucp-python" / "pyproject.toml"
 PACKAGE_JSON = REPO_ROOT / "packages" / "ucp-js" / "package.json"
 README_PATH = REPO_ROOT / "README.md"
-DOC_INSTALL_PATH = REPO_ROOT / "docs" / "getting-started" / "installation.md"
+DOCS_DIR = REPO_ROOT / "docs"
+DOC_INSTALL_PATH = DOCS_DIR / "getting-started" / "installation.md"
+DOC_README_PATH = DOCS_DIR / "README.md"
+DOC_UCM_CORE_PATH = DOCS_DIR / "ucm-core" / "README.md"
+DOC_UCM_ENGINE_PATH = DOCS_DIR / "ucm-engine" / "README.md"
+DOC_UCL_PARSER_PATH = DOCS_DIR / "ucl-parser" / "README.md"
+DOC_UCP_API_PATH = DOCS_DIR / "ucp-api" / "README.md"
+DOC_UCP_OBSERVE_PATH = DOCS_DIR / "ucp-observe" / "README.md"
+DOC_TRANSLATOR_MD_PATH = DOCS_DIR / "translators" / "markdown" / "README.md"
 CHANGELOG_PATH = REPO_ROOT / "changelog.json"
 
-README_PATTERN = re.compile(r"Latest release:\s*v(?P<version>[0-9][0-9A-Za-z.\-]*)")
+VERSION_CAPTURE = r"(?P<version>[0-9][0-9A-Za-z.\-]*)"
+
+README_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(rf"Latest release:\s*v{VERSION_CAPTURE}"),
+        "latest release badge",
+    ),
+    (
+        re.compile(rf"ucp-api\s*=\s*\"{VERSION_CAPTURE}\""),
+        "Rust dependency example",
+    ),
+    (
+        re.compile(rf"pip install ucp-content=={VERSION_CAPTURE}"),
+        "Python install command",
+    ),
+    (
+        re.compile(rf"npm install @ucp-core/core@{VERSION_CAPTURE}"),
+        "JavaScript install command",
+    ),
+]
 DOC_PATTERNS: list[tuple[Path, re.Pattern[str], str]] = [
     (
         DOC_INSTALL_PATH,
-        re.compile(r"ucp-api\s*=\s*\"(?P<version>[0-9][0-9A-Za-z.\-]*)\""),
-        "ucp-api dependency example",
+        re.compile(rf"ucp-api\s*=\s*\"{VERSION_CAPTURE}\""),
+        "getting-started ucp-api dependency example",
     ),
     (
         DOC_INSTALL_PATH,
-        re.compile(r"ucm-core\s*=\s*\"(?P<version>[0-9][0-9A-Za-z.\-]*)\""),
-        "ucm-core dependency example",
+        re.compile(rf"ucm-core\s*=\s*\"{VERSION_CAPTURE}\""),
+        "getting-started ucm-core dependency example",
     ),
     (
         DOC_INSTALL_PATH,
-        re.compile(r"ucm-engine\s*=\s*\"(?P<version>[0-9][0-9A-Za-z.\-]*)\""),
-        "ucm-engine dependency example",
+        re.compile(rf"ucm-engine\s*=\s*\"{VERSION_CAPTURE}\""),
+        "getting-started ucm-engine dependency example",
     ),
     (
         DOC_INSTALL_PATH,
-        re.compile(r"ucl-parser\s*=\s*\"(?P<version>[0-9][0-9A-Za-z.\-]*)\""),
-        "ucl-parser dependency example",
+        re.compile(rf"ucl-parser\s*=\s*\"{VERSION_CAPTURE}\""),
+        "getting-started ucl-parser dependency example",
     ),
     (
         DOC_INSTALL_PATH,
-        re.compile(r"ucp-translator-markdown\s*=\s*\"(?P<version>[0-9][0-9A-Za-z.\-]*)\""),
-        "markdown translator dependency example",
+        re.compile(rf"ucp-translator-markdown\s*=\s*\"{VERSION_CAPTURE}\""),
+        "getting-started markdown translator dependency example",
     ),
     (
         DOC_INSTALL_PATH,
-        re.compile(r"ucp-observe\s*=\s*\"(?P<version>[0-9][0-9A-Za-z.\-]*)\""),
-        "ucp-observe dependency example",
+        re.compile(rf"ucp-observe\s*=\s*\"{VERSION_CAPTURE}\""),
+        "getting-started ucp-observe dependency example",
+    ),
+    (
+        DOC_INSTALL_PATH,
+        re.compile(rf"ucm-core\s*=\s*\"{VERSION_CAPTURE}\"\s*\nucm-engine"),
+        "getting-started version conflict snippet",
+    ),
+    (
+        DOC_README_PATH,
+        re.compile(rf"ucp-api\s*=\s*\"{VERSION_CAPTURE}\""),
+        "docs README installation snippet",
+    ),
+    (
+        DOC_UCM_CORE_PATH,
+        re.compile(rf"ucm-core\s*=\s*\"{VERSION_CAPTURE}\""),
+        "ucm-core README dependency example",
+    ),
+    (
+        DOC_UCM_ENGINE_PATH,
+        re.compile(rf"ucm-engine\s*=\s*\"{VERSION_CAPTURE}\""),
+        "ucm-engine README dependency example",
+    ),
+    (
+        DOC_UCL_PARSER_PATH,
+        re.compile(rf"ucl-parser\s*=\s*\"{VERSION_CAPTURE}\""),
+        "ucl-parser README dependency example",
+    ),
+    (
+        DOC_UCP_API_PATH,
+        re.compile(rf"ucp-api\s*=\s*\"{VERSION_CAPTURE}\""),
+        "ucp-api README dependency example",
+    ),
+    (
+        DOC_UCP_OBSERVE_PATH,
+        re.compile(rf"ucp-observe\s*=\s*\"{VERSION_CAPTURE}\""),
+        "ucp-observe README dependency example",
+    ),
+    (
+        DOC_TRANSLATOR_MD_PATH,
+        re.compile(rf"ucp-translator-markdown\s*=\s*\"{VERSION_CAPTURE}\""),
+        "markdown translator README dependency example",
     ),
 ]
 
@@ -83,14 +150,19 @@ def load_js_version() -> str:
 
 
 def check_readme(version: str) -> list[str]:
+    errors: list[str] = []
     content = README_PATH.read_text(encoding="utf-8")
-    match = README_PATTERN.search(content)
-    if not match:
-        return ["README.md is missing the latest release marker."]
-    found = match.group("version")
-    if found != version:
-        return [f"README.md references v{found}, expected v{version}."]
-    return []
+    for pattern, label in README_PATTERNS:
+        match = pattern.search(content)
+        if not match:
+            errors.append(f"README.md is missing the {label}.")
+            continue
+        found = match.group("version")
+        if found != version:
+            errors.append(
+                f"README.md {label} references v{found}, expected v{version}."
+            )
+    return errors
 
 
 def check_git_tag(version: str) -> list[str]:
@@ -115,8 +187,14 @@ def check_git_tag(version: str) -> list[str]:
 
 def check_docs(version: str) -> list[str]:
     errors: list[str] = []
-    content = DOC_INSTALL_PATH.read_text(encoding="utf-8")
+    cache: dict[Path, str] = {}
     for path, pattern, label in DOC_PATTERNS:
+        if path not in cache:
+            if not path.exists():
+                errors.append(f"{path.relative_to(REPO_ROOT)} is missing.")
+                continue
+            cache[path] = path.read_text(encoding="utf-8")
+        content = cache[path]
         match = pattern.search(content)
         if not match:
             errors.append(f"{path.relative_to(REPO_ROOT)} is missing {label}.")
@@ -127,6 +205,34 @@ def check_docs(version: str) -> list[str]:
                 f"{path.relative_to(REPO_ROOT)} {label} references {found}, expected {version}."
             )
     return errors
+
+
+def fix_docs(version: str) -> list[str]:
+    """Rewrite doc files to align version references."""
+    fixed: list[str] = []
+    cache: dict[Path, str] = {}
+    for path, pattern, label in DOC_PATTERNS:
+        if path not in cache:
+            if not path.exists():
+                continue
+            cache[path] = path.read_text(encoding="utf-8")
+        content = cache[path]
+        match = pattern.search(content)
+        if not match:
+            continue
+        found = match.group("version")
+        if found == version:
+            continue
+        # Replace only the captured version group
+        new_content = pattern.sub(
+            lambda match, new_version=version: match.group(0).replace(
+                match.group("version"), new_version, 1
+            ),
+            content,
+        )
+        path.write_text(new_content, encoding="utf-8")
+        fixed.append(f"{path.relative_to(REPO_ROOT)} updated {label}: {found} → {version}")
+    return fixed
 
 
 def check_changelog(version: str) -> list[str]:
@@ -155,6 +261,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Ensure HEAD is tagged as v<version>. Useful for release workflows.",
     )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="Automatically rewrite doc files to align version references.",
+    )
     args = parser.parse_args(argv)
 
     errors: list[str] = []
@@ -177,6 +288,18 @@ def main(argv: list[str] | None = None) -> int:
     errors.extend(check_changelog(workspace_version))
     if args.require_tag:
         errors.extend(check_git_tag(workspace_version))
+
+    if args.fix:
+        fixed = fix_docs(workspace_version)
+        for line in fixed:
+            print(f"[version-sync] {line}")
+        # Re-check after fixing
+        errors = []
+        errors.extend(check_readme(workspace_version))
+        errors.extend(check_docs(workspace_version))
+        errors.extend(check_changelog(workspace_version))
+        if args.require_tag:
+            errors.extend(check_git_tag(workspace_version))
 
     if errors:
         for error in errors:

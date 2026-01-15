@@ -25,6 +25,7 @@ from .types import TransactionState
 @dataclass
 class Savepoint:
     """A savepoint within a transaction."""
+
     name: str
     operation_index: int
     document_state: str  # Serialized document
@@ -34,6 +35,7 @@ class Savepoint:
 @dataclass
 class TransactionOperation:
     """A recorded operation in a transaction."""
+
     operation_type: str
     args: Dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -51,7 +53,7 @@ def generate_transaction_id() -> str:
 
 class Transaction:
     """A transaction groups operations for atomic execution.
-    
+
     Transactions provide:
     - Atomic commit/rollback of multiple operations
     - Savepoints for partial rollback
@@ -71,10 +73,10 @@ class Transaction:
         self._start_time = time.time()
         self._timeout = timeout_seconds
         self._created_at = datetime.now(timezone.utc)
-        
+
         # Store initial state for rollback
         self._initial_state = serialize_document(doc)
-        
+
         # Operations and savepoints
         self._operations: List[TransactionOperation] = []
         self._savepoints: List[Savepoint] = []
@@ -110,24 +112,28 @@ class Transaction:
     def record_operation(self, op_type: str, **args: Any) -> None:
         """Record an operation in the transaction."""
         self._check_active()
-        self._operations.append(TransactionOperation(
-            operation_type=op_type,
-            args=args,
-        ))
+        self._operations.append(
+            TransactionOperation(
+                operation_type=op_type,
+                args=args,
+            )
+        )
 
     def savepoint(self, name: str) -> None:
         """Create a savepoint for partial rollback."""
         self._check_active()
-        self._savepoints.append(Savepoint(
-            name=name,
-            operation_index=len(self._operations),
-            document_state=serialize_document(self._doc),
-        ))
+        self._savepoints.append(
+            Savepoint(
+                name=name,
+                operation_index=len(self._operations),
+                document_state=serialize_document(self._doc),
+            )
+        )
 
     def rollback_to_savepoint(self, name: str) -> None:
         """Rollback to a named savepoint."""
         self._check_active()
-        
+
         # Find savepoint
         savepoint = None
         savepoint_index = -1
@@ -136,10 +142,10 @@ class Transaction:
                 savepoint = sp
                 savepoint_index = i
                 break
-        
+
         if savepoint is None:
             raise ValueError(f"Savepoint not found: {name}")
-        
+
         # Restore document state
         restored = deserialize_document(savepoint.document_state)
         self._doc.blocks = restored.blocks
@@ -147,30 +153,32 @@ class Transaction:
         self._doc.metadata = restored.metadata
         self._doc._version = restored._version
         self._doc.rebuild_indices()
-        
+
         # Trim operations and savepoints
-        self._operations = self._operations[:savepoint.operation_index]
-        self._savepoints = self._savepoints[:savepoint_index + 1]
+        self._operations = self._operations[: savepoint.operation_index]
+        self._savepoints = self._savepoints[: savepoint_index + 1]
 
     def commit(self) -> None:
         """Commit the transaction."""
         self._check_active()
         self._state = TransactionState.COMMITTED
-        
-        emit_event(UcpEvent(
-            event_type=EventType.TRANSACTION_COMMITTED.value,
-            data={
-                "transaction_id": self.id,
-                "operation_count": len(self._operations),
-                "elapsed_seconds": self.elapsed_seconds(),
-            },
-        ))
+
+        emit_event(
+            UcpEvent(
+                event_type=EventType.TRANSACTION_COMMITTED.value,
+                data={
+                    "transaction_id": self.id,
+                    "operation_count": len(self._operations),
+                    "elapsed_seconds": self.elapsed_seconds(),
+                },
+            )
+        )
 
     def rollback(self) -> None:
         """Rollback all changes in the transaction."""
         if self._state == TransactionState.COMMITTED:
             raise RuntimeError("Cannot rollback a committed transaction")
-        
+
         # Restore initial document state
         restored = deserialize_document(self._initial_state)
         self._doc.blocks = restored.blocks
@@ -178,16 +186,18 @@ class Transaction:
         self._doc.metadata = restored.metadata
         self._doc._version = restored._version
         self._doc.rebuild_indices()
-        
+
         self._state = TransactionState.ROLLED_BACK
-        
-        emit_event(UcpEvent(
-            event_type=EventType.TRANSACTION_ROLLED_BACK.value,
-            data={
-                "transaction_id": self.id,
-                "operation_count": len(self._operations),
-            },
-        ))
+
+        emit_event(
+            UcpEvent(
+                event_type=EventType.TRANSACTION_ROLLED_BACK.value,
+                data={
+                    "transaction_id": self.id,
+                    "operation_count": len(self._operations),
+                },
+            )
+        )
 
 
 # =============================================================================
@@ -209,12 +219,12 @@ class TransactionManager:
         timeout: Optional[float] = None,
     ) -> Transaction:
         """Begin a new transaction.
-        
+
         Args:
             doc: Document to operate on
             name: Optional transaction name
             timeout: Timeout in seconds (default: 30)
-            
+
         Returns:
             New Transaction instance
         """
@@ -224,12 +234,14 @@ class TransactionManager:
             name=name,
         )
         self._transactions[txn.id] = txn
-        
-        emit_event(UcpEvent(
-            event_type=EventType.TRANSACTION_STARTED.value,
-            data={"transaction_id": txn.id, "document_id": doc.id},
-        ))
-        
+
+        emit_event(
+            UcpEvent(
+                event_type=EventType.TRANSACTION_STARTED.value,
+                data={"transaction_id": txn.id, "document_id": doc.id},
+            )
+        )
+
         return txn
 
     def get(self, txn_id: str) -> Optional[Transaction]:
@@ -256,10 +268,7 @@ class TransactionManager:
 
     def cleanup(self) -> int:
         """Remove completed and timed-out transactions. Returns count removed."""
-        to_remove = [
-            tid for tid, txn in self._transactions.items()
-            if not txn.is_active()
-        ]
+        to_remove = [tid for tid, txn in self._transactions.items() if not txn.is_active()]
         for tid in to_remove:
             del self._transactions[tid]
         return len(to_remove)
@@ -291,23 +300,23 @@ class TransactionContext:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
         if self._txn is None:
             return False
-        
+
         if exc_type is not None:
             # Exception occurred - rollback
             if self._txn.is_active():
                 self._txn.rollback()
             return False
-        
+
         # No exception - commit if still active
         if self._txn.is_active():
             self._txn.commit()
-        
+
         return False
 
 
 def transaction(doc: Document, timeout: float = 30.0) -> TransactionContext:
     """Create a transaction context manager.
-    
+
     Usage:
         with transaction(doc) as txn:
             doc.edit_block(block_id, "new content")

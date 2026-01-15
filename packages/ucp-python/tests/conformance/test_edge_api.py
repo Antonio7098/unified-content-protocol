@@ -80,9 +80,11 @@ class TestEdgeFluent:
 
     def test_chained_fluent_methods(self):
         """Fluent methods can be chained."""
-        edge = (Edge.new(EdgeType.ELABORATES, "blk_target")
+        edge = (
+            Edge.new(EdgeType.ELABORATES, "blk_target")
             .with_confidence(0.9)
-            .with_description("Details"))
+            .with_description("Details")
+        )
 
         assert edge.metadata.confidence == 0.9
         assert edge.metadata.description == "Details"

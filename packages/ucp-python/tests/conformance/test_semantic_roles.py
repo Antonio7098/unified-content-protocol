@@ -189,11 +189,7 @@ class TestRoleInDocument:
     def test_role_in_document_add_block(self):
         """Roles work when adding blocks to document."""
         doc = create()
-        block_id = doc.add_block(
-            doc.root_id,
-            "Warning content",
-            role=SemanticRole.WARNING
-        )
+        block_id = doc.add_block(doc.root_id, "Warning content", role=SemanticRole.WARNING)
 
         block = doc.blocks[block_id]
         assert block.role == SemanticRole.WARNING

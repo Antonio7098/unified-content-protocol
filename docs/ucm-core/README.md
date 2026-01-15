@@ -17,7 +17,7 @@ UCM Core is the foundation of the UCP ecosystem. It defines:
 
 ```toml
 [dependencies]
-ucm-core = "0.1"
+ucm-core = "0.1.3"
 ```
 
 ## Module Overview

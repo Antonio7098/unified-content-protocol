@@ -26,7 +26,7 @@ class TestUnorderedLists:
 
         list_blocks = [b for b in doc.blocks.values() if b.role == SemanticRole.LIST]
         assert len(list_blocks) >= 1
-        
+
         content = list_blocks[0].content
         assert "- " in content  # Unordered marker preserved
 
@@ -37,9 +37,9 @@ class TestUnorderedLists:
 
         list_blocks = [b for b in doc.blocks.values() if b.role == SemanticRole.LIST]
         assert len(list_blocks) >= 1
-        
-        list_type = list_blocks[0].metadata.custom.get('list_type')
-        assert list_type == 'unordered'
+
+        list_type = list_blocks[0].metadata.custom.get("list_type")
+        assert list_type == "unordered"
 
 
 class TestOrderedLists:
@@ -60,7 +60,7 @@ class TestOrderedLists:
 
         list_blocks = [b for b in doc.blocks.values() if b.role == SemanticRole.LIST]
         assert len(list_blocks) >= 1
-        
+
         content = list_blocks[0].content
         # Should have numbered markers
         assert ". " in content
@@ -72,9 +72,9 @@ class TestOrderedLists:
 
         list_blocks = [b for b in doc.blocks.values() if b.role == SemanticRole.LIST]
         assert len(list_blocks) >= 1
-        
-        list_type = list_blocks[0].metadata.custom.get('list_type')
-        assert list_type == 'ordered'
+
+        list_type = list_blocks[0].metadata.custom.get("list_type")
+        assert list_type == "ordered"
 
 
 class TestListRoundTrip:
@@ -117,14 +117,14 @@ class TestListRoundTrip:
 2. Second step
 """
         doc = parse(original)
-        
+
         list_blocks = [b for b in doc.blocks.values() if b.role == SemanticRole.LIST]
         assert len(list_blocks) >= 2
-        
+
         # Check we have both types
-        list_types = [b.metadata.custom.get('list_type') for b in list_blocks]
-        assert 'ordered' in list_types
-        assert 'unordered' in list_types
+        list_types = [b.metadata.custom.get("list_type") for b in list_blocks]
+        assert "ordered" in list_types
+        assert "unordered" in list_types
 
 
 class TestListEdgeCases:
@@ -137,7 +137,7 @@ class TestListEdgeCases:
 
         list_blocks = [b for b in doc.blocks.values() if b.role == SemanticRole.LIST]
         assert len(list_blocks) >= 1
-        assert list_blocks[0].metadata.custom.get('list_type') == 'unordered'
+        assert list_blocks[0].metadata.custom.get("list_type") == "unordered"
 
     def test_single_item_ordered_list(self):
         """Single item ordered list is parsed correctly."""
@@ -146,7 +146,7 @@ class TestListEdgeCases:
 
         list_blocks = [b for b in doc.blocks.values() if b.role == SemanticRole.LIST]
         assert len(list_blocks) >= 1
-        assert list_blocks[0].metadata.custom.get('list_type') == 'ordered'
+        assert list_blocks[0].metadata.custom.get("list_type") == "ordered"
 
     def test_list_with_varied_markers(self):
         """Lists with varied unordered markers (-, *, +) are handled."""

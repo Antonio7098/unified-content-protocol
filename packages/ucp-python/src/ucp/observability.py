@@ -23,6 +23,7 @@ from .types import UcpEvent
 
 class LogLevel(str, Enum):
     """Log levels."""
+
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -34,9 +35,7 @@ def get_logger(name: str = "ucp") -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -53,38 +52,39 @@ _logger = get_logger()
 
 class EventType(str, Enum):
     """Types of UCP events."""
+
     # Document events
     DOCUMENT_CREATED = "document.created"
     DOCUMENT_MODIFIED = "document.modified"
-    
+
     # Block events
     BLOCK_ADDED = "block.added"
     BLOCK_EDITED = "block.edited"
     BLOCK_MOVED = "block.moved"
     BLOCK_DELETED = "block.deleted"
-    
+
     # Edge events
     EDGE_ADDED = "edge.added"
     EDGE_REMOVED = "edge.removed"
-    
+
     # Tag events
     TAG_ADDED = "tag.added"
     TAG_REMOVED = "tag.removed"
-    
+
     # UCL events
     UCL_PARSED = "ucl.parsed"
     UCL_EXECUTED = "ucl.executed"
     UCL_ERROR = "ucl.error"
-    
+
     # Validation events
     VALIDATION_STARTED = "validation.started"
     VALIDATION_COMPLETED = "validation.completed"
-    
+
     # Transaction events
     TRANSACTION_STARTED = "transaction.started"
     TRANSACTION_COMMITTED = "transaction.committed"
     TRANSACTION_ROLLED_BACK = "transaction.rolled_back"
-    
+
     # Snapshot events
     SNAPSHOT_CREATED = "snapshot.created"
     SNAPSHOT_RESTORED = "snapshot.restored"
@@ -93,6 +93,7 @@ class EventType(str, Enum):
 @dataclass
 class DocumentEvent(UcpEvent):
     """Event related to document operations."""
+
     document_id: str = ""
     block_id: Optional[str] = None
     operation: str = ""
@@ -101,6 +102,7 @@ class DocumentEvent(UcpEvent):
 @dataclass
 class UclEvent(UcpEvent):
     """Event related to UCL execution."""
+
     command: str = ""
     success: bool = True
     error_message: Optional[str] = None
@@ -110,6 +112,7 @@ class UclEvent(UcpEvent):
 @dataclass
 class SpanContext:
     """Context for a traced span."""
+
     trace_id: str
     span_id: str
     parent_span_id: Optional[str] = None
@@ -162,9 +165,7 @@ class EventBus:
     def unsubscribe(self, event_type: str, handler: EventHandler) -> None:
         """Unsubscribe from an event type."""
         if event_type in self._handlers:
-            self._handlers[event_type] = [
-                h for h in self._handlers[event_type] if h != handler
-            ]
+            self._handlers[event_type] = [h for h in self._handlers[event_type] if h != handler]
 
     def unsubscribe_all(self, handler: EventHandler) -> None:
         """Unsubscribe from all events."""
@@ -203,9 +204,11 @@ def emit_event(event: UcpEvent) -> None:
 
 def on_event(event_type: str) -> Callable[[EventHandler], EventHandler]:
     """Decorator to subscribe a function to an event type."""
+
     def decorator(handler: EventHandler) -> EventHandler:
         _event_bus.subscribe(event_type, handler)
         return handler
+
     return decorator
 
 
@@ -257,10 +260,7 @@ class Tracer:
             yield SpanContext(trace_id="", span_id="", name=name)
             return
 
-        trace_id = (
-            self._active_span.trace_id if self._active_span
-            else self._generate_trace_id()
-        )
+        trace_id = self._active_span.trace_id if self._active_span else self._generate_trace_id()
         parent_span_id = self._active_span.span_id if self._active_span else None
 
         span = SpanContext(
@@ -285,7 +285,8 @@ class Tracer:
             duration = span.duration_ms()
             _logger.debug(
                 f"Span '{name}' completed in {duration:.2f}ms"
-                if duration else f"Span '{name}' completed"
+                if duration
+                else f"Span '{name}' completed"
             )
 
     def get_spans(self) -> List[SpanContext]:
@@ -303,11 +304,14 @@ _tracer = Tracer.get_instance()
 
 def trace(name: str, **attributes: Any) -> Callable:
     """Decorator to trace a function."""
+
     def decorator(func: Callable) -> Callable:
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             with _tracer.span(name, **attributes):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 

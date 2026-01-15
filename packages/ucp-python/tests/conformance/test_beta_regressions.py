@@ -28,7 +28,7 @@ class TestBlockHashability:
         block2 = Block.text("Content 2")
 
         block_set = {block1, block2}
-        
+
         assert len(block_set) == 2
         assert block1 in block_set
 
@@ -56,13 +56,13 @@ class TestBlockHashability:
     def test_id_mapper_works_with_blocks(self):
         """IdMapper can use blocks in internal data structures."""
         from ucp import map_ids
-        
+
         doc = create()
         doc.add_block(doc.root_id, "First")
         doc.add_block(doc.root_id, "Second")
-        
+
         mapper = map_ids(doc)
-        
+
         # Should be able to get mappings without error
         mappings = mapper.get_mappings()
         assert len(mappings) >= 2
@@ -73,32 +73,32 @@ class TestSemanticRoles:
 
     def test_equation_role_exists(self):
         """EQUATION semantic role exists."""
-        assert hasattr(SemanticRole, 'EQUATION')
+        assert hasattr(SemanticRole, "EQUATION")
         assert SemanticRole.EQUATION.value == "equation"
 
     def test_metadata_role_exists(self):
         """METADATA semantic role exists."""
-        assert hasattr(SemanticRole, 'METADATA')
+        assert hasattr(SemanticRole, "METADATA")
         assert SemanticRole.METADATA.value == "metadata"
 
     def test_section_role_exists(self):
         """SECTION semantic role exists."""
-        assert hasattr(SemanticRole, 'SECTION')
+        assert hasattr(SemanticRole, "SECTION")
         assert SemanticRole.SECTION.value == "section"
 
     def test_note_role_exists(self):
         """NOTE semantic role exists."""
-        assert hasattr(SemanticRole, 'NOTE')
+        assert hasattr(SemanticRole, "NOTE")
         assert SemanticRole.NOTE.value == "note"
 
     def test_warning_role_exists(self):
         """WARNING semantic role exists."""
-        assert hasattr(SemanticRole, 'WARNING')
+        assert hasattr(SemanticRole, "WARNING")
         assert SemanticRole.WARNING.value == "warning"
 
     def test_tip_role_exists(self):
         """TIP semantic role exists."""
-        assert hasattr(SemanticRole, 'TIP')
+        assert hasattr(SemanticRole, "TIP")
         assert SemanticRole.TIP.value == "tip"
 
     def test_can_create_block_with_new_roles(self):
@@ -111,7 +111,7 @@ class TestSemanticRoles:
             SemanticRole.WARNING,
             SemanticRole.TIP,
         ]
-        
+
         for role in roles:
             block = Block.text("Content", role=role)
             assert block.role == role
@@ -154,7 +154,7 @@ class TestValidationResultAPI:
     def test_validation_issue_info_factory(self):
         """ValidationIssue.info() factory method exists."""
         issue = ValidationIssue.info("I001", "Informational note", block_id="blk_test")
-        
+
         assert issue.severity == ValidationSeverity.INFO
         assert issue.code == "I001"
         assert issue.message == "Informational note"
@@ -185,9 +185,11 @@ class TestEdgeAPI:
 
     def test_edge_fluent_chaining(self):
         """Edge fluent methods can be chained."""
-        edge = (Edge.new(EdgeType.ELABORATES, "blk_target")
+        edge = (
+            Edge.new(EdgeType.ELABORATES, "blk_target")
             .with_confidence(0.9)
-            .with_description("Details"))
+            .with_description("Details")
+        )
 
         assert edge.metadata.confidence == 0.9
         assert edge.metadata.description == "Details"
@@ -199,7 +201,7 @@ class TestSnapshotManager:
     def test_max_snapshots_parameter(self):
         """SnapshotManager accepts max_snapshots in constructor."""
         manager = SnapshotManager(max_snapshots=5)
-        
+
         # Should not raise
         assert manager is not None
 
@@ -207,16 +209,16 @@ class TestSnapshotManager:
         """SnapshotManager automatically evicts oldest when at capacity."""
         manager = SnapshotManager(max_snapshots=3)
         doc = create()
-        
+
         # Create 4 snapshots (exceeds max of 3)
         manager.create("snap1", doc)
         manager.create("snap2", doc)
         manager.create("snap3", doc)
         manager.create("snap4", doc)  # Should trigger eviction
-        
+
         # Should only have 3 snapshots
         assert manager.count() == 3
-        
+
         # Oldest (snap1) should have been evicted
         assert not manager.exists("snap1")
         assert manager.exists("snap4")
@@ -260,14 +262,14 @@ class TestUclBuilder:
     def test_edit_method_signature(self):
         """UclBuilder.edit() accepts block_id, content, and optional path."""
         from ucp import ucl
-        
+
         builder = ucl()
         # Should work with just block_id and content
         builder.edit("blk_1", "new content")
-        
+
         # Should work with explicit path
         builder.edit("blk_2", "other content", path="text")
-        
+
         result = builder.build()
         assert "EDIT blk_1" in result
         assert "EDIT blk_2" in result
@@ -276,19 +278,19 @@ class TestUclBuilder:
         """UclBuilder.edit() does not accept label parameter."""
         from ucp import ucl
         import inspect
-        
+
         sig = inspect.signature(ucl().edit)
         params = list(sig.parameters.keys())
-        
+
         # Should only have block_id, content, path
         assert "label" not in params
 
     def test_append_accepts_label(self):
         """UclBuilder.append() accepts label via properties kwargs."""
         from ucp import ucl
-        
+
         builder = ucl()
         builder.append("blk_1", "content", label="my-label")
-        
+
         result = builder.build()
         assert 'label="my-label"' in result

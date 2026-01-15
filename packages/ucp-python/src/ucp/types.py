@@ -20,6 +20,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 class ContentType(str, Enum):
     """Content types supported by UCM."""
+
     TEXT = "text"
     CODE = "code"
     TABLE = "table"
@@ -32,6 +33,7 @@ class ContentType(str, Enum):
 
 class TextFormat(str, Enum):
     """Text format variants."""
+
     PLAIN = "plain"
     MARKDOWN = "markdown"
     RICH = "rich"
@@ -39,6 +41,7 @@ class TextFormat(str, Enum):
 
 class SemanticRole(str, Enum):
     """Semantic roles for blocks."""
+
     # Headings
     HEADING1 = "heading1"
     HEADING2 = "heading2"
@@ -83,29 +86,30 @@ class SemanticRole(str, Enum):
 
 class EdgeType(str, Enum):
     """Types of relationships between blocks."""
+
     # Derivation relationships
     DERIVED_FROM = "derived_from"
     SUPERSEDES = "supersedes"
     TRANSFORMED_FROM = "transformed_from"
-    
+
     # Reference relationships
     REFERENCES = "references"
     CITED_BY = "cited_by"
     LINKS_TO = "links_to"
-    
+
     # Semantic relationships
     SUPPORTS = "supports"
     CONTRADICTS = "contradicts"
     ELABORATES = "elaborates"
     SUMMARIZES = "summarizes"
-    
+
     # Structural relationships
     PARENT_OF = "parent_of"
     CHILD_OF = "child_of"
     SIBLING_OF = "sibling_of"
     PREVIOUS_SIBLING = "previous_sibling"
     NEXT_SIBLING = "next_sibling"
-    
+
     # Version relationships
     VERSION_OF = "version_of"
     ALTERNATIVE_OF = "alternative_of"
@@ -150,6 +154,7 @@ class EdgeType(str, Enum):
 
 class Capability(str, Enum):
     """UCL command capabilities."""
+
     EDIT = "edit"
     APPEND = "append"
     MOVE = "move"
@@ -161,6 +166,7 @@ class Capability(str, Enum):
 
 class ValidationSeverity(str, Enum):
     """Severity levels for validation issues."""
+
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
@@ -168,6 +174,7 @@ class ValidationSeverity(str, Enum):
 
 class TransactionState(str, Enum):
     """Transaction lifecycle states."""
+
     ACTIVE = "active"
     COMMITTED = "committed"
     ROLLED_BACK = "rolled_back"
@@ -182,6 +189,7 @@ class TransactionState(str, Enum):
 @dataclass
 class EdgeMetadata:
     """Metadata for an edge relationship."""
+
     confidence: Optional[float] = None
     description: Optional[str] = None
     custom: Dict[str, Any] = field(default_factory=dict)
@@ -193,6 +201,7 @@ class EdgeMetadata:
 @dataclass
 class Edge:
     """An edge represents a relationship between blocks."""
+
     edge_type: EdgeType
     target: str  # Block ID
     metadata: EdgeMetadata = field(default_factory=EdgeMetadata)
@@ -214,9 +223,10 @@ class Edge:
 @dataclass
 class TokenEstimate:
     """Token count estimates for different models."""
+
     gpt4: int = 0
     claude: int = 0
-    
+
     @classmethod
     def estimate_text(cls, text: str) -> "TokenEstimate":
         """Estimate tokens for text content."""
@@ -231,6 +241,7 @@ class TokenEstimate:
 @dataclass
 class BlockMetadata:
     """Metadata for a content block."""
+
     semantic_role: Optional[SemanticRole] = None
     label: Optional[str] = None
     tags: List[str] = field(default_factory=list)
@@ -261,6 +272,7 @@ class BlockMetadata:
 @dataclass
 class DocumentMetadata:
     """Metadata for a document."""
+
     title: Optional[str] = None
     description: Optional[str] = None
     authors: List[str] = field(default_factory=list)
@@ -277,6 +289,7 @@ class DocumentMetadata:
 @dataclass
 class ValidationIssue:
     """A validation issue found in a document."""
+
     severity: ValidationSeverity
     code: str
     message: str
@@ -288,7 +301,9 @@ class ValidationIssue:
 
     @classmethod
     def warning(cls, code: str, message: str, block_id: Optional[str] = None) -> "ValidationIssue":
-        return cls(severity=ValidationSeverity.WARNING, code=code, message=message, block_id=block_id)
+        return cls(
+            severity=ValidationSeverity.WARNING, code=code, message=message, block_id=block_id
+        )
 
     @classmethod
     def info(cls, code: str, message: str, block_id: Optional[str] = None) -> "ValidationIssue":
@@ -299,6 +314,7 @@ class ValidationIssue:
 @dataclass
 class ValidationResult:
     """Result of document validation."""
+
     valid: bool
     issues: List[ValidationIssue] = field(default_factory=list)
 
@@ -329,6 +345,7 @@ class ValidationResult:
 @dataclass
 class ResourceLimits:
     """Resource limits for validation."""
+
     max_document_size: int = 50 * 1024 * 1024  # 50MB
     max_block_count: int = 100_000
     max_block_size: int = 5 * 1024 * 1024  # 5MB
@@ -344,6 +361,7 @@ class ResourceLimits:
 @dataclass
 class UcpEvent:
     """Base event for observability."""
+
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: str = ""
     data: Dict[str, Any] = field(default_factory=dict)
