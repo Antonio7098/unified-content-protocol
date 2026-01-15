@@ -217,9 +217,18 @@ from ucp import IdMapper, PromptBuilder
 doc = parse(markdown)
 mapper = IdMapper(doc)
 
-# IdMapper.describe() uses roles for structure display
+# IdMapper.describe() uses normalized format with structure and blocks
 print(mapper.describe(doc))
-# Output shows roles: [1] intro - Introduction text...
+# Output shows:
+# Document structure:
+# 1: 2 3
+# 2:
+# 3:
+#
+# Blocks:
+# 1 type=text content=""
+# 2 type=text content="Introduction"
+# 3 type=text content="Content..."
 ```
 
 ## See Also

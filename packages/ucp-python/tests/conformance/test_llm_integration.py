@@ -112,14 +112,17 @@ class TestIdMapper:
         assert all("short" in m and "long" in m for m in mappings)
 
     def test_describe_document(self):
-        """describe generates document description."""
+        """describe generates normalized document description."""
         doc = create()
         doc.add_block(doc.root_id, "First paragraph")
         mapper = IdMapper(doc)
 
         description = mapper.describe(doc)
 
-        assert "Document Structure:" in description
+        assert "Document structure:" in description
+        assert "Blocks:" in description
+        assert "type=" in description
+        assert 'content="' in description
 
     def test_map_ids_convenience(self):
         """map_ids convenience function works."""

@@ -19,11 +19,11 @@ use regex::Regex;
 use std::collections::HashMap;
 use ucm_core::{BlockId, Content, Document};
 
-/// Get a preview of content (first N characters)
-fn content_preview(content: &Content, max_len: usize) -> String {
-    let text = match content {
+/// Get the full string representation of content
+fn content_to_string(content: &Content) -> String {
+    match content {
         Content::Text(t) => t.text.clone(),
-        Content::Code(c) => format!("```{}\n{}```", c.language, c.source),
+        Content::Code(c) => c.source.clone(),
         Content::Table(t) => format!("Table {}x{}", t.columns.len(), t.rows.len()),
         Content::Math(m) => m.expression.clone(),
         Content::Json { value, .. } => value.to_string(),
@@ -32,12 +32,6 @@ fn content_preview(content: &Content, max_len: usize) -> String {
         Content::Composite { layout, children } => {
             format!("{:?} ({} children)", layout, children.len())
         }
-    };
-
-    if text.len() > max_len {
-        format!("{}...", &text[..max_len])
-    } else {
-        text
     }
 }
 
@@ -257,54 +251,77 @@ impl IdMapper {
         (original_tokens, shortened_tokens, savings)
     }
 
-    /// Generate a compact document representation for LLM prompts
+    /// Generate a normalized document representation for LLM prompts
     pub fn document_to_prompt(&self, doc: &Document) -> String {
         let mut lines = Vec::new();
 
         // Header
-        lines.push("Document Structure:".to_string());
+        lines.push("Document structure:".to_string());
 
-        // Build hierarchy representation
-        self.build_hierarchy_lines(doc, &doc.root, 0, &mut lines);
-
-        lines.join("\n")
-    }
-
-    fn build_hierarchy_lines(
-        &self,
-        doc: &Document,
-        block_id: &BlockId,
-        depth: usize,
-        lines: &mut Vec<String>,
-    ) {
-        let short_id = self
-            .to_short
-            .get(block_id)
-            .map(|id| id.to_string())
-            .unwrap_or_else(|| "?".to_string());
-        let indent = "  ".repeat(depth);
-
-        if let Some(block) = doc.get_block(block_id) {
-            let role = block
-                .metadata
-                .semantic_role
-                .as_ref()
-                .map(|r| format!("{:?}", r.category))
-                .unwrap_or_else(|| "block".to_string());
-
-            let content_preview = content_preview(&block.content, 50);
-            lines.push(format!(
-                "{}[{}] {} - {}",
-                indent, short_id, role, content_preview
-            ));
-        }
-
-        // Process children
-        if let Some(children) = doc.structure.get(block_id) {
-            for child_id in children {
-                self.build_hierarchy_lines(doc, child_id, depth + 1, lines);
+        // Collect all block IDs in BFS order
+        let mut all_blocks = Vec::new();
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(doc.root);
+        while let Some(block_id) = queue.pop_front() {
+            all_blocks.push(block_id);
+            if let Some(children) = doc.structure.get(&block_id) {
+                for child in children {
+                    queue.push_back(*child);
+                }
             }
         }
+
+        // Document structure section: parent: child1 child2 ...
+        for block_id in &all_blocks {
+            let short_id = self
+                .to_short
+                .get(block_id)
+                .map(|id| id.to_string())
+                .unwrap_or_else(|| "?".to_string());
+
+            let children = doc.children(block_id);
+            if children.is_empty() {
+                lines.push(format!("{}:", short_id));
+            } else {
+                let child_ids: Vec<String> = children
+                    .iter()
+                    .map(|c| {
+                        self.to_short
+                            .get(c)
+                            .map(|id| id.to_string())
+                            .unwrap_or_else(|| "?".to_string())
+                    })
+                    .collect();
+                lines.push(format!("{}: {}", short_id, child_ids.join(" ")));
+            }
+        }
+
+        // Blocks section
+        lines.push(String::new());
+        lines.push("Blocks:".to_string());
+        for block_id in &all_blocks {
+            if let Some(block) = doc.get_block(block_id) {
+                let short_id = self
+                    .to_short
+                    .get(block_id)
+                    .map(|id| id.to_string())
+                    .unwrap_or_else(|| "?".to_string());
+
+                let content_type = block.content.type_tag();
+                let content_str = content_to_string(&block.content);
+                // Escape content for display
+                let escaped_content = content_str
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n");
+                lines.push(format!(
+                    "{} type={} content=\"{}\"",
+                    short_id, content_type, escaped_content
+                ));
+            }
+        }
+
+        lines.join("\n")
     }
 
     /// Get the mapping table as a string (useful for debugging)
@@ -451,5 +468,26 @@ mod tests {
         let (original, shortened, savings) = mapper.estimate_token_savings(&prompt);
         assert!(savings > 0, "Should have token savings");
         assert!(shortened < original, "Shortened should be smaller");
+    }
+
+    #[test]
+    fn test_document_to_prompt_format() {
+        let mut doc = Document::create();
+        let root = doc.root;
+
+        let block1 = Block::new(Content::text("Title"), Some("heading1"));
+        let id1 = doc.add_block(block1, &root).unwrap();
+
+        let block2 = Block::new(Content::text("Paragraph"), Some("paragraph"));
+        doc.add_block(block2, &id1).unwrap();
+
+        let mapper = IdMapper::from_document(&doc);
+        let prompt = mapper.document_to_prompt(&doc);
+
+        // Check normalized format
+        assert!(prompt.contains("Document structure:"));
+        assert!(prompt.contains("Blocks:"));
+        assert!(prompt.contains("type="));
+        assert!(prompt.contains("content=\""));
     }
 }
