@@ -1,6 +1,6 @@
 # Unified Content Protocol (UCP)
 
-> Latest release: v0.1.2
+> Latest release: v0.1.3
 
 Unified Content Protocol is a graph-based intermediate representation for structured content. It provides deterministic, token-efficient building blocks that make it easy to ingest, transform, and serve complex documents to both humans and LLM-powered systems.
 
@@ -47,16 +47,16 @@ Unified Content Protocol is a graph-based intermediate representation for struct
 4. **Add to another project** (example using the high-level API):
    ```toml
    [dependencies]
-   ucp-api = "0.1.2"
+   ucp-api = "0.1.3"
    ```
 
 ## SDK Installation
 
 | SDK | Command |
 | --- | --- |
-| Rust (workspace) | `ucp-api = "0.1.2"` (or other crates at `0.1.2`) |
-| Python | `pip install ucp-content==0.1.2` |
-| JavaScript / TypeScript | `npm install @ucp-core/core@0.1.2` |
+| Rust (workspace) | `ucp-api = "0.1.3"` (or other crates at `0.1.3`) |
+| Python | `pip install ucp-content==0.1.3` |
+| JavaScript / TypeScript | `npm install @ucp-core/core@0.1.3` |
 
 ## Documentation
 

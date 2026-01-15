@@ -19,22 +19,23 @@
   },
   "entries": [
     {
-      "version": "v0.1.2",
+      "version": "v0.1.3",
       "date": "2026-01-15",
       "changes": [
         {
           "type": "changed",
           "area": "release",
-          "description": "Bump workspace version to 0.1.2 to trigger publish workflow.",
+          "description": "Bump workspace, SDKs, docs, and changelog to version 0.1.3 to trigger publish pipeline.",
           "commit": "pending",
           "files_affected": [
             "Cargo.toml",
             "packages/ucp-python/pyproject.toml",
+            "packages/ucp-python/src/ucp/__init__.py",
             "packages/ucp-js/package.json",
             "README.md",
             "docs/getting-started/installation.md"
           ],
-          "bugs": []
+          "issues": []
         }
       ]
     },
