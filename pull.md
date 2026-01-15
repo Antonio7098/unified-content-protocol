@@ -3,9 +3,8 @@
 Use this checklist whenever you prepare a pull request in this repository. Treat every item as mandatory unless the section explicitly says "optional".
 
 ## 1. Prep Work
-1. Create a descriptive branch name (e.g., `feat/<summary>` or `fix/<bug>`).
-2. Ensure your working tree is clean before starting: `git status -sb`.
-3. If you need credentials (PyPI, npm, etc.), verify they exist in GitHub Actions secrets—never commit secrets locally.
+1. Create a descriptive branch name (e.g., `feat/<summary>` or `fix/<bug>`) if you are not already on the correct one.
+2. If you start a new branch, ensure your working tree is clean before starting: `git status -sb`.
 
 ## 2. Tests, Lint, and Coverage
 Run **all** language toolchains. Fail fast if any command exits non‑zero.
