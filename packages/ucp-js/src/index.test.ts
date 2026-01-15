@@ -166,14 +166,16 @@ describe('IdMapper', () => {
     expect(expanded).toContain('blk_')
   })
 
-  it('generates document description', () => {
+  it('generates normalized document description', () => {
     const doc = parseMarkdown('# Hello\n\nWorld')
     const mapper = IdMapper.fromDocument(doc)
 
     const desc = mapper.describe(doc)
 
-    expect(desc).toContain('[2]')
-    expect(desc).toContain('heading1')
+    expect(desc).toContain('Document structure:')
+    expect(desc).toContain('Blocks:')
+    expect(desc).toContain('type=')
+    expect(desc).toContain('content="')
   })
 })
 

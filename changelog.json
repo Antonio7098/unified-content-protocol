@@ -1,15 +1,131 @@
 {
+  "template": {
+    "version": "vYYYY.MM.DD or semantic version",
+    "date": "ISO-8601 release date",
+    "changes": [
+      {
+        "type": "added | changed | fixed | removed",
+        "area": "subsystem or feature name",
+        "description": "Concise summary of the change",
+        "commit": "git hash or link",
+        "files_affected": [
+          "List of key files or directories impacted"
+        ],
+        "issues": [
+          "Optional list of bug IDs or tickets"
+        ]
+      }
+    ]
+  },
   "entries": [
+    {
+      "version": "v0.1.1",
+      "date": "2026-01-15",
+      "changes": [
+        {
+          "type": "changed",
+          "area": "llm.document_formatting",
+          "description": "Updated IdMapper formatting across Python, Rust, and JS to emit normalized Document structure/Blocks sections for LLM prompts.",
+          "commit": "pending",
+          "files_affected": [
+            "packages/ucp-python/src/ucp/llm.py",
+            "crates/ucp-llm/src/id_mapper.rs",
+            "packages/ucp-js/src/index.ts"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "tests",
+          "description": "Expanded Python, Rust, and JS test suites to assert the normalized format output.",
+          "commit": "pending",
+          "files_affected": [
+            "packages/ucp-python/tests/conformance/test_llm_integration.py",
+            "crates/ucp-llm/src/id_mapper.rs",
+            "packages/ucp-js/src/index.test.ts"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "docs",
+          "description": "Documented the normalized format in ucp-llm README and semantic roles guide for LLM context.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/ucp-llm/README.md",
+            "docs/ucm-core/semantic-roles.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "release.process",
+          "description": "Adopted structured changelog template mirroring Stageflow format for future releases.",
+          "commit": "pending",
+          "files_affected": [
+            "changelog.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
     {
       "version": "v0.1.0",
       "date": "2025-01-14",
       "changes": [
-        "Initial release of Unified Content Protocol workspace",
-        "Core Rust crates (ucm-core, ucm-engine, ucl-parser, ucp-api, ucp-observe, ucp-llm)",
-        "Markdown translator crate",
-        "Python SDK (ucp-content) initial publish",
-        "JavaScript SDK (@ucp-core/core) initial publish",
-        "Comprehensive docs and tooling"
+        {
+          "type": "added",
+          "area": "workspace",
+          "description": "Initial release of the Unified Content Protocol workspace with docs and tooling.",
+          "commit": "initial",
+          "files_affected": [
+            "crates/*",
+            "packages/*",
+            "docs/*"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "rust.crates",
+          "description": "Published core Rust crates (ucm-core, ucm-engine, ucl-parser, ucp-api, ucp-observe, ucp-llm).",
+          "commit": "initial",
+          "files_affected": [
+            "crates/"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "translators.markdown",
+          "description": "Released Markdown translator crate for bidirectional parsing.",
+          "commit": "initial",
+          "files_affected": [
+            "crates/ucp-translator-markdown",
+            "docs/translators/markdown/README.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.python",
+          "description": "Shipped initial Python SDK (ucp-content).",
+          "commit": "initial",
+          "files_affected": [
+            "packages/ucp-python"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.javascript",
+          "description": "Shipped initial JavaScript SDK (@ucp-core/core).",
+          "commit": "initial",
+          "files_affected": [
+            "packages/ucp-js"
+          ],
+          "issues": []
+        }
       ]
     }
   ]

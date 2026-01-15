@@ -996,29 +996,51 @@ export class IdMapper {
     return result
   }
 
-  /** Generate a compact document description */
+  /** Generate a normalized document description with structure and blocks */
   describe(doc: Document): string {
-    const lines: string[] = ['Document Structure:']
+    const lines: string[] = ['Document structure:']
 
-    const describe = (id: BlockId, depth: number) => {
-      const block = doc.blocks.get(id)
-      if (!block) return
-
-      const indent = '  '.repeat(depth)
-      const shortId = this.toShort.get(id)
-      const role = block.role ?? 'block'
-      const preview = block.content.slice(0, 40) + (block.content.length > 40 ? '...' : '')
-
-      if (id !== doc.root || block.content) {
-        lines.push(`${indent}[${shortId}] ${role} - ${preview}`)
-      }
-
-      for (const childId of block.children) {
-        describe(childId, depth + 1)
+    // Collect all block IDs in BFS order
+    const allBlocks: BlockId[] = []
+    const queue: BlockId[] = [doc.root]
+    while (queue.length > 0) {
+      const blockId = queue.shift()!
+      allBlocks.push(blockId)
+      const block = doc.blocks.get(blockId)
+      if (block) {
+        queue.push(...block.children)
       }
     }
 
-    describe(doc.root, 0)
+    // Document structure section: parent: child1 child2 ...
+    for (const blockId of allBlocks) {
+      const shortId = this.toShort.get(blockId)
+      const block = doc.blocks.get(blockId)
+      const children = block?.children ?? []
+      if (children.length > 0) {
+        const childIds = children.map(c => this.toShort.get(c)).join(' ')
+        lines.push(`${shortId}: ${childIds}`)
+      } else {
+        lines.push(`${shortId}:`)
+      }
+    }
+
+    // Blocks section
+    lines.push('')
+    lines.push('Blocks:')
+    for (const blockId of allBlocks) {
+      const block = doc.blocks.get(blockId)
+      if (!block) continue
+      const shortId = this.toShort.get(blockId)
+      const contentType = block.type ?? 'text'
+      // Escape content for display
+      const escapedContent = block.content
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+      lines.push(`${shortId} type=${contentType} content="${escapedContent}"`)
+    }
+
     return lines.join('\n')
   }
 

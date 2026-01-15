@@ -345,26 +345,40 @@ class IdMapper:
         return len(self._id_to_short)
 
     def describe(self, doc: Document) -> str:
-        """Generate a compact document description."""
-        lines: List[str] = ["Document Structure:"]
+        """Generate a normalized document description with structure and blocks."""
+        lines: List[str] = ["Document structure:"]
 
-        def describe_block(block_id: str, depth: int) -> None:
+        # Collect all block IDs in order (BFS traversal)
+        all_blocks: List[str] = []
+        queue = [doc.root]
+        while queue:
+            block_id = queue.pop(0)
+            all_blocks.append(block_id)
+            queue.extend(doc.children(block_id))
+
+        # Document structure section: parent: child1 child2 ...
+        for block_id in all_blocks:
+            short_id = self._id_to_short.get(block_id)
+            children = doc.children(block_id)
+            if children:
+                child_ids = " ".join(str(self._id_to_short.get(c)) for c in children)
+                lines.append(f"{short_id}: {child_ids}")
+            else:
+                lines.append(f"{short_id}:")
+
+        # Blocks section
+        lines.append("")
+        lines.append("Blocks:")
+        for block_id in all_blocks:
             block = doc.get_block(block_id)
             if block is None:
-                return
-
-            indent = "  " * depth
+                continue
             short_id = self._id_to_short.get(block_id)
-            role = block.role.value if block.role else "block"
-            preview = block.content[:40] + ("..." if len(block.content) > 40 else "")
+            content_type = block.content_type.value if block.content_type else "text"
+            # Escape content for display
+            escaped_content = block.content.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+            lines.append(f'{short_id} type={content_type} content="{escaped_content}"')
 
-            if block_id != doc.root or block.content:
-                lines.append(f"{indent}[{short_id}] {role} - {preview}")
-
-            for child_id in doc.children(block_id):
-                describe_block(child_id, depth + 1)
-
-        describe_block(doc.root, 0)
         return "\n".join(lines)
 
     def get_mappings(self) -> List[Dict[str, object]]:

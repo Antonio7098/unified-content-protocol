@@ -34,8 +34,27 @@ assert_eq!(short, "EDIT 1 SET text = \"Hello\"");
 Highlights:
 - Deterministic ordering (root first, remaining blocks sorted by ID)
 - `shorten_ucl` / `expand_ucl` for round-tripping commands
-- `document_to_prompt` helper for hierarchical summaries
+- `document_to_prompt` helper for normalized document representation
 - `estimate_token_savings` for quick what-if analysis
+
+#### Document Format
+
+`document_to_prompt` outputs a normalized, flat format with two sections:
+
+```
+Document structure:
+1: 2 3
+2:
+3:
+
+Blocks:
+1 type=text content=""
+2 type=text content="Title"
+3 type=text content="Paragraph"
+```
+
+- **Document structure**: Parent-child relationships (`parent: child1 child2 ...`)
+- **Blocks**: Block details with type and escaped content
 
 ### PromptBuilder
 
@@ -51,8 +70,8 @@ let builder = PromptBuilder::new()
     .with_short_ids(true);
 
 let system_prompt = builder.build_system_prompt();
-let doc_context = "[1] heading1 - Intro\n  [2] paragraph - Hello";
-let final_prompt = builder.build_prompt(doc_context, "Update block 2 to mention the date");
+let doc_context = "Document structure:\n1: 2\n2:\n\nBlocks:\n1 type=text content=\"\"\n2 type=text content=\"Hello\"";
+let final_prompt = builder.build_prompt(&doc_context, "Update block 2 to mention the date");
 ```
 
 Capabilities gate which command documentation is included (`EDIT`, `APPEND`, `MOVE`, `DELETE`, `LINK`, `SNAPSHOT`, `TRANSACTION`). Short-ID mode automatically updates rule text so the model knows IDs like `1`, `2`, `3` will appear.
