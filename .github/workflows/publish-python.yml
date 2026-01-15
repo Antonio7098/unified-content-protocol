@@ -1,39 +1,87 @@
 name: publish-python
 
 on:
-  push:
-    tags:
-      - "v*"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+
+      - name: Detect version change vs base
+        id: version-change
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "${BASE_REF}"
+          python - <<'PY'
+import os
+import subprocess
+import tomllib
+from pathlib import Path
+
+base_ref = os.environ["BASE_REF"]
+
+def load_version_from(spec: str) -> str:
+    data = subprocess.run(
+        ["git", "show", f"{spec}:Cargo.toml"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return tomllib.loads(data)["workspace"]["package"]["version"]
+
+repo_version = tomllib.loads(Path("Cargo.toml").read_text())["workspace"]["package"]["version"]
+base_version = load_version_from(f"origin/{base_ref}")
+
+print(f"Base version: {base_version}")
+print(f"Head version: {repo_version}")
+
+changed = base_version != repo_version
+with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+    fh.write(f"changed={'true' if changed else 'false'}\n")
+PY
+
+      - name: Abort (version unchanged)
+        if: steps.version-change.outputs.changed != 'true'
+        run: echo "::notice::No workspace version bump detected; skipping publish."
 
       - name: Install build tooling
+        if: steps.version-change.outputs.changed == 'true'
         run: |
           python -m pip install --upgrade pip
           python -m pip install build
 
-      - name: Verify version sync script
-        run: python scripts/check_version_sync.py --quiet
+      - name: Verify version sync
+        if: steps.version-change.outputs.changed == 'true'
+        run: python scripts/check_version_sync.py --quiet --require-tag
 
       - name: Build distribution
+        if: steps.version-change.outputs.changed == 'true'
         working-directory: packages/ucp-python
         run: python -m build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.8.11
+        if: steps.version-change.outputs.changed == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: packages/ucp-python/dist
           password: ${{ secrets.PYPI_API_TOKEN }}

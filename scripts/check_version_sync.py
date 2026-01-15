@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -92,6 +93,26 @@ def check_readme(version: str) -> list[str]:
     return []
 
 
+def check_git_tag(version: str) -> list[str]:
+    expected_tag = f"v{version}"
+    try:
+        tag = (
+            subprocess.run(
+                ["git", "describe", "--tags", "--exact-match", "HEAD"],
+                cwd=REPO_ROOT,
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            .stdout.strip()
+        )
+    except subprocess.CalledProcessError:
+        return ["HEAD is not tagged. Create the release tag first or omit --require-tag."]
+    if tag != expected_tag:
+        return [f"HEAD tag is {tag}, expected {expected_tag}."]
+    return []
+
+
 def check_docs(version: str) -> list[str]:
     errors: list[str] = []
     content = DOC_INSTALL_PATH.read_text(encoding="utf-8")
@@ -129,6 +150,11 @@ def main(argv: list[str] | None = None) -> int:
         description="Validate that workspace, SDKs, docs, and changelog share the same version."
     )
     parser.add_argument("--quiet", action="store_true", help="Suppress success output.")
+    parser.add_argument(
+        "--require-tag",
+        action="store_true",
+        help="Ensure HEAD is tagged as v<version>. Useful for release workflows.",
+    )
     args = parser.parse_args(argv)
 
     errors: list[str] = []
@@ -149,6 +175,8 @@ def main(argv: list[str] | None = None) -> int:
     errors.extend(check_readme(workspace_version))
     errors.extend(check_docs(workspace_version))
     errors.extend(check_changelog(workspace_version))
+    if args.require_tag:
+        errors.extend(check_git_tag(workspace_version))
 
     if errors:
         for error in errors:
