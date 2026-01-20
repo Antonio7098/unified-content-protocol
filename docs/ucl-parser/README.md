@@ -14,7 +14,7 @@ UCL is designed for:
 
 ```toml
 [dependencies]
-ucl-parser = "0.1.4"
+ucl-parser = "0.1.5"
 ```
 
 ## Quick Example
