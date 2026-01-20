@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use ucm_core::{Block, BlockId, Content, Document};
+use ucm_core::{BlockId, Content, Document};
 
 /// Reason why a block was included in context
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -439,16 +439,13 @@ impl ContextManager {
 
                     match method {
                         CompressionMethod::Truncate => {
-                            // Reduce token estimate
-                            context_block.token_estimate = context_block.token_estimate / 2;
+                            context_block.token_estimate /= 2;
                         }
                         CompressionMethod::StructureOnly => {
-                            // Minimal token estimate
                             context_block.token_estimate = 10;
                         }
                         CompressionMethod::Summarize => {
-                            // Would need external summarizer
-                            context_block.token_estimate = context_block.token_estimate / 3;
+                            context_block.token_estimate /= 3;
                         }
                     }
 
@@ -589,7 +586,7 @@ impl ContextManager {
             }
 
             for child in doc.children(&node_id) {
-                if !self.window.contains(&child) {
+                if !self.window.contains(child) {
                     let relevance = 0.6 - depth as f32 * 0.1;
                     self.add_block_internal(
                         doc,

@@ -358,6 +358,92 @@ export function findBlocksByTag(doc: Document, tag: string): BlockId[] {
 }
 
 // =============================================================================
+// DOCUMENT NAVIGATION & QUERY
+// =============================================================================
+
+/** Get children of a block */
+export function getChildren(doc: Document, parentId: BlockId): BlockId[] {
+  return [...(doc.blocks.get(parentId)?.children ?? [])]
+}
+
+/** Get parent of a block */
+export function getParent(doc: Document, childId: BlockId): BlockId | undefined {
+  return findParent(doc, childId)
+}
+
+/** Get all ancestors of a block (from immediate parent to root) */
+export function getAncestors(doc: Document, blockId: BlockId): BlockId[] {
+  const ancestors: BlockId[] = []
+  let current = getParent(doc, blockId)
+  while (current) {
+    ancestors.push(current)
+    current = getParent(doc, current)
+  }
+  return ancestors
+}
+
+/** Get all descendants of a block (breadth-first) */
+export function getDescendants(doc: Document, blockId: BlockId): BlockId[] {
+  const descendants: BlockId[] = []
+  const queue = [...getChildren(doc, blockId)]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    descendants.push(current)
+    queue.push(...getChildren(doc, current))
+  }
+  return descendants
+}
+
+/** Get siblings of a block (excluding itself) */
+export function getSiblings(doc: Document, blockId: BlockId): BlockId[] {
+  const parentId = getParent(doc, blockId)
+  if (!parentId) return []
+  return getChildren(doc, parentId).filter(id => id !== blockId)
+}
+
+/** Get depth of a block (root is 0) */
+export function getDepth(doc: Document, blockId: BlockId): number {
+  return getAncestors(doc, blockId).length
+}
+
+/** Find blocks by content type */
+export function findByType(doc: Document, contentType: ContentType): BlockId[] {
+  const ids: BlockId[] = []
+  for (const [id, block] of doc.blocks.entries()) {
+    if (block.type === contentType) {
+      ids.push(id)
+    }
+  }
+  return ids
+}
+
+/** Find blocks by semantic role */
+export function findByRole(doc: Document, role: SemanticRole): BlockId[] {
+  const ids: BlockId[] = []
+  for (const [id, block] of doc.blocks.entries()) {
+    if (block.role === role) {
+      ids.push(id)
+    }
+  }
+  return ids
+}
+
+/** Find a block by label */
+export function findByLabel(doc: Document, label: string): BlockId | undefined {
+  for (const [id, block] of doc.blocks.entries()) {
+    if (block.label === label) {
+      return id
+    }
+  }
+  return undefined
+}
+
+/** Get block count */
+export function getBlockCount(doc: Document): number {
+  return doc.blocks.size
+}
+
+// =============================================================================
 // EDGE MANAGEMENT
 // =============================================================================
 
@@ -688,6 +774,61 @@ export function parseMarkdown(markdown: string): Document {
       continue
     }
 
+    // List item (unordered or ordered)
+    const unorderedMatch = line.match(/^(\s*)[-*+]\s+(.+)$/)
+    const orderedMatch = line.match(/^(\s*)\d+\.\s+(.+)$/)
+    if (unorderedMatch || orderedMatch) {
+      const isOrdered = orderedMatch !== null
+      const listLines: string[] = []
+      
+      while (i < lines.length) {
+        const uMatch = lines[i].match(/^(\s*)[-*+]\s+(.+)$/)
+        const oMatch = lines[i].match(/^(\s*)\d+\.\s+(.+)$/)
+        const currentMatch = uMatch || oMatch
+        
+        if (!currentMatch) {
+          if (lines[i].trim() === '') {
+            i++
+            break
+          }
+          break
+        }
+        
+        const marker = uMatch ? uMatch[0].charAt(0) : '1'
+        const content = uMatch ? uMatch[2] : oMatch![2]
+        listLines.push(content)
+        i++
+      }
+      
+      // Preserve original list marker type
+      let content: string
+      if (isOrdered) {
+        content = listLines.map((item, idx) => `${idx + 1}. ${item}`).join('\n')
+      } else {
+        content = listLines.map(item => `- ${item}`).join('\n')
+      }
+      
+      const id = addBlock(doc, currentParent, content, { role: 'list' })
+      
+      // Store list type in metadata for round-trip fidelity
+      const block = doc.blocks.get(id)
+      if (block) {
+        if (!block.metadata) {
+          block.metadata = {
+            tags: [],
+            createdAt: new Date(),
+            modifiedAt: new Date(),
+            custom: {},
+          }
+        }
+        if (!block.metadata.custom) {
+          block.metadata.custom = {}
+        }
+        block.metadata.custom.listType = isOrdered ? 'ordered' : 'unordered'
+      }
+      continue
+    }
+
     // Paragraph
     const paragraphLines: string[] = []
     while (i < lines.length && lines[i].trim() !== '' && !lines[i].startsWith('#') && !lines[i].startsWith('```')) {
@@ -723,6 +864,21 @@ export function renderMarkdown(doc: Document): string {
         lines.push('')
       } else if (block.role === 'quote') {
         block.content.split('\n').forEach(l => lines.push('> ' + l))
+        lines.push('')
+      } else if (block.role === 'list') {
+        const listType = block.metadata?.custom?.listType as string ?? 'unordered'
+        // Content might already have list markers
+        if (block.content.startsWith('-') || block.content.startsWith('*') || (block.content && /^\d+\./.test(block.content))) {
+          lines.push(block.content)
+        } else {
+          // Apply appropriate markers based on list type
+          const contentLines = block.content.split('\n')
+          if (listType === 'ordered') {
+            contentLines.forEach((line, idx) => lines.push(`${idx + 1}. ${line}`))
+          } else {
+            contentLines.forEach(line => lines.push(`- ${line}`))
+          }
+        }
         lines.push('')
       } else {
         lines.push(block.content)
@@ -1248,6 +1404,29 @@ export class SnapshotManager {
     return this.snapshots.get(name)
   }
 
+  /** Get snapshot info without loading full data */
+  getInfo(name: string): { id: string; description?: string; createdAt: Date; documentVersion: number; blockCount: number } | undefined {
+    const snapshot = this.snapshots.get(name)
+    if (!snapshot) return undefined
+    
+    // Count blocks from serialized data
+    let blockCount = 0
+    try {
+      const parsed = JSON.parse(snapshot.data)
+      blockCount = Object.keys(parsed.blocks ?? {}).length
+    } catch {
+      blockCount = 0
+    }
+    
+    return {
+      id: snapshot.id,
+      description: snapshot.description,
+      createdAt: snapshot.createdAt,
+      documentVersion: snapshot.documentVersion,
+      blockCount,
+    }
+  }
+
   /** List all snapshots (newest first) */
   list(): Snapshot[] {
     return Array.from(this.snapshots.values())
@@ -1285,6 +1464,14 @@ export class SnapshotManager {
 // =============================================================================
 
 /** Transaction for atomic operations */
+export interface Savepoint {
+  name: string
+  operationIndex: number
+  documentState: string
+  createdAt: Date
+}
+
+/** Transaction for atomic operations */
 export class Transaction {
   readonly id: string
   readonly name?: string
@@ -1293,6 +1480,8 @@ export class Transaction {
   private _timeout: number
   private _initialState: string
   private _doc: Document
+  private _savepoints: Map<string, Savepoint> = new Map()
+  private _operationCount: number = 0
 
   constructor(doc: Document, timeoutMs = 30000, name?: string) {
     this.id = name ?? `txn_${Date.now().toString(16)}`
@@ -1320,6 +1509,50 @@ export class Transaction {
 
   elapsedMs(): number {
     return Date.now() - this._startTime
+  }
+
+  operationCount(): number {
+    return this._operationCount
+  }
+
+  /** Create a savepoint for partial rollback */
+  savepoint(name: string): void {
+    if (!this.isActive()) {
+      throw new Error(`Cannot create savepoint in ${this._state} transaction`)
+    }
+    
+    this._savepoints.set(name, {
+      name,
+      operationIndex: this._operationCount,
+      documentState: serializeDocument(this._doc),
+      createdAt: new Date(),
+    })
+  }
+
+  /** Rollback to a named savepoint */
+  rollbackToSavepoint(name: string): void {
+    if (!this.isActive()) {
+      throw new Error(`Cannot rollback to savepoint in ${this._state} transaction`)
+    }
+
+    const savepoint = this._savepoints.get(name)
+    if (!savepoint) {
+      throw new Error(`Savepoint not found: ${name}`)
+    }
+
+    // Restore document state
+    const restored = deserializeDocument(savepoint.documentState)
+    this._doc.blocks = restored.blocks
+    this._doc.metadata = restored.metadata
+    this._doc.version = restored.version
+
+    // Note: In JS we don't track individual operations, so we can't trim them
+    // The operation count stays the same, but document state is restored
+  }
+
+  /** Get a savepoint by name */
+  getSavepoint(name: string): Savepoint | undefined {
+    return this._savepoints.get(name)
   }
 
   commit(): void {
@@ -1821,3 +2054,8 @@ export {
   type ContextStatistics,
   type ContextMetadata,
 } from './context.js'
+
+// =============================================================================
+// EDGE INDEX
+// =============================================================================
+export { EdgeIndex } from './edge_index.js'

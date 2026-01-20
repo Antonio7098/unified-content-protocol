@@ -203,8 +203,7 @@ impl HtmlParser {
                 // Inline code - treat as text
                 let code_text = element.text().collect::<String>();
                 if !code_text.trim().is_empty() {
-                    let block =
-                        Block::new(Content::text(&format!("`{}`", code_text)), Some("code"));
+                    let block = Block::new(Content::text(format!("`{}`", code_text)), Some("code"));
                     Ok(Some(doc.add_block(block, parent_id)?))
                 } else {
                     Ok(None)
@@ -267,7 +266,7 @@ impl HtmlParser {
             HeadingStrategy::InferFromNesting => level, // Could be enhanced
         };
 
-        let role = format!("heading{}", adjusted_level.min(6).max(1));
+        let role = format!("heading{}", adjusted_level.clamp(1, 6));
         let block = Block::new(Content::text(&text), Some(&role));
         let block_id = doc.add_block(block, parent_id)?;
 
