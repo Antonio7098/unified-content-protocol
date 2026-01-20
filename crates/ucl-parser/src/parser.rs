@@ -376,15 +376,15 @@ impl<'a> Parser<'a> {
 
     fn parse_write_section(&mut self) -> ParseResult<Command> {
         self.advance(); // consume WRITE_SECTION
-        
+
         let section_id = self.expect_block_id()?;
-        
+
         // Expect :: separator for markdown content
         self.expect(TokenKind::DoubleColon)?;
-        
+
         // Parse markdown content (string literal)
         let markdown = self.expect_str()?;
-        
+
         // Parse optional BASE_LEVEL
         let base_heading_level = if self.check(TokenKind::BaseLevel) {
             self.advance();
@@ -392,7 +392,7 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        
+
         Ok(Command::WriteSection(WriteSectionCommand {
             section_id,
             markdown,

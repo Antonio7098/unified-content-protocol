@@ -1,7 +1,7 @@
 //! HTML parser implementation.
 
 use crate::error::{HtmlError, Result};
-use scraper::{Html, Selector, ElementRef};
+use scraper::{ElementRef, Html, Selector};
 use ucm_core::{Block, BlockId, Content, Document, MediaSource};
 
 /// Strategy for handling heading levels
@@ -125,18 +125,23 @@ impl HtmlParser {
                 // Handle headings specially for hierarchy
                 if let Some(level) = self.parse_heading_level(tag_name) {
                     // Pop stack until we find a heading with lower level
-                    while heading_stack.len() > 1 
-                        && heading_stack.last().map(|(l, _)| *l >= level).unwrap_or(false) 
+                    while heading_stack.len() > 1
+                        && heading_stack
+                            .last()
+                            .map(|(l, _)| *l >= level)
+                            .unwrap_or(false)
                     {
                         heading_stack.pop();
                     }
 
-                    let heading_parent = heading_stack.last()
+                    let heading_parent = heading_stack
+                        .last()
                         .map(|(_, id)| *id)
                         .unwrap_or(*parent_id);
 
-                    let heading_id = self.process_heading(doc, &heading_parent, child_element, level)?;
-                    
+                    let heading_id =
+                        self.process_heading(doc, &heading_parent, child_element, level)?;
+
                     if let Some(id) = heading_id {
                         heading_stack.push((level, id));
                         current_heading_parent = id;
@@ -198,7 +203,8 @@ impl HtmlParser {
                 // Inline code - treat as text
                 let code_text = element.text().collect::<String>();
                 if !code_text.trim().is_empty() {
-                    let block = Block::new(Content::text(&format!("`{}`", code_text)), Some("code"));
+                    let formatted = format!("`{}`", code_text);
+                    let block = Block::new(Content::text(&formatted), Some("code"));
                     Ok(Some(doc.add_block(block, parent_id)?))
                 } else {
                     Ok(None)
@@ -218,7 +224,8 @@ impl HtmlParser {
             "table" => self.process_table(doc, parent_id, element),
 
             // Container elements - process children
-            "div" | "section" | "article" | "main" | "aside" | "nav" | "header" | "footer" | "span" | "figure" | "figcaption" => {
+            "div" | "section" | "article" | "main" | "aside" | "nav" | "header" | "footer"
+            | "span" | "figure" | "figcaption" => {
                 self.process_children(doc, parent_id, element, depth)?;
                 Ok(None)
             }
@@ -260,7 +267,7 @@ impl HtmlParser {
             HeadingStrategy::InferFromNesting => level, // Could be enhanced
         };
 
-        let role = format!("heading{}", adjusted_level.min(6).max(1));
+        let role = format!("heading{}", adjusted_level.clamp(1, 6));
         let block = Block::new(Content::text(&text), Some(&role));
         let block_id = doc.add_block(block, parent_id)?;
 
@@ -326,9 +333,13 @@ impl HtmlParser {
             .value()
             .attr("class")
             .and_then(|class| {
-                class.split_whitespace()
+                class
+                    .split_whitespace()
                     .find(|c| c.starts_with("language-") || c.starts_with("lang-"))
-                    .map(|c| c.trim_start_matches("language-").trim_start_matches("lang-"))
+                    .map(|c| {
+                        c.trim_start_matches("language-")
+                            .trim_start_matches("lang-")
+                    })
             })
             .unwrap_or("text");
 
@@ -538,7 +549,7 @@ mod tests {
         </body></html>"#;
 
         let doc = HtmlParser::new().parse(html).unwrap();
-        
+
         // Verify structure
         let root_children = doc.children(&doc.root);
         assert!(!root_children.is_empty());
@@ -548,7 +559,7 @@ mod tests {
     fn test_code_language_extraction() {
         let html = r#"<pre><code class="language-rust">fn main() {}</code></pre>"#;
         let doc = HtmlParser::new().parse(html).unwrap();
-        
+
         // Should have extracted the code block
         assert!(doc.block_count() >= 2);
     }
@@ -564,7 +575,7 @@ mod tests {
         // Deeply nested HTML
         let html = "<div><div><div><div><div><p>Deep</p></div></div></div></div></div>";
         let result = parser.parse(html);
-        
+
         // Should handle gracefully (either succeed with truncation or error)
         // The important thing is it doesn't stack overflow
         assert!(result.is_ok() || matches!(result, Err(HtmlError::ResourceLimit(_))));
@@ -580,9 +591,9 @@ mod tests {
 
         let html = "<h1>Title</h1><h2>Subtitle</h2>";
         let doc = parser.parse(html).unwrap();
-        
+
         // All headings should be flattened to h3
-        for (_, block) in &doc.blocks {
+        for block in doc.blocks.values() {
             if let Some(ref role) = block.metadata.semantic_role {
                 if role.category.as_str().starts_with("heading") {
                     assert_eq!(role.category.as_str(), "heading3");

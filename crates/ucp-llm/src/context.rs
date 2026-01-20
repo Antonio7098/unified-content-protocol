@@ -6,7 +6,10 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use ucm_core::{Block, BlockId, Content, Document};
+use ucm_core::{BlockId, Content, Document};
+
+#[cfg(test)]
+use ucm_core::Block;
 
 /// Reason why a block was included in context
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -278,7 +281,12 @@ impl ContextManager {
             if *parent == doc.root || depth >= 3 {
                 break;
             }
-            self.add_block_internal(doc, *parent, InclusionReason::StructuralContext, 0.8 - depth as f32 * 0.1);
+            self.add_block_internal(
+                doc,
+                *parent,
+                InclusionReason::StructuralContext,
+                0.8 - depth as f32 * 0.1,
+            );
             result.blocks_added.push(*parent);
             current = *parent;
             depth += 1;
@@ -404,22 +412,28 @@ impl ContextManager {
         let mut result = ContextUpdateResult::default();
 
         if !self.window.constraints.allow_compression {
-            result.warnings.push("Compression not allowed by constraints".to_string());
+            result
+                .warnings
+                .push("Compression not allowed by constraints".to_string());
             return result;
         }
 
         // Find blocks to compress (lowest relevance, not already compressed)
-        let mut blocks_to_compress: Vec<(BlockId, f32)> = self.window.blocks
+        let mut blocks_to_compress: Vec<(BlockId, f32)> = self
+            .window
+            .blocks
             .iter()
             .filter(|(_, cb)| !cb.compressed)
             .map(|(id, cb)| (*id, cb.relevance_score))
             .collect();
 
-        blocks_to_compress.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        blocks_to_compress
+            .sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
         for (block_id, _) in blocks_to_compress.iter().take(10) {
             // Extract content text before mutable borrow
-            let original = doc.get_block(block_id)
+            let original = doc
+                .get_block(block_id)
                 .map(|block| self.extract_content_text(&block.content));
 
             if let Some(context_block) = self.window.blocks.get_mut(block_id) {
@@ -429,7 +443,7 @@ impl ContextManager {
                     match method {
                         CompressionMethod::Truncate => {
                             // Reduce token estimate
-                            context_block.token_estimate = context_block.token_estimate / 2;
+                            context_block.token_estimate /= 2;
                         }
                         CompressionMethod::StructureOnly => {
                             // Minimal token estimate
@@ -437,7 +451,7 @@ impl ContextManager {
                         }
                         CompressionMethod::Summarize => {
                             // Would need external summarizer
-                            context_block.token_estimate = context_block.token_estimate / 3;
+                            context_block.token_estimate /= 3;
                         }
                     }
 
@@ -494,7 +508,11 @@ impl ContextManager {
 
         // Sort blocks by relevance for output
         let mut blocks: Vec<(&BlockId, &ContextBlock)> = self.window.blocks.iter().collect();
-        blocks.sort_by(|a, b| b.1.relevance_score.partial_cmp(&a.1.relevance_score).unwrap_or(std::cmp::Ordering::Equal));
+        blocks.sort_by(|a, b| {
+            b.1.relevance_score
+                .partial_cmp(&a.1.relevance_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         for (block_id, context_block) in blocks {
             if let Some(block) = doc.get_block(block_id) {
@@ -508,7 +526,9 @@ impl ContextManager {
                     self.extract_content_text(&block.content)
                 };
 
-                let role = block.metadata.semantic_role
+                let role = block
+                    .metadata
+                    .semantic_role
                     .as_ref()
                     .map(|r| r.category.as_str())
                     .unwrap_or("block");
@@ -556,7 +576,12 @@ impl ContextManager {
         }
     }
 
-    fn expand_downward(&mut self, doc: &Document, start: BlockId, max_depth: usize) -> Vec<BlockId> {
+    fn expand_downward(
+        &mut self,
+        doc: &Document,
+        start: BlockId,
+        max_depth: usize,
+    ) -> Vec<BlockId> {
         let mut added = Vec::new();
         let mut queue = VecDeque::new();
         queue.push_back((start, 0usize));
@@ -567,9 +592,14 @@ impl ContextManager {
             }
 
             for child in doc.children(&node_id) {
-                if !self.window.contains(&child) {
+                if !self.window.contains(child) {
                     let relevance = 0.6 - depth as f32 * 0.1;
-                    self.add_block_internal(doc, *child, InclusionReason::StructuralContext, relevance.max(0.1));
+                    self.add_block_internal(
+                        doc,
+                        *child,
+                        InclusionReason::StructuralContext,
+                        relevance.max(0.1),
+                    );
                     added.push(*child);
                     queue.push_back((*child, depth + 1));
                 }
@@ -591,7 +621,12 @@ impl ContextManager {
 
             if !self.window.contains(parent) {
                 let relevance = 0.7 - depth as f32 * 0.1;
-                self.add_block_internal(doc, *parent, InclusionReason::StructuralContext, relevance.max(0.1));
+                self.add_block_internal(
+                    doc,
+                    *parent,
+                    InclusionReason::StructuralContext,
+                    relevance.max(0.1),
+                );
                 added.push(*parent);
             }
 
@@ -602,7 +637,12 @@ impl ContextManager {
         added
     }
 
-    fn expand_semantic(&mut self, doc: &Document, start: BlockId, max_depth: usize) -> Vec<BlockId> {
+    fn expand_semantic(
+        &mut self,
+        doc: &Document,
+        start: BlockId,
+        max_depth: usize,
+    ) -> Vec<BlockId> {
         let mut added = Vec::new();
         let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
@@ -622,7 +662,12 @@ impl ContextManager {
                 for edge in &block.edges {
                     if !self.window.contains(&edge.target) && !visited.contains(&edge.target) {
                         let relevance = 0.5 - depth as f32 * 0.1;
-                        self.add_block_internal(doc, edge.target, InclusionReason::SemanticRelevance, relevance.max(0.1));
+                        self.add_block_internal(
+                            doc,
+                            edge.target,
+                            InclusionReason::SemanticRelevance,
+                            relevance.max(0.1),
+                        );
                         added.push(edge.target);
                         queue.push_back((edge.target, depth + 1));
                     }
@@ -658,15 +703,21 @@ impl ContextManager {
     }
 
     fn find_lowest_relevance(&self) -> Option<BlockId> {
-        self.window.blocks
+        self.window
+            .blocks
             .iter()
             .filter(|(id, _)| Some(**id) != self.window.metadata.focus_area)
-            .min_by(|a, b| a.1.relevance_score.partial_cmp(&b.1.relevance_score).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|a, b| {
+                a.1.relevance_score
+                    .partial_cmp(&b.1.relevance_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|(id, _)| *id)
     }
 
     fn find_least_recent(&self) -> Option<BlockId> {
-        self.window.blocks
+        self.window
+            .blocks
             .iter()
             .filter(|(id, _)| Some(**id) != self.window.metadata.focus_area)
             .min_by(|a, b| a.1.last_accessed.cmp(&b.1.last_accessed))
@@ -688,7 +739,9 @@ impl ContextManager {
             Content::Media(m) => m.alt_text.clone().unwrap_or_else(|| "Media".to_string()),
             Content::Json { .. } => "JSON data".to_string(),
             Content::Binary { .. } => "Binary data".to_string(),
-            Content::Composite { children, .. } => format!("Composite: {} children", children.len()),
+            Content::Composite { children, .. } => {
+                format!("Composite: {} children", children.len())
+            }
         }
     }
 }
@@ -705,7 +758,10 @@ mod tests {
         let h1 = Block::new(Content::text("Chapter 1"), Some("heading1"));
         let h1_id = doc.add_block(h1, &root).unwrap();
 
-        let p1 = Block::new(Content::text("Introduction paragraph with some content"), Some("paragraph"));
+        let p1 = Block::new(
+            Content::text("Introduction paragraph with some content"),
+            Some("paragraph"),
+        );
         doc.add_block(p1, &h1_id).unwrap();
 
         let h2 = Block::new(Content::text("Section 1.1"), Some("heading2"));
