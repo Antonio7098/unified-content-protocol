@@ -33,3 +33,6 @@ benchmark_*.txt
 
 notes.txt
 .venv/
+packages/**/node_modules/
+packages/**/dist/
+packages/**/package-lock.json
