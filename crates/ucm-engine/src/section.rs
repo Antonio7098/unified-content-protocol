@@ -307,7 +307,10 @@ fn integrate_subtree(
     added_blocks.push(new_id);
 
     // Add to parent's children
-    doc.structure.entry(*parent_id).or_default().push(new_id);
+    doc.structure
+        .entry(*parent_id)
+        .or_default()
+        .push(new_id);
 
     // Initialize structure for new block
     doc.structure.entry(new_id).or_default();
@@ -336,8 +339,8 @@ fn adjust_heading_level(block: &mut Block, base_level: usize, _depth: usize) {
         let role_str = role.category.as_str();
 
         // Check if this is a heading
-        if let Some(stripped) = role_str.strip_prefix("heading") {
-            if let Ok(current_level) = stripped.parse::<usize>() {
+        if let Some(level_str) = role_str.strip_prefix("heading") {
+            if let Ok(current_level) = level_str.parse::<usize>() {
                 // Adjust level: new_level = base_level + current_level - 1
                 let new_level = (base_level + current_level - 1).clamp(1, 6);
 
@@ -467,9 +470,8 @@ pub fn get_all_sections(doc: &Document) -> Vec<(BlockId, usize)> {
 
     for (block_id, block) in &doc.blocks {
         if let Some(ref role) = block.metadata.semantic_role {
-            let role_str = role.category.as_str();
-            if let Some(stripped) = role_str.strip_prefix("heading") {
-                if let Ok(level) = stripped.parse::<usize>() {
+            if let Some(level_str) = role.category.as_str().strip_prefix("heading") {
+                if let Ok(level) = level_str.parse::<usize>() {
                     sections.push((*block_id, level));
                 }
             }

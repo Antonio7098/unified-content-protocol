@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use ucm_core::{BlockId, Content, Document};
 
+#[cfg(test)]
+use ucm_core::Block;
+
 /// Reason why a block was included in context
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InclusionReason {
@@ -439,12 +442,15 @@ impl ContextManager {
 
                     match method {
                         CompressionMethod::Truncate => {
+                            // Reduce token estimate
                             context_block.token_estimate /= 2;
                         }
                         CompressionMethod::StructureOnly => {
+                            // Minimal token estimate
                             context_block.token_estimate = 10;
                         }
                         CompressionMethod::Summarize => {
+                            // Would need external summarizer
                             context_block.token_estimate /= 3;
                         }
                     }
@@ -743,7 +749,7 @@ impl ContextManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ucm_core::{Block, DocumentId};
+    use ucm_core::DocumentId;
 
     fn create_test_document() -> Document {
         let mut doc = Document::new(DocumentId::new("test"));
