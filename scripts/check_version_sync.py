@@ -186,6 +186,9 @@ def check_git_tag(version: str) -> list[str]:
 
 def check_docs(version: str) -> list[str]:
     errors: list[str] = []
+    dup_pattern = re.compile(
+        rf'"(?P<dup_version>[0-9][0-9A-Za-z.\-]*)"[0-9][0-9A-Za-z.\-]*'
+    )
     cache: dict[Path, str] = {}
     for path, pattern, label in DOC_PATTERNS:
         if path not in cache:
@@ -202,6 +205,13 @@ def check_docs(version: str) -> list[str]:
         if found != version:
             errors.append(
                 f"{path.relative_to(REPO_ROOT)} {label} references {found}, expected {version}."
+            )
+        # Check for duplicated version pattern (e.g., "0.1.3"0.1.3)
+        full_match = match.group(0)
+        dup_match = dup_pattern.search(full_match)
+        if dup_match and len(dup_match.group(0)) > len(f'"{found}"'):
+            errors.append(
+                f"{path.relative_to(REPO_ROOT)} has duplicated version in {label}: {full_match}"
             )
     return errors
 
