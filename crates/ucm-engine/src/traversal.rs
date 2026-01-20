@@ -257,6 +257,7 @@ impl TraversalEngine {
         Ok(paths)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn find_paths_recursive(
         &self,
         doc: &Document,
@@ -280,11 +281,11 @@ impl TraversalEngine {
 
         // Check children
         for child in doc.children(current) {
-            if !visited.contains(&child) {
+            if !visited.contains(child) {
                 current_path.push(*child);
                 self.find_paths_recursive(
                     doc,
-                    &child,
+                    child,
                     target,
                     visited,
                     current_path,
@@ -427,11 +428,11 @@ impl TraversalEngine {
 
         if let Some(parent) = doc.parent(&start) {
             for sibling in doc.children(parent) {
-                if let Some(block) = doc.get_block(&sibling) {
+                if let Some(block) = doc.get_block(sibling) {
                     if self.matches_filter(block, filter) {
                         nodes.push(self.create_traversal_node(
                             doc,
-                            &sibling,
+                            sibling,
                             0,
                             Some(*parent),
                             output,
@@ -498,7 +499,7 @@ impl TraversalEngine {
 
                 // Add children to queue
                 for child in doc.children(&node_id) {
-                    if !visited.contains(&child) {
+                    if !visited.contains(child) {
                         queue.push_back((*child, Some(node_id), depth + 1));
                     }
                 }
@@ -600,6 +601,7 @@ impl TraversalEngine {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn dfs_recursive(
         &self,
         doc: &Document,

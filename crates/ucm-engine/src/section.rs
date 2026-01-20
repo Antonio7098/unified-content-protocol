@@ -307,13 +307,10 @@ fn integrate_subtree(
     added_blocks.push(new_id);
 
     // Add to parent's children
-    doc.structure
-        .entry(*parent_id)
-        .or_insert_with(Vec::new)
-        .push(new_id);
+    doc.structure.entry(*parent_id).or_default().push(new_id);
 
     // Initialize structure for new block
-    doc.structure.entry(new_id).or_insert_with(Vec::new);
+    doc.structure.entry(new_id).or_default();
 
     // Process children recursively
     if let Some(children) = source_doc.structure.get(source_block_id) {
@@ -339,10 +336,10 @@ fn adjust_heading_level(block: &mut Block, base_level: usize, _depth: usize) {
         let role_str = role.category.as_str();
 
         // Check if this is a heading
-        if role_str.starts_with("heading") {
-            if let Ok(current_level) = role_str[7..].parse::<usize>() {
+        if let Some(stripped) = role_str.strip_prefix("heading") {
+            if let Ok(current_level) = stripped.parse::<usize>() {
                 // Adjust level: new_level = base_level + current_level - 1
-                let new_level = (base_level + current_level - 1).min(6).max(1);
+                let new_level = (base_level + current_level - 1).clamp(1, 6);
 
                 // Update the semantic role
                 if let Some(new_role) =
@@ -471,8 +468,8 @@ pub fn get_all_sections(doc: &Document) -> Vec<(BlockId, usize)> {
     for (block_id, block) in &doc.blocks {
         if let Some(ref role) = block.metadata.semantic_role {
             let role_str = role.category.as_str();
-            if role_str.starts_with("heading") {
-                if let Ok(level) = role_str[7..].parse::<usize>() {
+            if let Some(stripped) = role_str.strip_prefix("heading") {
+                if let Ok(level) = stripped.parse::<usize>() {
                     sections.push((*block_id, level));
                 }
             }
