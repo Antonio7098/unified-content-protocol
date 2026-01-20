@@ -240,6 +240,12 @@ impl Engine {
                     "Use restore_snapshot method for snapshots",
                 ))
             }
+
+            Operation::WriteSection {
+                section_id,
+                markdown,
+                base_heading_level,
+            } => self.execute_write_section(doc, &section_id, &markdown, base_heading_level),
         }
     }
 
@@ -531,6 +537,48 @@ impl Engine {
         } else {
             Ok(OperationResult::failure("Edge not found"))
         }
+    }
+
+    fn execute_write_section(
+        &self,
+        doc: &mut Document,
+        section_id: &ucm_core::BlockId,
+        markdown: &str,
+        base_heading_level: Option<usize>,
+    ) -> Result<OperationResult> {
+        use crate::section::{clear_section_content, integrate_section_blocks};
+
+        // Verify section exists
+        if !doc.blocks.contains_key(section_id) {
+            return Err(Error::BlockNotFound(section_id.to_string()));
+        }
+
+        // Parse markdown into temporary document
+        let temp_doc = match ucp_translator_markdown::parse_markdown(markdown) {
+            Ok(d) => d,
+            Err(e) => {
+                return Ok(OperationResult::failure(format!(
+                    "Failed to parse markdown: {}",
+                    e
+                )));
+            }
+        };
+
+        // Clear existing section content
+        let removed = clear_section_content(doc, section_id).map_err(|e| {
+            Error::InvalidBlockId(format!("Failed to clear section: {}", e))
+        })?;
+
+        // Integrate new blocks from parsed markdown
+        let added = integrate_section_blocks(doc, section_id, &temp_doc, base_heading_level)
+            .map_err(|e| Error::InvalidBlockId(format!("Failed to integrate blocks: {}", e)))?;
+
+        // Collect all affected block IDs
+        let mut affected = vec![*section_id];
+        affected.extend(removed);
+        affected.extend(added);
+
+        Ok(OperationResult::success(affected))
     }
 }
 

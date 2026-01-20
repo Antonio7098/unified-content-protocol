@@ -93,6 +93,10 @@ pub enum TokenKind {
     First,
     #[token("LAST")]
     Last,
+    #[token("WRITE_SECTION")]
+    WriteSection,
+    #[token("BASE_LEVEL")]
+    BaseLevel,
 
     // Operators
     #[token("=")]

@@ -1,6 +1,6 @@
 # Unified Content Protocol (UCP)
 
-> Latest release: v0.1.3
+> Latest release: v0.1.4
 
 Unified Content Protocol is a graph-based intermediate representation for structured content. It provides deterministic, token-efficient building blocks that make it easy to ingest, transform, and serve complex documents to both humans and LLM-powered systems.
 
@@ -24,7 +24,8 @@ Unified Content Protocol is a graph-based intermediate representation for struct
 │   ├── ucp-api/             # High-level API surface bundling core crates
 │   ├── ucp-observe/         # Tracing, audit logging, metrics helpers
 │   └── translators/
-│       └── markdown/        # Markdown ⇄ UCP translator
+│       ├── markdown/        # Markdown ⇄ UCP translator
+│       └── html/            # HTML → UCP translator
 ├── docs/                    # Full documentation set (see below)
 └── ...                      # Tooling, workspace config, CI, etc.
 ```
@@ -47,16 +48,16 @@ Unified Content Protocol is a graph-based intermediate representation for struct
 4. **Add to another project** (example using the high-level API):
    ```toml
    [dependencies]
-   ucp-api = "0.1.3"
+   ucp-api = "0.1.4"
    ```
 
 ## SDK Installation
 
 | SDK | Command |
 | --- | --- |
-| Rust (workspace) | `ucp-api = "0.1.3"` (or other crates at `0.1.3`) |
-| Python | `pip install ucp-content==0.1.3` |
-| JavaScript / TypeScript | `npm install @ucp-core/core@0.1.3` |
+| Rust (workspace) | `ucp-api = "0.1.4"` (or other crates at `0.1.4`) |
+| Python | `pip install ucp-content==0.1.4` |
+| JavaScript / TypeScript | `npm install @ucp-core/core@0.1.4` |
 
 ## Documentation
 
@@ -67,7 +68,7 @@ All documentation lives in [`/docs`](./docs/index.md) and is structured for dire
 - **ucm-engine** – Operations, transactions, snapshots, validation
 - **ucl-parser** – Full UCL syntax + command reference
 - **ucp-api** – Client usage patterns and examples
-- **Translators** – Markdown conversion walkthrough
+- **Translators** – Markdown and HTML ingestion guides with configuration examples
 - **ucp-observe** – Tracing, audit, and metrics helpers
 - **Examples** – Basic → Advanced programs covering real workflows
 

@@ -8,10 +8,14 @@
 //! - Operation execution
 //! - Validation pipeline
 
+pub mod config;
 pub mod engine;
+pub mod error;
 pub mod operation;
+pub mod section;
 pub mod snapshot;
 pub mod transaction;
+pub mod traversal;
 pub mod validate;
 
 pub use engine::Engine;

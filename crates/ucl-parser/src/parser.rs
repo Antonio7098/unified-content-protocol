@@ -162,6 +162,7 @@ impl<'a> Parser<'a> {
             Some(TokenKind::Commit) => self.parse_commit(),
             Some(TokenKind::Rollback) => self.parse_rollback(),
             Some(TokenKind::Atomic) => self.parse_atomic(),
+            Some(TokenKind::WriteSection) => self.parse_write_section(),
             _ => Err(self.error("command")),
         }
     }
@@ -370,6 +371,32 @@ impl<'a> Parser<'a> {
             source_id: self.expect_block_id()?,
             edge_type: self.expect_ident()?,
             target_id: self.expect_block_id()?,
+        }))
+    }
+
+    fn parse_write_section(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume WRITE_SECTION
+        
+        let section_id = self.expect_block_id()?;
+        
+        // Expect :: separator for markdown content
+        self.expect(TokenKind::DoubleColon)?;
+        
+        // Parse markdown content (string literal)
+        let markdown = self.expect_str()?;
+        
+        // Parse optional BASE_LEVEL
+        let base_heading_level = if self.check(TokenKind::BaseLevel) {
+            self.advance();
+            Some(self.expect_int()? as usize)
+        } else {
+            None
+        };
+        
+        Ok(Command::WriteSection(WriteSectionCommand {
+            section_id,
+            markdown,
+            base_heading_level,
         }))
     }
 

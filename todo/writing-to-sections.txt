@@ -1,0 +1,405 @@
+Current State Analysis
+The codebase currently supports individual block editing through:
+
+Block-level operations in ucm-engine/src/engine.rs:
+Operation::Edit - edits specific block content at paths like content.text
+Operation::Append - adds new blocks to parents
+Individual block manipulation through the engine
+Markdown translation in crates/translators/markdown/:
+from_markdown.rs - parses markdown into hierarchical block structures
+to_markdown.rs - renders block documents back to markdown
+Supports heading hierarchy (H1-H6) with proper parent-child relationships
+Document structure uses hierarchical blocks where headings create sections:
+Headings become section containers
+Content under headings becomes child blocks
+Maintains relative section structure
+Required Changes for Section-based Markdown Writing
+1. New Operation Type: WriteSection
+Add to crates/ucm-engine/src/operation.rs:
+
+rust
+/// Replace section contents with markdown
+WriteSection {
+    section_id: BlockId,  // Target section (heading block)
+    markdown: String,      // New markdown content
+    preserve_structure: bool,  // Keep existing subsection structure
+},
+2. Engine Implementation
+Add to crates/ucm-engine/src/engine.rs:
+
+rust
+fn execute_write_section(
+    &self,
+    doc: &mut Document,
+    section_id: &BlockId,
+    markdown: &str,
+    preserve_structure: bool,
+) -> Result<OperationResult> {
+    // 1. Parse markdown into temporary document
+    let temp_doc = MarkdownParser::new().parse(markdown)?;
+    
+    // 2. Remove existing children of section (except subsections if preserve_structure)
+    self.clear_section_content(doc, section_id, preserve_structure)?;
+    
+    // 3. Integrate new blocks from temp_doc
+    self.integrate_section_blocks(doc, section_id, &temp_doc)?;
+    
+    Ok(OperationResult::success(vec![*section_id]))
+}
+3. Section Management Utilities
+New module crates/ucm-engine/src/section.rs:
+
+rust
+/// Clear section content while optionally preserving subsection structure
+pub fn clear_section_content(
+    doc: &mut Document,
+    section_id: &BlockId,
+    preserve_subsections: bool,
+) -> Result<()>
+/// Integrate blocks from temp document into target section
+pub fn integrate_section_blocks(
+    doc: &mut Document,
+    target_section: &BlockId,
+    source_doc: &Document,
+) -> Result<()>
+/// Find section by path (e.g., "Section 1 > Subsection 2")
+pub fn find_section_by_path(doc: &Document, path: &str) -> Option<BlockId>
+4. Enhanced Markdown Parser Integration
+Extend crates/translators/markdown/src/from_markdown.rs:
+
+rust
+impl MarkdownParser {
+    /// Parse markdown fragment (not full document) for section writing
+    pub fn parse_fragment(&self, markdown: &str) -> Result<Vec<Block>> {
+        // Parse without requiring root structure
+        // Return flat list of blocks with hierarchy preserved
+    }
+    
+    /// Parse with base heading level offset
+    pub fn parse_with_offset(&self, markdown: &str, base_level: usize) -> Result<Document> {
+        // Adjust heading levels to fit within target section
+    }
+}
+5. API Layer Updates
+Update crates/ucp-api/src/lib.rs to expose section operations:
+
+rust
+/// Write markdown to a section, replacing current content
+pub fn write_section(
+    &mut self,
+    section_path: &str,  // e.g., "Introduction > Getting Started"
+    markdown: &str,
+    options: WriteSectionOptions,
+) -> Result<Vec<BlockId>>
+pub struct WriteSectionOptions {
+    pub preserve_subsections: bool,
+    pub base_heading_level: Option<usize>,
+    pub merge_strategy: MergeStrategy,
+}
+Implementation Strategy
+Phase 1: Core Section Writing
+Add WriteSection operation
+Implement basic markdown-to-block integration
+Add section clearing logic
+Phase 2: Advanced Features
+Preserve existing subsection structure option
+Section path resolution ("Section 1 > Subsection 2")
+Heading level adjustment for nested sections
+Phase 3: Optimization & UX
+Batch operations for large sections
+Conflict resolution for concurrent edits
+Section diff/merge capabilities
+Benefits of This Approach
+Efficiency: Single markdown write replaces multiple block operations
+Natural authoring: Users write markdown as they normally would
+Structure preservation: Maintains hierarchical section relationships
+Incremental adoption: Works alongside existing block-level operations
+The changes leverage the existing markdown translation infrastructure while adding a higher-level section writing interface that maps naturally to the underlying block-based document model.
+
+ting functionality.
+
+Perfect! Based on my analysis of the current UCL command structure and SDK interfaces, here's what's needed to expose section writing functionality to agents and SDKs:
+
+1. New UCL Command: WRITE_SECTION
+Add to crates/ucl-parser/src/ast.rs in the Command enum:
+
+rust
+/// WRITE_SECTION command
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WriteSectionCommand {
+    pub section_id: String,        // Block ID of heading block
+    pub markdown: String,          // New markdown content
+    pub preserve_subsections: bool, // Keep existing subsection structure
+    pub base_heading_level: Option<usize>, // Adjust heading levels
+}
+Update the Command enum:
+
+rust
+pub enum Command {
+    // ... existing commands ...
+    WriteSection(WriteSectionCommand),
+    // ... rest of commands ...
+}
+2. Parser Support
+Add to crates/ucl-parser/src/lexer.rs:
+
+rust
+#[token("WRITE_SECTION")]
+WriteSection,
+Add parsing logic in crates/ucl-parser/src/parser.rs:
+
+rust
+fn parse_write_section_command(&mut self) -> ParseResult<WriteSectionCommand> {
+    let section_id = self.expect_block_id()?;
+    self.expect(TokenKind::Colon)?;
+    
+    // Parse markdown content (could be multi-line)
+    let markdown = self.parse_string_literal()?;
+    
+    // Parse optional flags
+    let mut preserve_subsections = false;
+    let mut base_heading_level = None;
+    
+    if self.try_match(TokenKind::With) {
+        // Parse WITH clause: PRESERVE_SUBSECTIONS true BASE_LEVEL 2
+        while !self.is_at_end() && !self.is_command_terminator() {
+            match self.peek_kind() {
+                Some(TokenKind::PreserveSubsections) => {
+                    self.next();
+                    preserve_subsections = self.parse_boolean()?;
+                }
+                Some(TokenKind::BaseLevel) => {
+                    self.next();
+                    base_heading_level = Some(self.parse_number()? as usize);
+                }
+                _ => break,
+            }
+        }
+    }
+    
+    Ok(WriteSectionCommand {
+        section_id,
+        markdown,
+        preserve_subsections,
+        base_heading_level,
+    })
+}
+3. Engine Integration
+Add to crates/ucm-engine/src/operation.rs:
+
+rust
+/// Write markdown to a section
+WriteSection {
+    section_id: BlockId,
+    markdown: String,
+    preserve_subsections: bool,
+    base_heading_level: Option<usize>,
+},
+Add execution logic in crates/ucm-engine/src/engine.rs:
+
+rust
+Operation::WriteSection {
+    section_id,
+    markdown,
+    preserve_subsections,
+    base_heading_level,
+} => self.execute_write_section(doc, &section_id, &markdown, preserve_subsections, base_heading_level),
+4. Python SDK Updates
+Add to packages/ucp-python/src/ucp/document.py:
+
+python
+def write_section(
+    self,
+    section_id: str,
+    markdown: str,
+    preserve_subsections: bool = False,
+    base_heading_level: Optional[int] = None,
+) -> List[str]:
+    """Write markdown to a section, replacing current contents.
+    
+    Args:
+        section_id: Block ID of the heading block
+        markdown: New markdown content
+        preserve_subsections: Keep existing subsection structure
+        base_heading_level: Adjust heading levels for nested content
+        
+    Returns:
+        List of affected block IDs
+    """
+    from .executor import execute_ucl
+    
+    # Build UCL command
+    ucl_cmd = f'WRITE_SECTION {section_id} :: """{markdown}"""'
+    if preserve_subsections:
+        ucl_cmd += ' WITH PRESERVE_SUBSECTIONS true'
+    if base_heading_level:
+        ucl_cmd += f' BASE_LEVEL {base_heading_level}'
+    
+    result = execute_ucl(self, ucl_cmd)
+    return result.affected_blocks if result.success else []
+def find_section_by_path(self, path: str) -> Optional[str]:
+    """Find a section by path like 'Introduction > Getting Started'."""
+    # Navigate hierarchy to find section
+    parts = path.split(' > ')
+    current_id = self.root
+    
+    for part in parts:
+        children = self.children.get(current_id, [])
+        found = False
+        for child_id in children:
+            block = self.blocks.get(child_id)
+            if (block and block.metadata.semantic_role and 
+                'heading' in block.metadata.semantic_role.value and
+                block.content.strip() == part):
+                current_id = child_id
+                found = True
+                break
+        if not found:
+            return None
+    
+    return current_id if current_id != self.root else None
+Add to packages/ucp-python/src/ucp/init.py exports:
+
+python
+# In the __all__ list
+"write_section",
+"find_section_by_path",
+5. JavaScript SDK Updates
+Add to packages/ucp-js/src/index.ts:
+
+typescript
+/** Write markdown to a section */
+export function writeSection(
+  doc: Document,
+  sectionId: BlockId,
+  markdown: string,
+  options: {
+    preserveSubsections?: boolean
+    baseHeadingLevel?: number
+  } = {}
+): BlockId[] {
+  // This would integrate with the Rust engine via WASM or API
+  // For now, provide a TypeScript implementation
+  const section = getBlock(doc, sectionId)
+  if (!section) throw new Error(`Section not found: ${sectionId}`)
+  
+  // Parse markdown into blocks
+  const tempDoc = parseMarkdown(markdown)
+  
+  // Clear existing content (except subsections if preserving)
+  clearSectionContent(doc, sectionId, options.preserveSubsections ?? false)
+  
+  // Integrate new blocks
+  return integrateSectionBlocks(doc, sectionId, tempDoc, options.baseHeadingLevel)
+}
+/** Find section by path like 'Introduction > Getting Started' */
+export function findSectionByPath(doc: Document, path: string): BlockId | undefined {
+  const parts = path.split(' > ')
+  let currentId = doc.root
+  
+  for (const part of parts) {
+    const current = getBlock(doc, currentId)
+    if (!current) return undefined
+    
+    const found = current.children.find(childId => {
+      const child = getBlock(doc, childId)
+      return child && 
+             child.role?.startsWith('heading') && 
+             child.content.trim() === part
+    })
+    
+    if (!found) return undefined
+    currentId = found
+  }
+  
+  return currentId !== doc.root ? currentId : undefined
+}
+/** Clear section content while optionally preserving subsections */
+function clearSectionContent(
+  doc: Document, 
+  sectionId: BlockId, 
+  preserveSubsections: boolean
+): void {
+  const section = getBlock(doc, sectionId)
+  if (!section) return
+  
+  // Remove non-heading children unless preserving
+  section.children = section.children.filter(childId => {
+    const child = getBlock(doc, childId)
+    if (!child) return false
+    
+    // Keep if it's a heading and we're preserving subsections
+    return preserveSubsections && child.role?.startsWith('heading')
+  })
+}
+/** Integrate blocks from temp document into section */
+function integrateSectionBlocks(
+  doc: Document,
+  sectionId: BlockId,
+  tempDoc: Document,
+  baseHeadingLevel?: number
+): BlockId[] {
+  const section = getBlock(doc, sectionId)
+  if (!section) return []
+  
+  const affectedIds: BlockId[] = []
+  
+  // Copy blocks from temp doc (excluding root)
+  for (const [tempId, tempBlock] of tempDoc.blocks.entries()) {
+    if (tempId === tempDoc.root) continue
+    
+    // Generate new ID and copy block
+    const newId = generateId()
+    const newBlock = { ...tempBlock, id: newId, children: [] }
+    
+    // Adjust heading levels if specified
+    if (baseHeadingLevel && newBlock.role?.startsWith('heading')) {
+      const currentLevel = parseInt(newBlock.role.slice(7), 10)
+      const newLevel = Math.max(1, Math.min(6, baseHeadingLevel + currentLevel - 1))
+      newBlock.role = `heading${newLevel}` as SemanticRole
+    }
+    
+    doc.blocks.set(newId, newBlock)
+    section.children.push(newId)
+    affectedIds.push(newId)
+  }
+  
+  return affectedIds
+}
+6. UCL Command Examples
+The new command would look like:
+
+ucl
+# Basic section write
+WRITE_SECTION blk_abc123def456 :: """
+## New Content
+This is the new section content.
+ 
+- Item 1
+- Item 2
+"""
+ 
+# With options
+WRITE_SECTION blk_abc123def456 :: """
+### Subsection
+Content here
+""" WITH PRESERVE_SUBSECTIONS true BASE_LEVEL 3
+7. Agent Integration Benefits
+This approach provides several advantages for LLM agents:
+
+Natural authoring: Agents can write markdown as they normally would
+Section-level operations: Single command replaces multiple block edits
+Structure preservation: Maintains document hierarchy and relationships
+Path-based targeting: Easy section identification via natural paths
+Token efficiency: One command vs. many individual block operations
+The implementation leverages the existing UCL infrastructure while providing a higher-level abstraction that's more natural for content creation tasks.
+
+Feedback submitted
+
+
+
+
+Command Awaiting Approval
+
+
+how do we make this robust. errors?

@@ -205,6 +205,17 @@ export function addBlock(
     tags: [],
     children: [],
     edges: [],
+    metadata: {
+      tags: [],
+      createdAt: new Date(),
+      modifiedAt: new Date(),
+      custom: {},
+    },
+  }
+  
+  // Set semanticRole in metadata if role is provided
+  if (options.role) {
+    block.metadata!.semanticRole = options.role
   }
 
   doc.blocks.set(id, block)
@@ -1760,3 +1771,53 @@ export const ucp = {
 }
 
 export default ucp
+
+// =============================================================================
+// SECTION OPERATIONS
+// =============================================================================
+export {
+  writeSection,
+  findSectionByPath,
+  getAllSections,
+  clearSectionWithUndo,
+  restoreDeletedSection,
+  type SectionWriteResult,
+  type DeletedSectionContent,
+  type ClearSectionResult,
+} from './section.js'
+
+// =============================================================================
+// TRAVERSAL
+// =============================================================================
+export {
+  TraversalEngine,
+  traverse,
+  pathToRoot,
+  expand,
+  type NavigateDirection,
+  type TraversalOutput,
+  type TraversalFilter,
+  type TraversalNode,
+  type TraversalSummary,
+  type TraversalResult,
+  type TraversalConfig,
+} from './traversal.js'
+
+// =============================================================================
+// CONTEXT MANAGEMENT
+// =============================================================================
+export {
+  ContextWindow,
+  ContextManager,
+  createContext,
+  type InclusionReason,
+  type ExpandDirection,
+  type ExpansionPolicy,
+  type PruningPolicy,
+  type CompressionMethod,
+  type ContextBlock,
+  type ContextConstraints,
+  type ContextUpdateResult,
+  type ContextStatistics,
+  type ContextMetadata,
+} from './context.js'

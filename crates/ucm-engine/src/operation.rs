@@ -84,6 +84,16 @@ pub enum Operation {
 
     /// Restore a snapshot
     RestoreSnapshot { name: String },
+
+    /// Write markdown content to a section, replacing all children
+    WriteSection {
+        /// Target section (heading block) to write to
+        section_id: BlockId,
+        /// New markdown content to parse and insert
+        markdown: String,
+        /// Adjust heading levels relative to this base (e.g., 2 means top-level becomes H2)
+        base_heading_level: Option<usize>,
+    },
 }
 
 /// Edit operators
@@ -213,6 +223,17 @@ impl Operation {
             }
             Operation::RestoreSnapshot { name } => {
                 format!("SNAPSHOT RESTORE {}", name)
+            }
+            Operation::WriteSection {
+                section_id,
+                base_heading_level,
+                ..
+            } => {
+                if let Some(level) = base_heading_level {
+                    format!("WRITE_SECTION {} BASE_LEVEL {}", section_id, level)
+                } else {
+                    format!("WRITE_SECTION {}", section_id)
+                }
             }
         }
     }

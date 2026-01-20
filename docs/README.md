@@ -19,8 +19,8 @@ UCP provides a token-efficient, deterministic framework for representing and tra
 │                         ucm-core                                 │
 │         (Core Types: Block, Document, Content, Edge)             │
 ├─────────────────────────────────────────────────────────────────┤
-│ ucp-translator-markdown   │        ucp-observe                     │
-│    (Format Translators)     │    (Observability/Metrics)         │
+│ ucp-translator-markdown / ucp-translator-html │    ucp-observe      │
+│             (Format Translators)              │ (Observability)    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -33,6 +33,7 @@ UCP provides a token-efficient, deterministic framework for representing and tra
 | [`ucl-parser`](./ucl-parser/README.md) | Parser for the Unified Content Language (UCL) |
 | [`ucp-api`](./ucp-api/README.md) | High-level API for application integration |
 | [`ucp-translator-markdown`](./translators/markdown/README.md) | Bidirectional Markdown conversion |
+| [`ucp-translator-html`](./translators/html/README.md) | HTML → UCM translator with semantic extraction |
 | [`ucp-llm`](./ucp-llm/README.md) | LLM utilities (ID mapping, prompt building) |
 | [`ucp-observe`](./ucp-observe/README.md) | Observability utilities (tracing, metrics, audit) |
 
@@ -44,7 +45,7 @@ Add UCP to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ucp-api = "0.1.3"
+ucp-api = "0.1.4"
 ```
 
 ### Basic Usage
@@ -87,6 +88,7 @@ A collection of blocks organized in a hierarchical tree structure:
 - **Adjacency map** defining parent-child relationships
 - **Secondary indices** for fast lookup by tag, role, label, or content type
 - **Edge index** for relationship traversal
+- **Traversal utilities** (BFS/DFS/path-finding) for navigation and context gathering
 
 ### UCL (Unified Content Language)
 
@@ -97,6 +99,7 @@ A token-efficient command language for document manipulation:
 - `DELETE` - Remove blocks
 - `LINK/UNLINK` - Manage relationships
 - `SNAPSHOT` - Version management
+- `WRITE_SECTION` - Replace section content from Markdown with undo support
 
 ## Documentation Structure
 
@@ -130,7 +133,9 @@ docs/
 │   ├── README.md
 │   └── client.md
 ├── translators/
-│   └── markdown/
+│   ├── markdown/
+│   │   └── README.md
+│   └── html/
 │       └── README.md
 ├── ucp-llm/
 │   └── README.md

@@ -87,6 +87,7 @@ pub enum Command {
     Snapshot(SnapshotCommand),
     Transaction(TransactionCommand),
     Atomic(Vec<Command>),
+    WriteSection(WriteSectionCommand),
 }
 
 /// EDIT command
@@ -206,6 +207,17 @@ pub enum TransactionCommand {
     Begin { name: Option<String> },
     Commit { name: Option<String> },
     Rollback { name: Option<String> },
+}
+
+/// WRITE_SECTION command - write markdown to a section
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WriteSectionCommand {
+    /// Target section block ID
+    pub section_id: String,
+    /// Markdown content to write
+    pub markdown: String,
+    /// Base heading level for relative heading adjustment
+    pub base_heading_level: Option<usize>,
 }
 
 /// Path expression

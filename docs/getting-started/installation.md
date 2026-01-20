@@ -15,7 +15,7 @@ For most use cases, add `ucp-api` which re-exports everything you need:
 
 ```toml
 [dependencies]
-ucp-api = "0.1.3"
+ucp-api = "0.1.4"
 ```
 
 ### Individual Crates
@@ -25,19 +25,19 @@ For fine-grained control, you can depend on specific crates:
 ```toml
 [dependencies]
 # Core types only
-ucm-core = "0.1.3"
+ucm-core = "0.1.4"
 
 # Core + transformation engine
-ucm-engine = "0.1.3"
+ucm-engine = "0.1.4"
 
 # UCL command parsing
-ucl-parser = "0.1.3"
+ucl-parser = "0.1.4"
 
 # Markdown conversion
-ucp-translator-markdown = "0.1.3"
+ucp-translator-markdown = "0.1.4"
 
 # Observability utilities
-ucp-observe = "0.1.3"
+ucp-observe = "0.1.4"
 ```
 
 ## Feature Flags
@@ -125,8 +125,8 @@ If you're using multiple UCP crates, ensure they're all from the same version:
 
 ```toml
 [dependencies]
-ucm-core = "0.1.3"
-ucm-engine = "0.1.3"  # Must match ucm-core version
+ucm-core = "0.1.4"
+ucm-engine = "0.1.4"  # Must match ucm-core version
 ```
 
 ## Next Steps

@@ -14,7 +14,7 @@ UCP Observe helps you:
 
 ```toml
 [dependencies]
-ucp-observe = "0.1.3"
+ucp-observe = "0.1.4"
 ```
 
 ## Quick Start
