@@ -200,7 +200,8 @@ pub fn restore_deleted_content(
         if let Some(children) = doc.structure.get_mut(&deleted.parent_id) {
             children.extend(parent_children.clone());
         } else {
-            doc.structure.insert(deleted.parent_id, parent_children.clone());
+            doc.structure
+                .insert(deleted.parent_id, parent_children.clone());
         }
     }
 
@@ -260,7 +261,14 @@ pub fn integrate_section_blocks(
 
     // Process each root child and its subtree
     for child_id in root_children {
-        let integrated = integrate_subtree(doc, target_section, source_doc, &child_id, base_heading_level, 0)?;
+        let integrated = integrate_subtree(
+            doc,
+            target_section,
+            source_doc,
+            &child_id,
+            base_heading_level,
+            0,
+        )?;
         added_blocks.extend(integrated);
     }
 
@@ -285,7 +293,7 @@ fn integrate_subtree(
 
     // Clone and potentially adjust heading level
     let mut new_block = source_block.clone();
-    
+
     if let Some(base_level) = base_heading_level {
         adjust_heading_level(&mut new_block, base_level, depth);
     }
@@ -310,7 +318,14 @@ fn integrate_subtree(
     // Process children recursively
     if let Some(children) = source_doc.structure.get(source_block_id) {
         for child_id in children.clone() {
-            let child_added = integrate_subtree(doc, &new_id, source_doc, &child_id, base_heading_level, depth + 1)?;
+            let child_added = integrate_subtree(
+                doc,
+                &new_id,
+                source_doc,
+                &child_id,
+                base_heading_level,
+                depth + 1,
+            )?;
             added_blocks.extend(child_added);
         }
     }
@@ -322,15 +337,17 @@ fn integrate_subtree(
 fn adjust_heading_level(block: &mut Block, base_level: usize, _depth: usize) {
     if let Some(ref mut role) = block.metadata.semantic_role {
         let role_str = role.category.as_str();
-        
+
         // Check if this is a heading
         if role_str.starts_with("heading") {
             if let Ok(current_level) = role_str[7..].parse::<usize>() {
                 // Adjust level: new_level = base_level + current_level - 1
                 let new_level = (base_level + current_level - 1).min(6).max(1);
-                
+
                 // Update the semantic role
-                if let Some(new_role) = ucm_core::metadata::SemanticRole::parse(&format!("heading{}", new_level)) {
+                if let Some(new_role) =
+                    ucm_core::metadata::SemanticRole::parse(&format!("heading{}", new_level))
+                {
                     *role = new_role;
                 }
             }
@@ -341,20 +358,20 @@ fn adjust_heading_level(block: &mut Block, base_level: usize, _depth: usize) {
 /// Regenerate block ID to avoid conflicts.
 fn regenerate_block_id(block: &Block) -> BlockId {
     use std::time::{SystemTime, UNIX_EPOCH};
-    
+
     // Create a unique ID based on content and timestamp
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    
+
     let content_hash = ucm_core::id::compute_content_hash(&block.content);
-    
+
     // Combine timestamp and content hash for uniqueness
     let mut id_bytes = [0u8; 12];
     id_bytes[0..8].copy_from_slice(&timestamp.to_le_bytes()[0..8]);
     id_bytes[8..12].copy_from_slice(&content_hash.as_bytes()[0..4]);
-    
+
     BlockId::from_bytes(id_bytes)
 }
 
@@ -371,7 +388,7 @@ fn regenerate_block_id(block: &Block) -> BlockId {
 /// * `None` - If the path doesn't match any section
 pub fn find_section_by_path(doc: &Document, path: &str) -> Option<BlockId> {
     let parts: Vec<&str> = path.split(" > ").map(|s| s.trim()).collect();
-    
+
     if parts.is_empty() {
         return None;
     }
@@ -380,7 +397,7 @@ pub fn find_section_by_path(doc: &Document, path: &str) -> Option<BlockId> {
 
     for part in parts {
         let children = doc.structure.get(&current_id)?;
-        
+
         let found = children.iter().find(|child_id| {
             if let Some(block) = doc.get_block(child_id) {
                 // Check if this is a heading with matching text
@@ -390,7 +407,7 @@ pub fn find_section_by_path(doc: &Document, path: &str) -> Option<BlockId> {
                     .as_ref()
                     .map(|r| r.category.as_str().starts_with("heading"))
                     .unwrap_or(false);
-                
+
                 if is_heading {
                     // Extract text content
                     let text = match &block.content {
@@ -490,16 +507,16 @@ mod tests {
     #[test]
     fn test_clear_section_content() {
         let mut doc = create_test_document();
-        
+
         // Find the H1 section
         let h1_id = find_section_by_path(&doc, "Introduction").unwrap();
-        
+
         // Clear the section
         let removed = clear_section_content(&mut doc, &h1_id).unwrap();
-        
+
         // Should have removed H2 and paragraph
         assert_eq!(removed.len(), 2);
-        
+
         // H1 should have no children now
         let children = doc.structure.get(&h1_id).unwrap();
         assert!(children.is_empty());
@@ -508,15 +525,15 @@ mod tests {
     #[test]
     fn test_find_section_by_path() {
         let doc = create_test_document();
-        
+
         // Find single level
         let h1_id = find_section_by_path(&doc, "Introduction");
         assert!(h1_id.is_some());
-        
+
         // Find nested path
         let h2_id = find_section_by_path(&doc, "Introduction > Getting Started");
         assert!(h2_id.is_some());
-        
+
         // Non-existent path
         let missing = find_section_by_path(&doc, "Missing Section");
         assert!(missing.is_none());
@@ -525,12 +542,12 @@ mod tests {
     #[test]
     fn test_get_all_sections() {
         let doc = create_test_document();
-        
+
         let sections = get_all_sections(&doc);
-        
+
         // Should have H1 and H2
         assert_eq!(sections.len(), 2);
-        
+
         // Check levels
         let levels: Vec<usize> = sections.iter().map(|(_, l)| *l).collect();
         assert!(levels.contains(&1));
@@ -540,10 +557,10 @@ mod tests {
     #[test]
     fn test_get_section_depth() {
         let doc = create_test_document();
-        
+
         let h1_id = find_section_by_path(&doc, "Introduction").unwrap();
         let h2_id = find_section_by_path(&doc, "Introduction > Getting Started").unwrap();
-        
+
         assert_eq!(get_section_depth(&doc, &h1_id), Some(1));
         assert_eq!(get_section_depth(&doc, &h2_id), Some(2));
     }
@@ -552,27 +569,27 @@ mod tests {
     fn test_clear_with_undo_and_restore() {
         let mut doc = create_test_document();
         let original_count = doc.block_count();
-        
+
         // Find the H1 section
         let h1_id = find_section_by_path(&doc, "Introduction").unwrap();
-        
+
         // Clear with undo support
         let result = clear_section_content_with_undo(&mut doc, &h1_id).unwrap();
-        
+
         // Should have removed H2 and paragraph
         assert_eq!(result.removed_ids.len(), 2);
         assert_eq!(result.deleted_content.block_count(), 2);
-        
+
         // Document should have fewer blocks
         assert!(doc.block_count() < original_count);
-        
+
         // Restore the deleted content
         let restored = restore_deleted_content(&mut doc, &result.deleted_content).unwrap();
-        
+
         // Should have restored all blocks
         assert_eq!(restored.len(), 2);
         assert_eq!(doc.block_count(), original_count);
-        
+
         // H1 should have children again
         let children = doc.structure.get(&h1_id).unwrap();
         assert!(!children.is_empty());

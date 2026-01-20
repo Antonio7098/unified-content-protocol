@@ -58,7 +58,7 @@ mod tests {
         </body></html>"#;
 
         let doc = parse_html(html).unwrap();
-        
+
         // Should have root + h1 + h2 + h2 + paragraphs
         assert!(doc.block_count() >= 5);
     }
@@ -86,7 +86,7 @@ mod tests {
         };
         let parser = HtmlParser::with_config(config);
         let doc = parser.parse(html).unwrap();
-        
+
         assert!(doc.block_count() >= 2);
     }
 

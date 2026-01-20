@@ -169,7 +169,9 @@ impl TraversalEngine {
         output: TraversalOutput,
     ) -> Result<TraversalResult> {
         let start = start_id.unwrap_or(doc.root);
-        let max_depth = depth.unwrap_or(self.config.max_depth).min(self.config.max_depth);
+        let max_depth = depth
+            .unwrap_or(self.config.max_depth)
+            .min(self.config.max_depth);
         let filter = filter.unwrap_or_default();
 
         let start_time = std::time::Instant::now();
@@ -179,8 +181,12 @@ impl TraversalEngine {
             NavigateDirection::Up => self.traverse_up(doc, start, max_depth, &filter, output),
             NavigateDirection::Both => self.traverse_both(doc, start, max_depth, &filter, output),
             NavigateDirection::Siblings => self.traverse_siblings(doc, start, &filter, output),
-            NavigateDirection::BreadthFirst => self.traverse_bfs(doc, start, max_depth, &filter, output),
-            NavigateDirection::DepthFirst => self.traverse_dfs(doc, start, max_depth, &filter, output),
+            NavigateDirection::BreadthFirst => {
+                self.traverse_bfs(doc, start, max_depth, &filter, output)
+            }
+            NavigateDirection::DepthFirst => {
+                self.traverse_dfs(doc, start, max_depth, &filter, output)
+            }
         }?;
 
         let mut result = result;
@@ -199,7 +205,14 @@ impl TraversalEngine {
         node_id: &BlockId,
         output: TraversalOutput,
     ) -> Result<TraversalResult> {
-        self.navigate(doc, Some(*node_id), NavigateDirection::Down, Some(1), None, output)
+        self.navigate(
+            doc,
+            Some(*node_id),
+            NavigateDirection::Down,
+            Some(1),
+            None,
+            output,
+        )
     }
 
     /// Get the path from a node to the root
@@ -231,7 +244,15 @@ impl TraversalEngine {
         let mut visited = HashSet::new();
         let mut current_path = vec![*from];
 
-        self.find_paths_recursive(doc, from, to, &mut visited, &mut current_path, &mut paths, max_paths)?;
+        self.find_paths_recursive(
+            doc,
+            from,
+            to,
+            &mut visited,
+            &mut current_path,
+            &mut paths,
+            max_paths,
+        )?;
 
         Ok(paths)
     }
@@ -261,7 +282,15 @@ impl TraversalEngine {
         for child in doc.children(current) {
             if !visited.contains(&child) {
                 current_path.push(*child);
-                self.find_paths_recursive(doc, &child, target, visited, current_path, paths, max_paths)?;
+                self.find_paths_recursive(
+                    doc,
+                    &child,
+                    target,
+                    visited,
+                    current_path,
+                    paths,
+                    max_paths,
+                )?;
                 current_path.pop();
             }
         }
@@ -271,7 +300,15 @@ impl TraversalEngine {
             for edge in &block.edges {
                 if !visited.contains(&edge.target) {
                     current_path.push(edge.target);
-                    self.find_paths_recursive(doc, &edge.target, target, visited, current_path, paths, max_paths)?;
+                    self.find_paths_recursive(
+                        doc,
+                        &edge.target,
+                        target,
+                        visited,
+                        current_path,
+                        paths,
+                        max_paths,
+                    )?;
                     current_path.pop();
                 }
             }
@@ -352,7 +389,11 @@ impl TraversalEngine {
         let mut seen = HashSet::new();
         let mut nodes = Vec::new();
 
-        for node in up_result.nodes.into_iter().chain(down_result.nodes.into_iter()) {
+        for node in up_result
+            .nodes
+            .into_iter()
+            .chain(down_result.nodes.into_iter())
+        {
             if seen.insert(node.id) {
                 nodes.push(node);
             }
@@ -388,7 +429,13 @@ impl TraversalEngine {
             for sibling in doc.children(parent) {
                 if let Some(block) = doc.get_block(&sibling) {
                     if self.matches_filter(block, filter) {
-                        nodes.push(self.create_traversal_node(doc, &sibling, 0, Some(*parent), output));
+                        nodes.push(self.create_traversal_node(
+                            doc,
+                            &sibling,
+                            0,
+                            Some(*parent),
+                            output,
+                        ));
                     }
                 }
             }
@@ -442,11 +489,11 @@ impl TraversalEngine {
                 }
 
                 let node = self.create_traversal_node(doc, &node_id, depth, parent_id, output);
-                
+
                 if let Some(role) = &node.semantic_role {
                     *nodes_by_role.entry(role.clone()).or_insert(0) += 1;
                 }
-                
+
                 nodes.push(node);
 
                 // Add children to queue
@@ -479,7 +526,10 @@ impl TraversalEngine {
             nodes_by_role,
             truncated,
             truncation_reason: if truncated {
-                Some(format!("Max nodes limit ({}) reached", self.config.max_nodes))
+                Some(format!(
+                    "Max nodes limit ({}) reached",
+                    self.config.max_nodes
+                ))
             } else {
                 None
             },
@@ -532,7 +582,10 @@ impl TraversalEngine {
             nodes_by_role,
             truncated,
             truncation_reason: if truncated {
-                Some(format!("Max nodes limit ({}) reached", self.config.max_nodes))
+                Some(format!(
+                    "Max nodes limit ({}) reached",
+                    self.config.max_nodes
+                ))
             } else {
                 None
             },
@@ -576,11 +629,11 @@ impl TraversalEngine {
             }
 
             let node = self.create_traversal_node(doc, &node_id, depth, parent_id, output);
-            
+
             if let Some(role) = &node.semantic_role {
                 *nodes_by_role.entry(role.clone()).or_insert(0) += 1;
             }
-            
+
             nodes.push(node);
 
             // Collect edges
@@ -597,8 +650,17 @@ impl TraversalEngine {
             // Recurse to children
             for child in doc.children(&node_id) {
                 self.dfs_recursive(
-                    doc, *child, Some(node_id), depth + 1, max_depth, filter, output,
-                    visited, nodes, edges, nodes_by_role,
+                    doc,
+                    *child,
+                    Some(node_id),
+                    depth + 1,
+                    max_depth,
+                    filter,
+                    output,
+                    visited,
+                    nodes,
+                    edges,
+                    nodes_by_role,
                 )?;
             }
         }
@@ -610,7 +672,10 @@ impl TraversalEngine {
     fn matches_filter(&self, block: &Block, filter: &TraversalFilter) -> bool {
         // Check role inclusion
         if !filter.include_roles.is_empty() {
-            let role = block.metadata.semantic_role.as_ref()
+            let role = block
+                .metadata
+                .semantic_role
+                .as_ref()
                 .map(|r| r.category.as_str().to_string())
                 .unwrap_or_default();
             if !filter.include_roles.contains(&role) {
@@ -620,7 +685,10 @@ impl TraversalEngine {
 
         // Check role exclusion
         if !filter.exclude_roles.is_empty() {
-            let role = block.metadata.semantic_role.as_ref()
+            let role = block
+                .metadata
+                .semantic_role
+                .as_ref()
                 .map(|r| r.category.as_str().to_string())
                 .unwrap_or_default();
             if filter.exclude_roles.contains(&role) {
@@ -630,7 +698,9 @@ impl TraversalEngine {
 
         // Check tag inclusion
         if !filter.include_tags.is_empty() {
-            let has_tag = filter.include_tags.iter()
+            let has_tag = filter
+                .include_tags
+                .iter()
                 .any(|t| block.metadata.tags.contains(t));
             if !has_tag {
                 return false;
@@ -639,7 +709,9 @@ impl TraversalEngine {
 
         // Check tag exclusion
         if !filter.exclude_tags.is_empty() {
-            let has_excluded = filter.exclude_tags.iter()
+            let has_excluded = filter
+                .exclude_tags
+                .iter()
                 .any(|t| block.metadata.tags.contains(t));
             if has_excluded {
                 return false;
@@ -649,7 +721,10 @@ impl TraversalEngine {
         // Check content pattern
         if let Some(ref pattern) = filter.content_pattern {
             let content_text = self.extract_content_text(&block.content);
-            if !content_text.to_lowercase().contains(&pattern.to_lowercase()) {
+            if !content_text
+                .to_lowercase()
+                .contains(&pattern.to_lowercase())
+            {
                 return false;
             }
         }
@@ -671,16 +746,15 @@ impl TraversalEngine {
 
         let content_preview = match output {
             TraversalOutput::StructureOnly => None,
-            TraversalOutput::StructureWithPreviews | TraversalOutput::StructureAndBlocks => {
-                block.map(|b| {
+            TraversalOutput::StructureWithPreviews | TraversalOutput::StructureAndBlocks => block
+                .map(|b| {
                     let text = self.extract_content_text(&b.content);
                     if text.len() > self.config.default_preview_length {
                         format!("{}...", &text[..self.config.default_preview_length])
                     } else {
                         text
                     }
-                })
-            }
+                }),
         };
 
         let semantic_role = block
@@ -710,7 +784,9 @@ impl TraversalEngine {
             Content::Media(m) => m.alt_text.clone().unwrap_or_else(|| "Media".to_string()),
             Content::Json { .. } => "JSON data".to_string(),
             Content::Binary { .. } => "Binary data".to_string(),
-            Content::Composite { children, .. } => format!("Composite: {} children", children.len()),
+            Content::Composite { children, .. } => {
+                format!("Composite: {} children", children.len())
+            }
         }
     }
 }
@@ -752,7 +828,14 @@ mod tests {
         let engine = TraversalEngine::new();
 
         let result = engine
-            .navigate(&doc, None, NavigateDirection::BreadthFirst, Some(10), None, TraversalOutput::StructureAndBlocks)
+            .navigate(
+                &doc,
+                None,
+                NavigateDirection::BreadthFirst,
+                Some(10),
+                None,
+                TraversalOutput::StructureAndBlocks,
+            )
             .unwrap();
 
         assert!(!result.nodes.is_empty());
@@ -765,7 +848,14 @@ mod tests {
         let engine = TraversalEngine::new();
 
         let result = engine
-            .navigate(&doc, None, NavigateDirection::DepthFirst, Some(10), None, TraversalOutput::StructureAndBlocks)
+            .navigate(
+                &doc,
+                None,
+                NavigateDirection::DepthFirst,
+                Some(10),
+                None,
+                TraversalOutput::StructureAndBlocks,
+            )
             .unwrap();
 
         assert!(!result.nodes.is_empty());
@@ -804,7 +894,14 @@ mod tests {
         };
 
         let result = engine
-            .navigate(&doc, None, NavigateDirection::BreadthFirst, Some(10), Some(filter), TraversalOutput::StructureAndBlocks)
+            .navigate(
+                &doc,
+                None,
+                NavigateDirection::BreadthFirst,
+                Some(10),
+                Some(filter),
+                TraversalOutput::StructureAndBlocks,
+            )
             .unwrap();
 
         // Should only include headings
@@ -838,7 +935,14 @@ mod tests {
         let engine = TraversalEngine::with_config(config);
 
         let result = engine
-            .navigate(&doc, None, NavigateDirection::BreadthFirst, Some(1), None, TraversalOutput::StructureAndBlocks)
+            .navigate(
+                &doc,
+                None,
+                NavigateDirection::BreadthFirst,
+                Some(1),
+                None,
+                TraversalOutput::StructureAndBlocks,
+            )
             .unwrap();
 
         // All nodes should have depth <= 1

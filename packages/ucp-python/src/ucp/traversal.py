@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, List, Dict, Set, Callable
+from typing import Optional, List, Dict, Set
 from collections import deque
 
 from .document import Document

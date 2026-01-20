@@ -14,7 +14,7 @@ import time
 
 from .document import Document
 from .block import Block
-from .types import ContentType, SemanticRole
+from .types import SemanticRole
 
 
 @dataclass

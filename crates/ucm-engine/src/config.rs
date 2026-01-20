@@ -79,11 +79,7 @@ pub struct SecurityConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
-            allowed_schemes: vec![
-                "http".to_string(),
-                "https".to_string(),
-                "data".to_string(),
-            ],
+            allowed_schemes: vec!["http".to_string(), "https".to_string(), "data".to_string()],
             max_url_length: 2048,
             block_external_resources: false,
             sanitize_content: true,
@@ -162,7 +158,10 @@ mod tests {
     fn test_default_config() {
         let config = EngineConfig::default();
         assert_eq!(config.performance.max_memory_mb, 512);
-        assert!(config.security.allowed_schemes.contains(&"https".to_string()));
+        assert!(config
+            .security
+            .allowed_schemes
+            .contains(&"https".to_string()));
     }
 
     #[test]
@@ -199,7 +198,9 @@ mod tests {
         assert!(config.validate_url("ftp://example.com/file").is_err());
 
         // Path traversal
-        assert!(config.validate_url("https://example.com/../etc/passwd").is_err());
+        assert!(config
+            .validate_url("https://example.com/../etc/passwd")
+            .is_err());
     }
 
     #[test]
