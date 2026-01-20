@@ -39,7 +39,9 @@ def prompt_yes_no(message: str, *, default: str = "y") -> bool:
         print("Please answer y or n.")
 
 
-def ensure_json(path: Path, root_key: str, template: dict[str, Any] | None = None) -> dict[str, Any]:
+def ensure_json(
+    path: Path, root_key: str, template: dict[str, Any] | None = None
+) -> dict[str, Any]:
     if not path.exists():
         data: dict[str, Any] = template.copy() if template else {}
         data.setdefault(root_key, [])
@@ -65,20 +67,28 @@ def parse_csv_list(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-def collect_changelog_changes(existing: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+def collect_changelog_changes(
+    existing: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     if existing and prompt_yes_no("Reuse existing change list?", default="y"):
         return existing
 
     changes: list[dict[str, Any]] = []
     while True:
         change_type = prompt(
-            "Change type (added/changed/fixed/removed)", default="changed", required=True
+            "Change type (added/changed/fixed/removed)",
+            default="changed",
+            required=True,
         )
         area = prompt("Area (subsystem/feature)", required=True)
         description = prompt("Description", required=True)
         commit = prompt("Commit hash/link", default="pending", required=True)
-        files = parse_csv_list(prompt("Files affected (comma separated)", required=True))
-        issues = parse_csv_list(prompt("Issues (comma separated, optional)", default=""))
+        files = parse_csv_list(
+            prompt("Files affected (comma separated)", required=True)
+        )
+        issues = parse_csv_list(
+            prompt("Issues (comma separated, optional)", default="")
+        )
 
         changes.append(
             {
@@ -115,9 +125,7 @@ def add_changelog_entry(file_path: Path) -> None:
                         "area": "subsystem or feature name",
                         "description": "Concise summary of the change",
                         "commit": "git hash or link",
-                        "files_affected": [
-                            "List of key files or directories impacted"
-                        ],
+                        "files_affected": ["List of key files or directories impacted"],
                         "issues": ["Optional list of bug IDs or tickets"],
                     }
                 ],
@@ -177,7 +185,9 @@ def edit_changelog_entry(file_path: Path, *, version: str | None = None) -> None
     )
 
     new_version = prompt("Version", default=entry.get("version", ""), required=True)
-    new_date = prompt("Date (ISO-8601)", default=entry.get("date", today), required=True)
+    new_date = prompt(
+        "Date (ISO-8601)", default=entry.get("date", today), required=True
+    )
     changes = collect_changelog_changes(entry.get("changes"))
 
     entries[idx] = {"version": new_version, "date": new_date, "changes": changes}
@@ -195,7 +205,9 @@ def delete_changelog_entry(file_path: Path, *, version: str | None = None) -> No
         label_builder=lambda e: f"{e.get('version')} ({e.get('date')})",
     )
 
-    if not prompt_yes_no(f"Delete changelog entry {entry.get('version')}?", default="n"):
+    if not prompt_yes_no(
+        f"Delete changelog entry {entry.get('version')}?", default="n"
+    ):
         print("Aborted.")
         return
 
@@ -267,7 +279,11 @@ def edit_bug_entry(file_path: Path, *, bug_id: str | None = None) -> None:
     def field(name: str, default: str | None = None, required: bool = False) -> str:
         current = bug.get(name)
         current_str = "" if current is None else str(current)
-        return prompt(name.replace("_", " ").title(), default=current_str or default, required=required)
+        return prompt(
+            name.replace("_", " ").title(),
+            default=current_str or default,
+            required=required,
+        )
 
     updated = {
         "id": field("id", required=True),
@@ -280,7 +296,8 @@ def edit_bug_entry(file_path: Path, *, bug_id: str | None = None) -> None:
         "reported_by": field("reported_by", default="unknown"),
         "owner": field("owner", default="unassigned"),
         "created_at": field(
-            "created_at", default=bug.get("created_at") or datetime.now(timezone.utc).isoformat()
+            "created_at",
+            default=bug.get("created_at") or datetime.now(timezone.utc).isoformat(),
         ),
         "resolved_at": field("resolved_at", default=""),
         "description": field("description", required=True),
@@ -316,10 +333,14 @@ def delete_bug_entry(file_path: Path, *, bug_id: str | None = None) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Manage changelog.json and bugs.json entries")
+    parser = argparse.ArgumentParser(
+        description="Manage changelog.json and bugs.json entries"
+    )
     subparsers = parser.add_subparsers(dest="target", required=True)
 
-    changelog_parser = subparsers.add_parser("changelog", help="Manage changelog entries")
+    changelog_parser = subparsers.add_parser(
+        "changelog", help="Manage changelog entries"
+    )
     changelog_parser.add_argument(
         "--file",
         type=Path,

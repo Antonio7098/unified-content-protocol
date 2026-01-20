@@ -465,7 +465,9 @@ Paragraph""")
 
     def test_tag_inclusion_filter(self):
         doc = ucp.parse("# Intro\n\nParagraph")
-        paragraph = next((b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None)
+        paragraph = next(
+            (b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None
+        )
         assert paragraph is not None
 
         doc.add_tag(paragraph.id, "important")
@@ -498,7 +500,9 @@ class TestContextRendering:
 
     def test_render_for_prompt_shows_compressed_marker(self):
         doc = ucp.parse("# Title\n\nParagraph")
-        paragraph = next((b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None)
+        paragraph = next(
+            (b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None
+        )
         assert paragraph is not None
 
         manager = ucp.ContextManager("ctx-compress")

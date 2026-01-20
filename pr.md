@@ -60,12 +60,15 @@ Use `python scripts/log_helper.py add` to add a new entry, which will:
 ## 7. Commit and PR
 1. `git commit -am "<type>: <summary>"` (or stage granularly).
 2. `git push -u origin <branch>`.
-3. Open a PR with a detailed description covering:
-   - Summary of functional changes
+3. **Generate a detailed PR description** based on:
+   - `git diff --stat` and `git diff` output for the changes
+   - Relevant entries from `changelog.json` for this version
+   - Summary of what was added/changed/fixed
    - Tests & coverage results (paste key command outputs or summarize)
    - Docs updates
    - Version bump rationale
-   - Release impact (e.g., “Tag vX.Y.Z after merge to trigger PyPI publish”)
+   - Release impact (e.g., "Tag vX.Y.Z after merge to trigger PyPI publish")
+4. Open a PR with the generated description using `gh pr create --title "<title>" --body "<generated_description>" --base main --head <branch>`
 
 ## 8. Post-Merge Release
 1. Wait for maintainer confirmation that the PR is merged.
