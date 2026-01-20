@@ -15,7 +15,7 @@ The UCP API is the recommended entry point for most applications. It provides:
 
 ```toml
 [dependencies]
-ucp-api = "0.1.4"0.1.3
+ucp-api = "0.1.4"
 ```
 
 ## Quick Start
