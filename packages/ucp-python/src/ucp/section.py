@@ -20,6 +20,7 @@ from .types import SemanticRole
 @dataclass
 class SectionWriteResult:
     """Result of a section write operation."""
+
     success: bool
     section_id: str
     blocks_removed: List[str]
@@ -56,25 +57,25 @@ def write_section(
 ) -> SectionWriteResult:
     """
     Write markdown content to a section, replacing all children.
-    
+
     This parses the provided markdown and replaces all content under
     the specified section (heading block) with the parsed blocks.
-    
+
     Args:
         doc: The document to modify
         section_id: The block ID of the section heading
         markdown: Markdown content to write
         base_heading_level: Optional base level for heading adjustment
-        
+
     Returns:
         SectionWriteResult with details of the operation
-        
+
     Example:
         >>> result = write_section(doc, "blk_123", "## New Section\\n\\nContent here")
         >>> print(f"Added {len(result.blocks_added)} blocks")
     """
     from .markdown import parse as parse_markdown
-    
+
     # Verify section exists
     if section_id not in doc.blocks:
         return SectionWriteResult(
@@ -82,18 +83,18 @@ def write_section(
             section_id=section_id,
             blocks_removed=[],
             blocks_added=[],
-            error=f"Section not found: {section_id}"
+            error=f"Section not found: {section_id}",
         )
-    
+
     # Clear existing children
     blocks_removed = _clear_section_children(doc, section_id)
-    
+
     # Parse markdown into temporary structure
     parsed = parse_markdown(markdown)
-    
+
     # Integrate parsed blocks
     blocks_added = _integrate_blocks(doc, section_id, parsed, base_heading_level)
-    
+
     return SectionWriteResult(
         success=True,
         section_id=section_id,
@@ -173,14 +174,14 @@ def _integrate_blocks(
 ) -> List[str]:
     """Integrate blocks from source document into target parent."""
     added = []
-    
+
     # Get root children from source
     root_children = source_doc.structure.get(source_doc.root, [])
-    
+
     for child_id in root_children:
         integrated = _integrate_subtree(doc, parent_id, source_doc, child_id, base_heading_level, 0)
         added.extend(integrated)
-    
+
     return added
 
 
@@ -238,11 +239,11 @@ def _integrate_subtree(
 ) -> List[str]:
     """Recursively integrate a subtree."""
     added = []
-    
+
     source_block = source_doc.blocks.get(source_block_id)
     if not source_block:
         return added
-    
+
     # Copy metadata so adjustments don't mutate source
     metadata = copy.deepcopy(source_block.metadata) if source_block.metadata else None
 
@@ -276,76 +277,82 @@ def _integrate_subtree(
         doc.indices.index_block(new_block)
 
     added.append(new_id)
-    
+
     # Process children
     children = source_doc.structure.get(source_block_id, [])
     for child_id in children:
-        child_added = _integrate_subtree(doc, new_id, source_doc, child_id, base_heading_level, depth + 1)
+        child_added = _integrate_subtree(
+            doc, new_id, source_doc, child_id, base_heading_level, depth + 1
+        )
         added.extend(child_added)
-    
+
     return added
 
 
 def find_section_by_path(doc: Document, path: str) -> Optional[str]:
     """
     Find a section by its path in the document hierarchy.
-    
+
     The path uses " > " as a separator between heading names.
-    
+
     Args:
         doc: The document to search
         path: Path like "Introduction > Getting Started"
-        
+
     Returns:
         Block ID of the section, or None if not found
-        
+
     Example:
         >>> section_id = find_section_by_path(doc, "Chapter 1 > Section 1.1")
     """
     parts = [p.strip() for p in path.split(" > ")]
     if not parts:
         return None
-    
+
     current_id = doc.root
-    
+
     for part in parts:
         children = doc.structure.get(current_id, [])
         found = None
-        
+
         for child_id in children:
             block = doc.blocks.get(child_id)
             if not block:
                 continue
-            
+
             # Check if this is a heading with matching text
-            role = block.metadata.semantic_role.value if block.metadata and block.metadata.semantic_role else ""
+            role = (
+                block.metadata.semantic_role.value
+                if block.metadata and block.metadata.semantic_role
+                else ""
+            )
             if role.startswith("heading"):
                 content = block.content
                 if isinstance(content, str) and content.strip() == part:
                     found = child_id
                     break
-        
+
         if not found:
             return None
         current_id = found
-    
+
     return current_id if current_id != doc.root else None
 
 
 def get_all_sections(doc: Document) -> List[tuple[str, int]]:
     """
     Get all sections (heading blocks) in the document.
-    
+
     Returns:
         List of (block_id, heading_level) tuples
-        
+
     Example:
         >>> sections = get_all_sections(doc)
         >>> for block_id, level in sections:
         ...     print(f"H{level}: {doc.blocks[block_id].content}")
     """
     sections = []
-    
+
     for block_id, block in doc.blocks.items():
         if block.metadata and block.metadata.semantic_role:
             role = block.metadata.semantic_role.value
@@ -355,5 +362,5 @@ def get_all_sections(doc: Document) -> List[tuple[str, int]]:
                     sections.append((block_id, level))
                 except ValueError:
                     pass
-    
+
     return sections
