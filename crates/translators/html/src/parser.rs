@@ -592,7 +592,7 @@ mod tests {
         let doc = parser.parse(html).unwrap();
 
         // All headings should be flattened to h3
-        for (_, block) in &doc.blocks {
+        for block in doc.blocks.values() {
             if let Some(ref role) = block.metadata.semantic_role {
                 if role.category.as_str().starts_with("heading") {
                     assert_eq!(role.category.as_str(), "heading3");

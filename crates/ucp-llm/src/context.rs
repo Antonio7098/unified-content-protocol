@@ -743,7 +743,7 @@ impl ContextManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ucm_core::DocumentId;
+    use ucm_core::{Block, DocumentId};
 
     fn create_test_document() -> Document {
         let mut doc = Document::new(DocumentId::new("test"));
