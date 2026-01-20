@@ -89,6 +89,33 @@ class TestDocumentOperations:
         doc.remove_tag(paragraph.id, "important")
         assert not doc.block_has_tag(paragraph.id, "important")
 
+    def test_section_clear_and_restore(self):
+        doc = ucp.parse("# Intro\n\n## Getting Started\n\nParagraph")
+
+        h1_id = ucp.find_section_by_path(doc, "Intro")
+        assert h1_id is not None
+
+        original_count = doc.block_count()
+
+        snapshot = ucp.clear_section_with_undo(doc, h1_id)
+        assert snapshot.removed_ids
+
+        # Add replacement content after clearing
+        replacement_id = doc.add_block(
+            h1_id,
+            "Replacement",
+            role=ucp.SemanticRole.PARAGRAPH,
+        )
+        assert replacement_id in doc.blocks
+
+        restored_ids = ucp.restore_deleted_section(doc, snapshot.deleted_content)
+        assert len(restored_ids) == len(snapshot.removed_ids)
+        assert replacement_id not in doc.blocks
+        assert doc.block_count() == original_count
+
+        # Original subsection should exist again
+        assert ucp.find_section_by_path(doc, "Intro > Getting Started") is not None
+
 
 class TestPromptBuilder:
     def test_builds_prompt_with_capabilities(self):
@@ -299,3 +326,184 @@ class TestIdMapperAdvanced:
 
         assert len(mappings) == 3  # root + heading + para
         assert mappings[0]["short"] == 1
+
+
+class TestSectionOperations:
+    def test_write_section_replaces_children_and_adjusts_headings(self):
+        doc = ucp.parse("# Intro\n\n## Getting Started\n\nParagraph")
+        section_id = ucp.find_section_by_path(doc, "Intro")
+        assert section_id is not None
+
+        original_children = doc.children(section_id)
+        assert original_children
+
+        result = ucp.write_section(
+            doc,
+            section_id,
+            "# Replacement Heading\n\nParagraph content",
+            base_heading_level=3,
+        )
+
+        assert result.success
+        assert len(result.blocks_removed) >= len(original_children)
+
+        new_children = doc.children(section_id)
+        assert new_children
+        new_heading = doc.blocks[new_children[0]]
+        assert new_heading.metadata.semantic_role.value == "heading3"
+
+    def test_write_section_requires_existing_section(self):
+        doc = ucp.parse("# Intro")
+        result = ucp.write_section(doc, "missing", "# Content")
+
+        assert not result.success
+        assert result.error.startswith("Section not found")
+
+    def test_write_section_without_base_level_preserves_heading_role(self):
+        doc = ucp.parse("# Intro")
+        section_id = ucp.find_section_by_path(doc, "Intro")
+        assert section_id is not None
+
+        result = ucp.write_section(doc, section_id, "# Replacement")
+
+        assert result.success
+        new_children = doc.children(section_id)
+        assert new_children
+        replacement = doc.blocks[new_children[0]]
+        assert replacement.metadata.semantic_role.value == "heading1"
+
+    def test_clear_restore_and_write_section_roundtrip(self):
+        doc = ucp.parse("# Intro\n\n## Getting Started\n\nParagraph")
+        section_id = ucp.find_section_by_path(doc, "Intro")
+        assert section_id is not None
+
+        snapshot = ucp.clear_section_with_undo(doc, section_id)
+        assert not doc.children(section_id)
+
+        write_result = ucp.write_section(doc, section_id, "## Temporary\n\nTemp content")
+        assert write_result.success
+        assert write_result.blocks_added
+
+        restored_ids = ucp.restore_deleted_section(doc, snapshot.deleted_content)
+        assert restored_ids
+        assert ucp.find_section_by_path(doc, "Intro > Getting Started") is not None
+
+        for block_id in write_result.blocks_added:
+            assert block_id not in doc.blocks
+
+
+class TestSectionIntegrations:
+    def test_traversal_and_context_after_section_updates(self):
+        doc = ucp.parse(
+            """# Intro
+
+## Getting Started
+
+Paragraph
+
+## Details
+
+Paragraph"""
+        )
+
+        section_id = ucp.find_section_by_path(doc, "Intro")
+        assert section_id is not None
+
+        ucp.write_section(
+            doc,
+            section_id,
+            "# Plan\n\n## Steps\n\nDo things",
+            base_heading_level=2,
+        )
+
+        engine = ucp.TraversalEngine()
+        traversal_filter = ucp.TraversalFilter()
+        result = engine.navigate(
+            doc,
+            doc.root,
+            direction=ucp.NavigateDirection.BREADTH_FIRST,
+            depth=3,
+            filter=traversal_filter,
+            output=ucp.TraversalOutput.STRUCTURE_WITH_PREVIEWS,
+        )
+
+        assert result.nodes
+        assert any(node.semantic_role in ("heading2", "heading3") for node in result.nodes)
+
+        manager = ucp.ContextManager("section-test")
+        summary = manager.initialize_focus(doc, section_id, "Summarize intro")
+        assert summary.blocks_added
+
+        prompt_view = manager.render_for_prompt(doc)
+        assert f"[{section_id}]" in prompt_view
+        assert "heading" in prompt_view
+
+
+class TestTraversalFilters:
+    def test_role_inclusion_filter(self):
+        doc = ucp.parse("""# Intro
+
+## Getting Started
+
+Paragraph""")
+
+        section_id = ucp.find_section_by_path(doc, "Intro > Getting Started")
+        assert section_id is not None
+
+        engine = ucp.TraversalEngine()
+        traversal_filter = ucp.TraversalFilter(include_roles=["heading2"])
+        result = engine.navigate(
+            doc,
+            section_id,
+            direction=ucp.NavigateDirection.BREADTH_FIRST,
+            depth=3,
+            filter=traversal_filter,
+            output=ucp.TraversalOutput.STRUCTURE_AND_BLOCKS,
+        )
+
+        assert any(node.id == section_id for node in result.nodes)
+
+    def test_tag_inclusion_filter(self):
+        doc = ucp.parse("# Intro\n\nParagraph")
+        paragraph = next((b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None)
+        assert paragraph is not None
+
+        doc.add_tag(paragraph.id, "important")
+
+        engine = ucp.TraversalEngine()
+        traversal_filter = ucp.TraversalFilter(include_tags=["important"])
+        result = engine.navigate(
+            doc,
+            paragraph.id,
+            direction=ucp.NavigateDirection.BREADTH_FIRST,
+            depth=2,
+            filter=traversal_filter,
+            output=ucp.TraversalOutput.STRUCTURE_WITH_PREVIEWS,
+        )
+
+        assert result.nodes
+        assert all("important" in doc.blocks[node.id].metadata.tags for node in result.nodes)
+
+
+class TestContextRendering:
+    def test_render_for_prompt_defaults_to_block_role(self):
+        doc = ucp.create()
+        orphan_id = doc.add_block(doc.root, "Plain content")
+
+        manager = ucp.ContextManager("ctx-default")
+        manager.add_block(doc, orphan_id)
+
+        prompt = manager.render_for_prompt(doc)
+        assert "block: Plain content" in prompt
+
+    def test_render_for_prompt_shows_compressed_marker(self):
+        doc = ucp.parse("# Title\n\nParagraph")
+        paragraph = next((b for b in doc.blocks.values() if b.role == ucp.SemanticRole.PARAGRAPH), None)
+        assert paragraph is not None
+
+        manager = ucp.ContextManager("ctx-compress")
+        manager.add_block(doc, paragraph.id)
+        manager.compress(doc)
+
+        prompt = manager.render_for_prompt(doc)
+        assert "[compressed]" in prompt
