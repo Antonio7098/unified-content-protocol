@@ -127,7 +127,7 @@ export class TraversalEngine {
       current = parent
     }
 
-    return path.reverse()
+    return path
   }
 
   /**
@@ -194,19 +194,20 @@ export class TraversalEngine {
       visited.add(id)
 
       const block = doc.blocks.get(id)
+      const children = this.getChildren(doc, id)
+
+      for (const child of children) {
+        if (!visited.has(child)) {
+          queue.push({ id: child, parentId: id, depth: depth + 1 })
+        }
+      }
+
       if (block && this.matchesFilter(block, filter)) {
         const node = this.createNode(doc, id, depth, parentId, output)
         nodes.push(node)
 
         if (node.semanticRole) {
           nodesByRole[node.semanticRole] = (nodesByRole[node.semanticRole] || 0) + 1
-        }
-
-        const children = this.getChildren(doc, id)
-        for (const child of children) {
-          if (!visited.has(child)) {
-            queue.push({ id: child, parentId: id, depth: depth + 1 })
-          }
         }
       }
     }
@@ -272,17 +273,18 @@ export class TraversalEngine {
     visited.add(nodeId)
 
     const block = doc.blocks.get(nodeId)
+    const children = this.getChildren(doc, nodeId)
+
+    for (const child of children) {
+      this.dfsRecursive(doc, child, nodeId, depth + 1, maxDepth, filter, output, visited, nodes, nodesByRole)
+    }
+
     if (block && this.matchesFilter(block, filter)) {
       const node = this.createNode(doc, nodeId, depth, parentId, output)
       nodes.push(node)
 
       if (node.semanticRole) {
         nodesByRole[node.semanticRole] = (nodesByRole[node.semanticRole] || 0) + 1
-      }
-
-      const children = this.getChildren(doc, nodeId)
-      for (const child of children) {
-        this.dfsRecursive(doc, child, nodeId, depth + 1, maxDepth, filter, output, visited, nodes, nodesByRole)
       }
     }
   }
@@ -392,7 +394,7 @@ export class TraversalEngine {
 
   private matchesFilter(block: Block, filter: TraversalFilter): boolean {
     const role = block.metadata?.semanticRole || ''
-    const tags = block.metadata?.tags || []
+    const tags = [...(block.tags || []), ...(block.metadata?.tags || [])]
 
     if (filter.includeRoles?.length && !filter.includeRoles.includes(role)) {
       return false

@@ -247,6 +247,36 @@ def fix_docs(version: str) -> list[str]:
     return fixed
 
 
+def fix_readme(version: str) -> list[str]:
+    """Rewrite README badge and snippet references."""
+    if not README_PATH.exists():
+        return ["README.md is missing."]
+
+    fixed: list[str] = []
+    content = README_PATH.read_text(encoding="utf-8")
+    original_content = content
+
+    for pattern, label in README_PATTERNS:
+        match = pattern.search(content)
+        if not match:
+            continue
+        found = match.group("version")
+        if found == version:
+            continue
+        content = pattern.sub(
+            lambda match, new_version=version: match.group(0).replace(
+                match.group("version"), new_version, 1
+            ),
+            content,
+        )
+        fixed.append(f"README.md updated {label}: {found} → {version}")
+
+    if content != original_content:
+        README_PATH.write_text(content, encoding="utf-8")
+
+    return fixed
+
+
 def check_changelog(version: str) -> list[str]:
     if not CHANGELOG_PATH.exists():
         return ["changelog.json is missing."]
@@ -302,7 +332,9 @@ def main(argv: list[str] | None = None) -> int:
         errors.extend(check_git_tag(workspace_version))
 
     if args.fix:
-        fixed = fix_docs(workspace_version)
+        fixed: list[str] = []
+        fixed.extend(fix_readme(workspace_version))
+        fixed.extend(fix_docs(workspace_version))
         for line in fixed:
             print(f"[version-sync] {line}")
         # Re-check after fixing
