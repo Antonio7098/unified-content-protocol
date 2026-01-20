@@ -186,6 +186,9 @@ def check_git_tag(version: str) -> list[str]:
 
 def check_docs(version: str) -> list[str]:
     errors: list[str] = []
+    dup_pattern = re.compile(
+        rf'"(?P<dup_version>[0-9][0-9A-Za-z.\-]*)"[0-9][0-9A-Za-z.\-]*'
+    )
     cache: dict[Path, str] = {}
     for path, pattern, label in DOC_PATTERNS:
         if path not in cache:
@@ -202,6 +205,13 @@ def check_docs(version: str) -> list[str]:
         if found != version:
             errors.append(
                 f"{path.relative_to(REPO_ROOT)} {label} references {found}, expected {version}."
+            )
+        # Check for duplicated version pattern (e.g., "0.1.3"0.1.3)
+        full_match = match.group(0)
+        dup_match = dup_pattern.search(full_match)
+        if dup_match and len(dup_match.group(0)) > len(f'"{found}"'):
+            errors.append(
+                f"{path.relative_to(REPO_ROOT)} has duplicated version in {label}: {full_match}"
             )
     return errors
 
@@ -234,6 +244,36 @@ def fix_docs(version: str) -> list[str]:
         fixed.append(
             f"{path.relative_to(REPO_ROOT)} updated {label}: {found} → {version}"
         )
+    return fixed
+
+
+def fix_readme(version: str) -> list[str]:
+    """Rewrite README badge and snippet references."""
+    if not README_PATH.exists():
+        return ["README.md is missing."]
+
+    fixed: list[str] = []
+    content = README_PATH.read_text(encoding="utf-8")
+    original_content = content
+
+    for pattern, label in README_PATTERNS:
+        match = pattern.search(content)
+        if not match:
+            continue
+        found = match.group("version")
+        if found == version:
+            continue
+        content = pattern.sub(
+            lambda match, new_version=version: match.group(0).replace(
+                match.group("version"), new_version, 1
+            ),
+            content,
+        )
+        fixed.append(f"README.md updated {label}: {found} → {version}")
+
+    if content != original_content:
+        README_PATH.write_text(content, encoding="utf-8")
+
     return fixed
 
 
@@ -292,7 +332,9 @@ def main(argv: list[str] | None = None) -> int:
         errors.extend(check_git_tag(workspace_version))
 
     if args.fix:
-        fixed = fix_docs(workspace_version)
+        fixed: list[str] = []
+        fixed.extend(fix_readme(workspace_version))
+        fixed.extend(fix_docs(workspace_version))
         for line in fixed:
             print(f"[version-sync] {line}")
         # Re-check after fixing

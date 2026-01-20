@@ -1,0 +1,84 @@
+name: publish-npm
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify version consistency
+        run: python scripts/check_version_sync.py --quiet
+
+      - name: Node setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: packages/ucp-js
+        run: npm ci
+
+      - name: Run tests
+        working-directory: packages/ucp-js
+        run: npm run test
+
+  publish:
+    needs: version-check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify version sync (tag push)
+        run: python scripts/check_version_sync.py --quiet --require-tag
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        working-directory: packages/ucp-js
+        run: npm ci
+
+      - name: Build package
+        working-directory: packages/ucp-js
+        run: npm run build
+
+      - name: Publish to npm (trusted publisher)
+        working-directory: packages/ucp-js
+        run: npm publish --provenance --access public
