@@ -1,18 +1,18 @@
 [package]
-name = "ucm-engine"
-description = "Transformation engine for the Unified Content Model"
+name = "ucp-translator-html"
+description = "HTML to UCM document translator"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 ucm-core = { workspace = true }
-ucp-translator-markdown = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-chrono = { workspace = true }
 tracing = { workspace = true }
+scraper = "0.20"
+url = "2.5"
 
 [dev-dependencies]
 proptest = { workspace = true }

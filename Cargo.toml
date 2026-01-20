@@ -8,10 +8,11 @@ members = [
     "crates/ucp-observe",
     "crates/ucp-llm",
     "crates/translators/markdown",
+    "crates/translators/html",
 ]
 
 [workspace.package]
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/unified-content/ucp"
@@ -63,6 +64,7 @@ ucl-parser = { path = "crates/ucl-parser" }
 ucp-observe = { path = "crates/ucp-observe" }
 ucp-llm = { path = "crates/ucp-llm" }
 ucp-translator-markdown = { path = "crates/translators/markdown" }
+ucp-translator-html = { path = "crates/translators/html" }
 
 [profile.release]
 lto = true

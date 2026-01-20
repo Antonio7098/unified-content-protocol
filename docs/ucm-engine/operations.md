@@ -15,6 +15,7 @@ pub enum Operation {
     Unlink { source, edge_type, target },
     CreateSnapshot { name, description },
     RestoreSnapshot { name },
+    WriteSection { section_id, markdown, base_heading_level },
 }
 ```
 
@@ -35,13 +36,18 @@ Operation::Edit {
 
 ### Edit Operators
 
-| Operator | Symbol | Description |
-|----------|--------|-------------|
-| `Set` | `=` | Replace value |
-| `Append` | `+=` | Append to string/array |
-| `Remove` | `-=` | Remove from string/array |
-| `Increment` | `++` | Increment number |
-| `Decrement` | `--` | Decrement number |
+| Operator | Operation | Description |
+|-----------|-------------|-------------|
+| `Edit` | Modify block content or metadata |
+| `Move` | Move block to new parent |
+| `Append` | Add new block |
+| `Delete` | Remove block |
+| `Prune` | Remove unreachable blocks |
+| `Link` | Add edge between blocks |
+| `Unlink` | Remove edge |
+| `CreateSnapshot` | Create document snapshot |
+| `RestoreSnapshot` | Restore from snapshot |
+| `WriteSection` | Replace a section's children from Markdown with optional heading offset and undo |
 
 ### Examples
 
@@ -96,18 +102,70 @@ let result = engine.execute(&mut doc, Operation::Edit {
     value: serde_json::json!("draft"),
     operator: EditOperator::Remove,
 }).unwrap();
+
+// Delete single block (children become orphaned)
+let result = engine.execute(&mut doc, Operation::Delete {
+    block_id: block_id.clone(),
+    cascade: false,
+    preserve_children: false,
+}).unwrap();
+
+// Delete with all descendants
+let result = engine.execute(&mut doc, Operation::Delete {
+    block_id: block_id.clone(),
+    cascade: true,
+    preserve_children: false,
+}).unwrap();
+
+// Delete but keep children (reparent to grandparent)
+let result = engine.execute(&mut doc, Operation::Delete {
+    block_id: block_id.clone(),
+    cascade: false,
+    preserve_children: true,
+}).unwrap();
+
+## WriteSection Operation
+
+Replace an entire section's children with parsed Markdown while capturing an undo payload.
+
+### Structure
+
+```rust
+Operation::WriteSection {
+    section_id: BlockId,
+    markdown: String,
+    base_heading_level: Option<usize>,
+}
 ```
 
-### Supported Paths
+### Behavior
 
-| Path | Description |
-|------|-------------|
-| `content.text` | Text content |
-| `text` | Alias for content.text |
-| `metadata.label` | Block label |
-| `metadata.tags` | Block tags |
-| `metadata.summary` | Block summary |
-| `metadata.*` | Custom metadata |
+1. Calls `clear_section_content_with_undo` to remove the section's descendants and produce a `ClearSectionResult` containing `removed_ids` and a `DeletedContent` snapshot (blocks + structure + parent metadata).
+2. Parses the supplied Markdown using `ucp-translator-markdown` and integrates it beneath `section_id`. When `base_heading_level` is set, each heading is re-based (e.g., `Some(3)` promotes the inserted top-level heading to `###`).
+3. Returns an `OperationResult` whose `affected_blocks` include both deleted and newly added block IDs so downstream systems can update caches.
+
+### Undo Workflow
+
+Persist `DeletedContent` if you want a full rollback. Restoring first clears whatever content currently resides under the section (including manual edits after the write) and then reattaches the preserved subtree.
+
+```rust
+use ucm_engine::section::{clear_section_content_with_undo, restore_deleted_content};
+
+let result = clear_section_content_with_undo(&mut doc, &section_id)?;
+let snapshot = result.deleted_content;
+
+// ... Write new markdown or perform edits ...
+
+let restored_ids = restore_deleted_content(&mut doc, &snapshot)?;
+assert_eq!(restored_ids.len(), result.removed_ids.len());
+```
+
+### SDK Support
+
+- **Python**: `ucp.clear_section_with_undo(doc, section_id)` and `ucp.restore_deleted_section(doc, deleted_content)` mirror the Rust helpers. Restoration always removes the "replacement" subtree before reattaching the saved blocks.
+- **JavaScript**: `clearSectionWithUndo(doc, sectionId)` returns `{ removedIds, deletedContent }` and `restoreDeletedSection(doc, deletedContent)` restores it.
+
+The deleted payload is pure JSON (blocks, structure, parent metadata), so you can persist it in durable storage to enable long-lived undo stacks.
 
 ## Move Operation
 

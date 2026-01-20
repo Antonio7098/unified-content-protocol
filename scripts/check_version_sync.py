@@ -168,18 +168,17 @@ def check_readme(version: str) -> list[str]:
 def check_git_tag(version: str) -> list[str]:
     expected_tag = f"v{version}"
     try:
-        tag = (
-            subprocess.run(
-                ["git", "describe", "--tags", "--exact-match", "HEAD"],
-                cwd=REPO_ROOT,
-                check=True,
-                text=True,
-                capture_output=True,
-            )
-            .stdout.strip()
-        )
+        tag = subprocess.run(
+            ["git", "describe", "--tags", "--exact-match", "HEAD"],
+            cwd=REPO_ROOT,
+            check=True,
+            text=True,
+            capture_output=True,
+        ).stdout.strip()
     except subprocess.CalledProcessError:
-        return ["HEAD is not tagged. Create the release tag first or omit --require-tag."]
+        return [
+            "HEAD is not tagged. Create the release tag first or omit --require-tag."
+        ]
     if tag != expected_tag:
         return [f"HEAD tag is {tag}, expected {expected_tag}."]
     return []
@@ -230,8 +229,11 @@ def fix_docs(version: str) -> list[str]:
             ),
             content,
         )
+        cache[path] = new_content
         path.write_text(new_content, encoding="utf-8")
-        fixed.append(f"{path.relative_to(REPO_ROOT)} updated {label}: {found} → {version}")
+        fixed.append(
+            f"{path.relative_to(REPO_ROOT)} updated {label}: {found} → {version}"
+        )
     return fixed
 
 

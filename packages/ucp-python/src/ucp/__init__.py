@@ -38,7 +38,7 @@ Example:
 
 from __future__ import annotations
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 # =============================================================================
 # CORE TYPES (from types module)
@@ -162,6 +162,56 @@ from .observability import (
 )
 
 # =============================================================================
+# SECTION OPERATIONS (from section module)
+# =============================================================================
+from .section import (
+    SectionWriteResult,
+    DeletedSectionContent,
+    ClearSectionResult,
+    write_section,
+    find_section_by_path,
+    get_all_sections,
+    clear_section_with_undo,
+    restore_deleted_section,
+)
+
+# =============================================================================
+# TRAVERSAL (from traversal module)
+# =============================================================================
+from .traversal import (
+    NavigateDirection,
+    TraversalOutput,
+    TraversalFilter,
+    TraversalNode,
+    TraversalSummary,
+    TraversalResult,
+    TraversalConfig,
+    TraversalEngine,
+    traverse,
+    path_to_root,
+    expand,
+)
+
+# =============================================================================
+# CONTEXT MANAGEMENT (from context module)
+# =============================================================================
+from .context import (
+    InclusionReason,
+    ExpandDirection,
+    ExpansionPolicy,
+    PruningPolicy,
+    CompressionMethod,
+    ContextBlock,
+    ContextConstraints,
+    ContextUpdateResult,
+    ContextStatistics,
+    ContextMetadata,
+    ContextWindow,
+    ContextManager,
+    create_context,
+)
+
+# =============================================================================
 # CONVENIENCE FUNCTIONS
 # =============================================================================
 
@@ -260,4 +310,39 @@ __all__ = [
     "record_metric",
     # Convenience
     "create",
+    # Section operations
+    "SectionWriteResult",
+    "DeletedSectionContent",
+    "ClearSectionResult",
+    "write_section",
+    "find_section_by_path",
+    "get_all_sections",
+    "clear_section_with_undo",
+    "restore_deleted_section",
+    # Traversal
+    "NavigateDirection",
+    "TraversalOutput",
+    "TraversalFilter",
+    "TraversalNode",
+    "TraversalSummary",
+    "TraversalResult",
+    "TraversalConfig",
+    "TraversalEngine",
+    "traverse",
+    "path_to_root",
+    "expand",
+    # Context management
+    "InclusionReason",
+    "ExpandDirection",
+    "ExpansionPolicy",
+    "PruningPolicy",
+    "CompressionMethod",
+    "ContextBlock",
+    "ContextConstraints",
+    "ContextUpdateResult",
+    "ContextStatistics",
+    "ContextMetadata",
+    "ContextWindow",
+    "ContextManager",
+    "create_context",
 ]

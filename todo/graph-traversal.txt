@@ -1,0 +1,752 @@
+erfect! Based on my analysis of the current graph structure and LLM prompt construction, here's a comprehensive design for graph traversal commands:
+
+Current State Analysis
+The current system uses:
+
+BFS traversal for LLM prompts (in id_mapper.rs)
+Parent-child relationships in doc.structure HashMap
+Normalized format: Structure + Blocks sections
+Depth control through validation (max nesting depth)
+1. New UCL Graph Traversal Commands
+A. Navigation Commands
+rust
+// Add to crates/ucl-parser/src/ast.rs
+pub enum Command {
+    // ... existing commands ...
+    
+    /// Navigate and explore graph structure
+    Navigate(NavigateCommand),
+    
+    /// Expand/collapse nodes for focused views
+    Expand(ExpandCommand),
+    
+    /// Search and filter graph
+    Find(FindCommand),
+    
+    /// Export graph views
+    Export(ExportCommand),
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NavigateCommand {
+    pub start_id: Option<String>,        // Root if None
+    pub direction: NavigateDirection,
+    pub depth: Option<usize>,            // Max depth to traverse
+    pub filter: Option<TraversalFilter>,
+    pub output: TraversalOutput,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum NavigateDirection {
+    Down,           // Children only
+    Up,             // Parent only  
+    Both,           // Both directions
+    Siblings,       // Same level
+    BreadthFirst,   // BFS traversal
+    DepthFirst,     // DFS traversal
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TraversalFilter {
+    pub roles: Vec<String>,             // Filter by semantic roles
+    pub tags: Vec<String>,              // Filter by tags
+    pub content_types: Vec<String>,      // Filter by content types
+    pub custom: HashMap<String, String>, // Custom filters
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TraversalOutput {
+    StructureOnly,                      // Just hierarchy
+    StructureAndBlocks,                 // Full view (current LLM format)
+    Summary,                           // Summary statistics
+    Paths,                             // All paths from start
+    Tree,                              // Tree visualization
+}
+B. Expand/Collapse Commands
+rust
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExpandCommand {
+    pub node_id: String,
+    pub depth: usize,                   // How many levels to expand
+    pub mode: ExpandMode,
+    pub preserve_context: bool,         // Keep surrounding context
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ExpandMode {
+    Replace,                           // Replace current view
+    Append,                            // Add to current view
+    Focus,                             // Focus on expanded subtree
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FindCommand {
+    pub query: String,                 // Search query
+    pub scope: SearchScope,
+    pub filter: Option<TraversalFilter>,
+    pub max_results: Option<usize>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SearchScope {
+    Global,                            // Search entire document
+    FromNode(String),                  // Search from specific node
+    InPath(String),                     // Search in specific path
+}
+2. Enhanced Traversal Engine
+Add to crates/ucm-engine/src/operation.rs:
+
+rust
+/// Navigate graph structure
+Navigate {
+    start_id: Option<BlockId>,
+    direction: NavigateDirection,
+    depth: Option<usize>,
+    filter: Option<TraversalFilter>,
+    output: TraversalOutput,
+},
+/// Expand/collapse nodes
+Expand {
+    node_id: BlockId,
+    depth: usize,
+    mode: ExpandMode,
+    preserve_context: bool,
+},
+/// Search graph
+Find {
+    query: String,
+    scope: SearchScope,
+    filter: Option<TraversalFilter>,
+    max_results: Option<usize>,
+},
+3. Traversal Implementation
+Create crates/ucm-engine/src/traversal.rs:
+
+rust
+//! Graph traversal operations for UCM documents
+use ucm_core::{Block, BlockId, Document};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet, VecDeque};
+/// Traversal result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraversalResult {
+    pub nodes: Vec<TraversalNode>,
+    pub edges: Vec<TraversalEdge>,
+    pub paths: Vec<Vec<BlockId>>,
+    pub summary: TraversalSummary,
+    pub metadata: TraversalMetadata,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraversalNode {
+    pub id: BlockId,
+    pub depth: usize,
+    pub parent: Option<BlockId>,
+    pub children: Vec<BlockId>,
+    pub block_info: BlockSummary,
+    pub visible: bool,                 // Whether to show in output
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockSummary {
+    pub content_type: String,
+    pub role: Option<String>,
+    pub label: Option<String>,
+    pub tags: Vec<String>,
+    pub content_preview: String,       // First 100 chars
+    pub size_bytes: usize,
+    pub token_estimate: usize,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraversalEdge {
+    pub source: BlockId,
+    pub target: BlockId,
+    pub edge_type: String,
+    pub weight: Option<f32>,           // For path finding
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraversalSummary {
+    pub total_nodes: usize,
+    pub visible_nodes: usize,
+    pub max_depth: usize,
+    pub node_types: HashMap<String, usize>,
+    pub traversal_time_ms: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraversalMetadata {
+    pub start_node: Option<BlockId>,
+    pub traversal_strategy: String,
+    pub filters_applied: Vec<String>,
+    pub truncated: bool,
+}
+/// Graph traversal engine
+pub struct TraversalEngine {
+    config: TraversalConfig,
+}
+#[derive(Debug, Clone)]
+pub struct TraversalConfig {
+    pub max_depth: usize,
+    pub max_nodes: usize,
+    pub default_preview_length: usize,
+    pub include_orphans: bool,
+    pub cache_enabled: bool,
+}
+impl Default for TraversalConfig {
+    fn default() -> Self {
+        Self {
+            max_depth: 10,
+            max_nodes: 1000,
+            default_preview_length: 100,
+            include_orphans: false,
+            cache_enabled: true,
+        }
+    }
+}
+impl TraversalEngine {
+    pub fn new() -> Self {
+        Self {
+            config: TraversalConfig::default(),
+        }
+    }
+    pub fn with_config(config: TraversalConfig) -> Self {
+        Self { config }
+    }
+    /// Navigate graph with specified parameters
+    pub fn navigate(
+        &self,
+        doc: &Document,
+        start_id: Option<BlockId>,
+        direction: NavigateDirection,
+        depth: Option<usize>,
+        filter: Option<TraversalFilter>,
+        output: TraversalOutput,
+    ) -> Result<TraversalResult> {
+        let start = start_id.unwrap_or(doc.root);
+        let max_depth = depth.unwrap_or(self.config.max_depth);
+        let start_time = std::time::Instant::now();
+        // Perform traversal
+        let (nodes, edges) = match direction {
+            NavigateDirection::Down => self.traverse_down(doc, start, max_depth, &filter),
+            NavigateDirection::Up => self.traverse_up(doc, start, max_depth, &filter),
+            NavigateDirection::Both => self.traverse_both(doc, start, max_depth, &filter),
+            NavigateDirection::Siblings => self.traverse_siblings(doc, start, &filter),
+            NavigateDirection::BreadthFirst => self.traverse_bfs(doc, start, max_depth, &filter),
+            NavigateDirection::DepthFirst => self.traverse_dfs(doc, start, max_depth, &filter),
+        }?;
+        // Apply output formatting
+        let visible_nodes = self.apply_output_format(&nodes, &output);
+        // Generate paths
+        let paths = self.generate_paths(&visible_nodes);
+        // Create summary
+        let summary = TraversalSummary {
+            total_nodes: nodes.len(),
+            visible_nodes: visible_nodes.len(),
+            max_depth: visible_nodes.iter().map(|n| n.depth).max().unwrap_or(0),
+            node_types: self.count_node_types(&visible_nodes),
+            traversal_time_ms: start_time.elapsed().as_millis() as u64,
+        };
+        Ok(TraversalResult {
+            nodes: visible_nodes,
+            edges,
+            paths,
+            summary,
+            metadata: TraversalMetadata {
+                start_node: Some(start),
+                traversal_strategy: format!("{:?}", direction),
+                filters_applied: self.get_filter_descriptions(&filter),
+                truncated: nodes.len() > self.config.max_nodes,
+            },
+        })
+    }
+    /// Breadth-first traversal
+    fn traverse_bfs(
+        &self,
+        doc: &Document,
+        start: BlockId,
+        max_depth: usize,
+        filter: &Option<TraversalFilter>,
+    ) -> Result<(Vec<TraversalNode>, Vec<TraversalEdge>)> {
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        queue.push_back((start, None, 0)); // (node_id, parent_id, depth)
+        while let Some((node_id, parent_id, depth)) = queue.pop_front() {
+            if depth > max_depth || nodes.len() >= self.config.max_nodes {
+                break;
+            }
+            if visited.contains(&node_id) {
+                continue;
+            }
+            visited.insert(node_id);
+            // Get block info
+            let block = doc.get_block(&node_id)
+                .ok_or_else(|| ucm_core::Error::BlockNotFound(node_id.to_string()))?;
+            // Apply filter
+            if let Some(f) = filter {
+                if !self.matches_filter(block, f) {
+                    continue;
+                }
+            }
+            // Get children
+            let children = doc.children(&node_id);
+            // Create traversal node
+            let node = TraversalNode {
+                id: node_id,
+                depth,
+                parent: parent_id,
+                children: children.clone(),
+                block_info: self.summarize_block(block),
+                visible: true,
+            };
+            nodes.push(node);
+            // Add edge to parent
+            if let Some(parent) = parent_id {
+                edges.push(TraversalEdge {
+                    source: parent,
+                    target: node_id,
+                    edge_type: "parent_child".to_string(),
+                    weight: None,
+                });
+            }
+            // Queue children
+            for child in children {
+                queue.push_back((child, Some(node_id), depth + 1));
+            }
+        }
+        Ok((nodes, edges))
+    }
+    /// Depth-first traversal
+    fn traverse_dfs(
+        &self,
+        doc: &Document,
+        start: BlockId,
+        max_depth: usize,
+        filter: &Option<TraversalFilter>,
+    ) -> Result<(Vec<TraversalNode>, Vec<TraversalEdge>)> {
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
+        let mut visited = HashSet::new();
+        self.dfs_recursive(doc, start, None, 0, max_depth, filter, &mut visited, &mut nodes, &mut edges)?;
+        Ok((nodes, edges))
+    }
+    fn dfs_recursive(
+        &self,
+        doc: &Document,
+        node_id: BlockId,
+        parent_id: Option<BlockId>,
+        depth: usize,
+        max_depth: usize,
+        filter: &Option<TraversalFilter>,
+        visited: &mut HashSet<BlockId>,
+        nodes: &mut Vec<TraversalNode>,
+        edges: &mut Vec<TraversalEdge>,
+    ) -> Result<()> {
+        if depth > max_depth || nodes.len() >= self.config.max_nodes {
+            return Ok(());
+        }
+        if visited.contains(&node_id) {
+            return Ok(());
+        }
+        visited.insert(node_id);
+        let block = doc.get_block(&node_id)
+            .ok_or_else(|| ucm_core::Error::BlockNotFound(node_id.to_string()))?;
+        // Apply filter
+        if let Some(f) = filter {
+            if !self.matches_filter(block, f) {
+                return Ok(());
+            }
+        }
+        let children = doc.children(&node_id);
+        // Create node
+        let node = TraversalNode {
+            id: node_id,
+            depth,
+            parent: parent_id,
+            children: children.clone(),
+            block_info: self.summarize_block(block),
+            visible: true,
+        };
+        nodes.push(node);
+        // Add edge
+        if let Some(parent) = parent_id {
+            edges.push(TraversalEdge {
+                source: parent,
+                target: node_id,
+                edge_type: "parent_child".to_string(),
+                weight: None,
+            });
+        }
+        // Recurse into children
+        for child in children {
+            self.dfs_recursive(doc, child, Some(node_id), depth + 1, max_depth, filter, visited, nodes, edges)?;
+        }
+        Ok(())
+    }
+    /// Upward traversal (to parents)
+    fn traverse_up(
+        &self,
+        doc: &Document,
+        start: BlockId,
+        max_depth: usize,
+        filter: &Option<TraversalFilter>,
+    ) -> Result<(Vec<TraversalNode>, Vec<TraversalEdge>)> {
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
+        let mut visited = HashSet::new();
+        let mut current = Some(start);
+        let mut depth = 0;
+        while let Some(node_id) = current {
+            if depth > max_depth || nodes.len() >= self.config.max_nodes {
+                break;
+            }
+            if visited.contains(&node_id) {
+                break;
+            }
+            visited.insert(node_id);
+            let block = doc.get_block(&node_id)
+                .ok_or_else(|| ucm_core::Error::BlockNotFound(node_id.to_string()))?;
+            // Apply filter
+            if let Some(f) = filter {
+                if !self.matches_filter(block, f) {
+                    break;
+                }
+            }
+            // Create node
+            let node = TraversalNode {
+                id: node_id,
+                depth,
+                parent: doc.parent(&node_id).copied(),
+                children: doc.children(&node_id),
+                block_info: self.summarize_block(block),
+                visible: true,
+            };
+            nodes.push(node);
+            // Move to parent
+            current = doc.parent(&node_id).copied();
+            depth += 1;
+        }
+        Ok((nodes, edges))
+    }
+    /// Sibling traversal
+    fn traverse_siblings(
+        &self,
+        doc: &Document,
+        start: BlockId,
+        filter: &Option<TraversalFilter>,
+    ) -> Result<(Vec<TraversalNode>, Vec<TraversalEdge>)> {
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
+        // Find parent
+        let parent_id = doc.parent(&start)
+            .ok_or_else(|| ucm_core::Error::BlockNotFound("No parent found".to_string()))?;
+        let siblings = doc.children(&parent_id);
+        for sibling_id in siblings {
+            let block = doc.get_block(&sibling_id)
+                .ok_or_else(|| ucm_core::Error::BlockNotFound(sibling_id.to_string()))?;
+            // Apply filter
+            if let Some(f) = filter {
+                if !self.matches_filter(block, f) {
+                    continue;
+                }
+            }
+            let node = TraversalNode {
+                id: sibling_id,
+                depth: 0,
+                parent: Some(parent_id),
+                children: doc.children(&sibling_id),
+                block_info: self.summarize_block(block),
+                visible: true,
+            };
+            nodes.push(node);
+            // Add edge to parent
+            edges.push(TraversalEdge {
+                source: parent_id,
+                target: sibling_id,
+                edge_type: "parent_child".to_string(),
+                weight: None,
+            });
+        }
+        Ok((nodes, edges))
+    }
+    /// Bidirectional traversal
+    fn traverse_both(
+        &self,
+        doc: &Document,
+        start: BlockId,
+        max_depth: usize,
+        filter: &Option<TraversalFilter>,
+    ) -> Result<(Vec<TraversalNode>, Vec<TraversalEdge>)> {
+        // Combine upward and downward traversal
+        let (mut down_nodes, mut down_edges) = self.traverse_down(doc, start, max_depth, filter)?;
+        let (up_nodes, up_edges) = self.traverse_up(doc, start, max_depth, filter)?;
+        // Merge results, avoiding duplicates
+        let mut node_ids = HashSet::new();
+        for node in &down_nodes {
+            node_ids.insert(node.id);
+        }
+        for node in up_nodes {
+            if !node_ids.contains(&node.id) {
+                down_nodes.push(node);
+            }
+        }
+        down_edges.extend(up_edges);
+        Ok((down_nodes, down_edges))
+    }
+    /// Downward traversal (children only)
+    fn traverse_down(
+        &self,
+        doc: &Document,
+        start: BlockId,
+        max_depth: usize,
+        filter: &Option<TraversalFilter>,
+    ) -> Result<(Vec<TraversalNode>, Vec<TraversalEdge>)> {
+        self.traverse_bfs(doc, start, max_depth, filter)
+    }
+    /// Check if block matches filter
+    fn matches_filter(&self, block: &Block, filter: &TraversalFilter) -> bool {
+        // Check roles
+        if !filter.roles.is_empty() {
+            if let Some(role) = &block.metadata.semantic_role {
+                let role_str = role.category.as_str();
+                if !filter.roles.iter().any(|r| r == role_str) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        // Check tags
+        if !filter.tags.is_empty() {
+            if !filter.tags.iter().any(|tag| block.has_tag(tag)) {
+                return false;
+            }
+        }
+        // Check content types
+        if !filter.content_types.is_empty() {
+            let content_type = block.content.type_tag();
+            if !filter.content_types.iter().any(|ct| ct == content_type) {
+                return false;
+            }
+        }
+        true
+    }
+    /// Summarize block for traversal
+    fn summarize_block(&self, block: &Block) -> BlockSummary {
+        let content_str = match &block.content {
+            ucm_core::Content::Text(text) => text.text.clone(),
+            ucm_core::Content::Code(code) => format!("code: {}", &code.source[..code.source.len().min(50)]),
+            ucm_core::Content::Table(table) => format!("table: {} rows", table.rows.len()),
+            ucm_core::Content::Math(math) => format!("math: {}", &math.expression[..math.expression.len().min(50)]),
+            ucm_core::Content::Media(media) => format!("media: {:?}", media.media_type),
+            ucm_core::Content::Json { value, .. } => format!("json: {}", value),
+            ucm_core::Content::Binary { mime_type, .. } => format!("binary: {}", mime_type),
+            ucm_core::Content::Composite { children, .. } => format!("composite: {} children", children.len()),
+        };
+        let content_preview = if content_str.len() > self.config.default_preview_length {
+            format!("{}...", &content_str[..self.config.default_preview_length])
+        } else {
+            content_str
+        };
+        BlockSummary {
+            content_type: block.content.type_tag().to_string(),
+            role: block.metadata.semantic_role.as_ref().map(|r| r.category.as_str().to_string()),
+            label: block.metadata.label.clone(),
+            tags: block.metadata.tags.clone(),
+            content_preview,
+            size_bytes: block.size_bytes(),
+            token_estimate: block.token_estimate().tokens,
+        }
+    }
+    /// Apply output formatting to nodes
+    fn apply_output_format(&self, nodes: &[TraversalNode], output: &TraversalOutput) -> Vec<TraversalNode> {
+        match output {
+            TraversalOutput::StructureOnly => {
+                // Only show structure, hide content
+                nodes.iter().map(|node| {
+                    let mut node = node.clone();
+                    node.visible = false; // Hide detailed content
+                    node
+                }).collect()
+            }
+            TraversalOutput::StructureAndBlocks => {
+                // Show everything (current LLM format)
+                nodes.to_vec()
+            }
+            TraversalOutput::Summary => {
+                // Only summary info
+                nodes.iter().take(10).map(|node| {
+                    let mut node = node.clone();
+                    node.block_info.content_preview = format!("({} tokens)", node.block_info.token_estimate);
+                    node
+                }).collect()
+            }
+            TraversalOutput::Paths => {
+                // Focus on paths
+                nodes.to_vec()
+            }
+            TraversalOutput::Tree => {
+                // Tree visualization format
+                nodes.to_vec()
+            }
+        }
+    }
+    /// Generate all paths from root to each node
+    fn generate_paths(&self, nodes: &[TraversalNode]) -> Vec<Vec<BlockId>> {
+        let mut paths = Vec::new();
+        
+        for node in nodes {
+            let path = self.build_path_to_node(nodes, node.id);
+            paths.push(path);
+        }
+        paths
+    }
+    /// Build path from root to specific node
+    fn build_path_to_node(&self, nodes: &[TraversalNode], target: BlockId) -> Vec<BlockId> {
+        let mut path = Vec::new();
+        let mut current = target;
+        // Walk up the tree
+        while let Some(node) = nodes.iter().find(|n| n.id == current) {
+            path.push(current);
+            if let Some(parent) = node.parent {
+                current = parent;
+            } else {
+                break;
+            }
+        }
+        path.reverse(); // Root to target
+        path
+    }
+    /// Count node types for summary
+    fn count_node_types(&self, nodes: &[TraversalNode]) -> HashMap<String, usize> {
+        let mut counts = HashMap::new();
+        
+        for node in nodes {
+            let key = format!("{}:{}", 
+                node.block_info.content_type,
+                node.block_info.role.as_deref().unwrap_or("none")
+            );
+            *counts.entry(key).or_insert(0) += 1;
+        }
+        counts
+    }
+    /// Get filter descriptions for metadata
+    fn get_filter_descriptions(&self, filter: &Option<TraversalFilter>) -> Vec<String> {
+        match filter {
+            Some(f) => {
+                let mut descriptions = Vec::new();
+                if !f.roles.is_empty() {
+                    descriptions.push(format!("roles: {}", f.roles.join(",")));
+                }
+                if !f.tags.is_empty() {
+                    descriptions.push(format!("tags: {}", f.tags.join(",")));
+                }
+                if !f.content_types.is_empty() {
+                    descriptions.push(format!("types: {}", f.content_types.join(",")));
+                }
+                descriptions
+            }
+            None => Vec::new(),
+        }
+    }
+}
+4. LLM Prompt Integration
+Enhance the prompt builder to support traversal results:
+
+rust
+// In crates/ucp-llm/src/prompt_builder.rs
+impl PromptBuilder {
+    /// Add navigation capability
+    pub fn navigate(&self) -> self {
+        // Add NAVIGATE command documentation
+        self.capabilities.insert('navigate');
+        self
+    }
+    /// Add search capability  
+    pub fn search(&self) -> self {
+        self.capabilities.insert('search');
+        self
+    }
+    /// Build prompt from traversal result
+    pub fn from_traversal(&self, result: &TraversalResult) -> String {
+        let mut parts = Vec::new();
+        // Add traversal metadata
+        parts.push(format!("## Graph Overview"));
+        parts.push(format!("Nodes: {}", result.summary.visible_nodes));
+        parts.push(format!("Max depth: {}", result.summary.max_depth));
+        parts.push(format!("Traversal time: {}ms", result.summary.traversal_time_ms));
+        // Add structure section
+        parts.push(String::new());
+        parts.push("Document structure:".to_string());
+        
+        for node in &result.nodes {
+            if node.visible {
+                let indent = "  ".repeat(node.depth);
+                let short_id = self.id_mapper.get_short(node.id).unwrap_or(0);
+                
+                if node.children.is_empty() {
+                    parts.push(format!("{}{}:", indent, short_id));
+                } else {
+                    let child_ids: Vec<String> = node.children.iter()
+                        .filter_map(|&id| self.id_mapper.get_short(id))
+                        .map(|id| id.to_string())
+                        .collect();
+                    parts.push(format!("{}{}: {}", indent, short_id, child_ids.join(" ")));
+                }
+            }
+        }
+        // Add blocks section (if requested)
+        parts.push(String::new());
+        parts.push("Blocks:".to_string());
+        
+        for node in &result.nodes {
+            if node.visible {
+                let short_id = self.id_mapper.get_short(node.id).unwrap_or(0);
+                let info = &node.block_info;
+                
+                parts.push(format!(
+                    "{} type={} role={} content=\"{}\"",
+                    short_id, info.content_type, 
+                    info.role.as_deref().unwrap_or("none"),
+                    info.content_preview
+                ));
+            }
+        }
+        parts.join("\n")
+    }
+}
+5. UCL Command Examples
+ucl
+# Navigate down 3 levels, show only headings
+NAVIGATE FROM blk_abc123def456 DOWN DEPTH 3 FILTER roles=heading1,heading2,heading3 OUTPUT STRUCTURE_AND_BLOCKS
+ 
+# Find all blocks with "todo" tag
+FIND "todo" IN GLOBAL FILTER tags=todo MAX_RESULTS 50
+ 
+# Expand node to show 2 more levels
+EXPAND blk_xyz789uvw012 DEPTH 2 MODE FOCUS PRESERVE_CONTEXT true
+ 
+# Get tree view of entire document
+NAVIGATE FROM ROOT BOTH DEPTH 10 OUTPUT TREE
+ 
+# Search in specific section
+FIND "API documentation" IN_PATH "Introduction > Getting Started" FILTER content_type=text
+6. Web Page Navigation Extension
+For web pages, add URL traversal:
+
+rust
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WebNavigateCommand {
+    pub start_url: String,
+    pub depth: usize,
+    pub follow_links: bool,
+    pub link_filter: Option<LinkFilter>,
+    pub extract_content: bool,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinkFilter {
+    pub same_domain: bool,
+    pub patterns: Vec<String>,          // URL patterns to match
+    pub exclude_patterns: Vec<String>,  // URL patterns to exclude
+}
+This comprehensive graph traversal system provides:
+
+Flexible navigation - Multiple traversal strategies
+Depth control - Prevent infinite traversal
+Filtering - Role, tag, content type filters
+Output formats - Structure-only, full, summary, tree
+LLM integration - Seamless prompt building
+Web extension - URL traversal for web pages
+Performance - Caching and limits
+Search - Content-based discovery

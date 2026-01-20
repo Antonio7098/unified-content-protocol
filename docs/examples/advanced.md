@@ -991,6 +991,147 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Example 8: Undoable Section Replace (Rust & Python)
+
+This scenario shows how to replace a section's content from Markdown while keeping a restore payload that can be replayed later.
+
+```rust
+use ucm_core::{Content, Document};
+use ucm_engine::{Engine, Operation};
+use ucm_engine::section::{clear_section_content_with_undo, restore_deleted_content};
+use ucp_translator_markdown::parse_markdown;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = Document::create();
+    let root = doc.root.clone();
+
+    // Seed a section
+    let section = doc.add_block(Content::text("Chapter 1"), Some("heading1"), &root)?;
+    doc.add_block(Content::text("Legacy paragraph"), Some("paragraph"), &section)?;
+
+    // Capture existing content before replacement
+    let ClearSectionResult { removed_ids, deleted_content } =
+        clear_section_content_with_undo(&mut doc, &section)?;
+    assert!(!removed_ids.is_empty());
+
+    // Integrate new markdown using the WriteSection operation
+    let markdown = "## New Intro\\n\\nFresh content.".to_string();
+    let mut engine = Engine::new();
+    engine.execute(&mut doc, Operation::WriteSection {
+        section_id: section.clone(),
+        markdown,
+        base_heading_level: Some(1),
+    })?;
+
+    // ... later, roll back to the snapshot
+    let restored = restore_deleted_content(&mut doc, &deleted_content)?;
+    assert_eq!(restored.len(), removed_ids.len());
+    Ok(())
+}
+```
+
+```python
+import ucp
+
+doc = ucp.parse("""# Chapter 1\n\nLegacy paragraph\n""")
+section_id = ucp.find_section_by_path(doc, "Chapter 1")
+
+snapshot = ucp.clear_section_with_undo(doc, section_id)
+ucp.write_section(doc, section_id, "## New Intro\n\nFresh content", base_heading_level=1)
+
+# ... persist snapshot.deleted_content somewhere durable ...
+
+ucp.restore_deleted_section(doc, snapshot.deleted_content)
+assert ucp.find_section_by_path(doc, "Chapter 1 > Legacy paragraph")
+```
+
+## Example 9: Context Window Management with Traversal (Python)
+
+Combine the traversal engine with the context manager to collect relevant blocks, curate them, and render an LLM-ready prompt.
+
+```python
+from ucp import (
+    create, add_block, find_section_by_path,
+    TraversalEngine, TraversalFilter, NavigateDirection,
+    create_context, ExpandDirection, CompressionMethod,
+)
+
+doc = create()
+root = doc.root_id
+chapter = add_block(doc, root, "Chapter 1", role="heading1")
+section = add_block(doc, chapter, "1.1 Overview", role="heading2")
+para = add_block(doc, section, "This section introduces the topic.", role="paragraph")
+
+# Traverse downward two levels starting at Chapter 1
+engine = TraversalEngine()
+nodes = engine.traverse(
+    doc,
+    start_id=chapter,
+    direction=NavigateDirection.BREADTH_FIRST,
+    max_depth=2,
+    filter=TraversalFilter(include_roles=["heading", "paragraph"]),
+)
+
+print(f"Collected {len(nodes.nodes)} nodes for consideration")
+
+# Build a context window around the same section
+ctx = create_context("analysis", max_tokens=2000)
+ctx.initialize_focus(doc, section, "Summarize the overview")
+ctx.expand_context(doc, ExpandDirection.DOWN, depth=2)
+
+# Drop any block you don't want to keep
+for block_id in list(ctx.window.blocks.keys()):
+    meta = ctx.window.blocks[block_id]
+    if meta.relevance_score < 0.2:
+        ctx.remove_block(block_id)
+
+# Compress if over budget, then render for the LLM
+ctx.compress(doc, CompressionMethod.TRUNCATE)
+prompt = ctx.render_for_prompt(doc)
+print(prompt)
+```
+
+## Example 10: HTML Ingestion Pipeline
+
+Use the HTML translator to harvest structured content from arbitrary markup, normalize heading depth, and append it under an existing section.
+
+```rust
+use ucm_core::{Content, Document};
+use ucp_translator_html::{HtmlParser, ParseConfig};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = Document::create();
+    let root = doc.root.clone();
+    let appendix = doc.add_block(Content::text("Appendix"), Some("heading1"), &root)?;
+
+    let html = r#"
+    <article>
+        <h1>Release Notes</h1>
+        <p>Highlights of the latest release.</p>
+        <h2>Bug Fixes</h2>
+        <ul><li>Fixed context window bug</li><li>Improved traversal speed</li></ul>
+    </article>
+    "#;
+
+    let parser = HtmlParser::new(ParseConfig {
+        base_heading_level: Some(2), // slot beneath Appendix (H1)
+        denied_nodes: Some(vec!["script", "style"]),
+        capture_attributes: true,
+        ..Default::default()
+    });
+
+    let imported = parser.parse(html)?;
+
+    // Integrate imported doc as a subtree under Appendix
+    for child in imported.children(&imported.root) {
+        doc.clone_subtree_from(&imported, child, &appendix)?;
+    }
+
+    println!("Appendix now has {} children", doc.children(&appendix).len());
+    Ok(())
+}
+```
+
 ## See Also
 
 - [Basic Examples](./basic.md) - Getting started examples

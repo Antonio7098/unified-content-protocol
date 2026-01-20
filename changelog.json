@@ -19,6 +19,60 @@
   },
   "entries": [
     {
+      "version": "v0.1.4",
+      "date": "2026-01-19",
+      "changes": [
+        {
+          "type": "added",
+          "area": "engine.write_section",
+          "description": "Implemented undoable section replacement flow (clear, write, restore) across engine, Python, and JS SDKs, plus regression tests and docs.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucm-engine/src/section.rs",
+            "packages/ucp-python/src/ucp/section.py",
+            "packages/ucp-python/tests/test_ucp.py",
+            "packages/ucp-js/src/section.ts",
+            "packages/ucp-js/src/index.test.ts"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "docs.translators",
+          "description": "Introduced HTML translator crate/documentation and expanded README references to cover Markdown + HTML ingestion.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/translators/html/README.md",
+            "docs/index.md",
+            "docs/README.md",
+            "README.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "docs.examples",
+          "description": "Expanded advanced examples with undoable section restore, context window traversal, and HTML ingestion walkthroughs.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/examples/advanced.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "docs.context",
+          "description": "Documented traversal + context-window workflows and updated repo maps to reflect new translators.",
+          "commit": "pending",
+          "files_affected": [
+            "README.md",
+            "docs/README.md"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.3",
       "date": "2026-01-15",
       "changes": [

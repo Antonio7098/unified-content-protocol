@@ -1,0 +1,435 @@
+Yes, we can absolutely use selectolax in Rust! It's an excellent choice for HTML/XML parsing. Here's how to integrate it:
+
+1. Add selectolax to Workspace Dependencies
+Add to Cargo.toml in workspace dependencies:
+
+toml
+[workspace.dependencies]
+# ... existing dependencies ...
+# HTML/XML parsing
+selectolax = "0.6"
+scraper = "0.19"  # Alternative if needed
+2. Create a New Crate for HTML Processing
+Create crates/translators/html/Cargo.toml:
+
+toml
+[package]
+name = "ucp-translator-html"
+description = "HTML to UCM document translator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+ 
+[dependencies]
+ucm-core = { workspace = true }
+selectolax = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+3. HTML to UCM Translator Implementation
+Create crates/translators/html/src/lib.rs:
+
+rust
+//! HTML to UCM document translator using selectolax
+use selectolax::Node;
+use ucm_core::{Block, Content, Document, Result};
+use thiserror::Error;
+#[derive(Debug, Error)]
+pub enum HtmlError {
+    #[error("Parse error: {0}")]
+    Parse(String),
+    #[error("Invalid HTML structure: {0}")]
+    InvalidStructure(String),
+}
+/// HTML parser configuration
+pub struct HtmlParserConfig {
+    pub preserve_whitespace: bool,
+    pub extract_images: bool,
+    pub extract_links: bool,
+    pub heading_strategy: HeadingStrategy,
+}
+pub enum HeadingStrategy {
+    /// Use actual heading levels (h1-h6)
+    AsIs,
+    /// Flatten all headings to h3
+    Flatten,
+    /// Infer hierarchy from nesting
+    InferFromNesting,
+}
+impl Default for HtmlParserConfig {
+    fn default() -> Self {
+        Self {
+            preserve_whitespace: false,
+            extract_images: true,
+            extract_links: true,
+            heading_strategy: HeadingStrategy::AsIs,
+        }
+    }
+}
+/// HTML to UCM translator
+pub struct HtmlParser {
+    config: HtmlParserConfig,
+}
+impl HtmlParser {
+    pub fn new() -> Self {
+        Self {
+            config: HtmlParserConfig::default(),
+        }
+    }
+    pub fn with_config(config: HtmlParserConfig) -> Self {
+        Self { config }
+    }
+    /// Parse HTML string into UCM document
+    pub fn parse(&self, html: &str) -> Result<Document> {
+        let mut doc = Document::create();
+        let root = doc.root;
+        let html_tree = selectolax::parse_html()
+            .utf8()
+            .select(html)
+            .map_err(|e| HtmlError::Parse(e.to_string()))?;
+        // Process body or use root
+        let body = html_tree
+            .select_first("body")
+            .unwrap_or_else(|_| html_tree);
+        self.process_node(&mut doc, &root, &body, 0)?;
+        Ok(doc)
+    }
+    /// Process a DOM node and its children
+    fn process_node(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+        depth: usize,
+    ) -> Result<ucm_core::BlockId> {
+        match node.tag_name().as_deref() {
+            Some("h1" | "h2" | "h3" | "h4" | "h5" | "h6") => {
+                self.process_heading(doc, parent_id, node, depth)
+            }
+            Some("p") => self.process_paragraph(doc, parent_id, node),
+            Some("ul" | "ol") => self.process_list(doc, parent_id, node),
+            Some("blockquote") => self.process_blockquote(doc, parent_id, node),
+            Some("pre") => self.process_code_block(doc, parent_id, node),
+            Some("img") => self.process_image(doc, parent_id, node),
+            Some("a") => self.process_link(doc, parent_id, node),
+            Some("table") => self.process_table(doc, parent_id, node),
+            Some("div" | "section" | "article") => {
+                // Container elements - process children directly
+                self.process_children(doc, parent_id, node, depth)
+            }
+            Some("script" | "style" | "meta" | "link") => {
+                // Skip metadata elements
+                Ok(*parent_id)
+            }
+            _ => {
+                // Default: treat as text content
+                self.process_text_content(doc, parent_id, node)
+            }
+        }
+    }
+    fn process_heading(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+        depth: usize,
+    ) -> Result<ucm_core::BlockId> {
+        let level = match self.config.heading_strategy {
+            HeadingStrategy::AsIs => {
+                match node.tag_name().as_deref() {
+                    Some("h1") => 1,
+                    Some("h2") => 2,
+                    Some("h3") => 3,
+                    Some("h4") => 4,
+                    Some("h5") => 5,
+                    Some("h6") => 6,
+                    _ => 3,
+                }
+            }
+            HeadingStrategy::Flatten => 3,
+            HeadingStrategy::InferFromNesting => (depth + 1).min(6),
+        };
+        let text = node.text().trim().to_string();
+        let role = format!("heading{}", level);
+        let block = Block::new(Content::text(&text), Some(&role));
+        let block_id = doc.add_block(block, parent_id)?;
+        // Process any nested content
+        self.process_children(doc, &block_id, node, depth + 1)?;
+        Ok(block_id)
+    }
+    fn process_paragraph(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+    ) -> Result<ucm_core::BlockId> {
+        let content = self.extract_formatted_text(node)?;
+        let block = Block::new(Content::text(&content), Some("paragraph"));
+        doc.add_block(block, parent_id)
+    }
+    fn process_list(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+    ) -> Result<ucm_core::BlockId> {
+        let list_items: Vec<String> = node
+            .select("li")
+            .iter()
+            .map(|li| self.extract_formatted_text(li).unwrap_or_default())
+            .collect();
+        let list_content = list_items.join("\n");
+        let block = Block::new(Content::text(&list_content), Some("list"));
+        doc.add_block(block, parent_id)
+    }
+    fn process_blockquote(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+    ) -> Result<ucm_core::BlockId> {
+        let content = self.extract_formatted_text(node)?;
+        let block = Block::new(Content::text(&content), Some("quote"));
+        doc.add_block(block, parent_id)
+    }
+    fn process_code_block(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+    ) -> Result<ucm_core::BlockId> {
+        let code = node.text();
+        let language = node
+            .get_attribute("class")
+            .and_then(|class| class.strip_prefix("language-"))
+            .unwrap_or("text");
+        let block = Block::new(Content::code(language, &code), Some("code"));
+        doc.add_block(block, parent_id)
+    }
+    fn process_image(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+    ) -> Result<ucm_core::BlockId> {
+        if !self.config.extract_images {
+            return Ok(*parent_id);
+        }
+        let src = node.get_attribute("src").unwrap_or_default();
+        let alt = node.get_attribute("alt").unwrap_or_default();
+        // Create media block
+        let media_content = Content::media(&alt, &src);
+        let block = Block::new(media_content, Some("image"));
+        doc.add_block(block, parent_id)
+    }
+    fn process_link(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+    ) -> Result<ucm_core::BlockId> {
+        if !self.config.extract_links {
+            return self.process_text_content(doc, parent_id, node);
+        }
+        let href = node.get_attribute("href").unwrap_or_default();
+        let text = node.text();
+        // Create link block with edge to external resource
+        let block = Block::new(Content::text(&text), Some("link"));
+        let block_id = doc.add_block(block, parent_id)?;
+        // Add edge representing the link
+        if let Ok(edge) = ucm_core::Edge::new(
+            ucm_core::EdgeType::LinksTo,
+            ucm_core::BlockId::from_bytes([0; 12]), // Placeholder for external ref
+        ) {
+            // Store href in edge metadata
+            let mut edge_with_meta = edge;
+            edge_with_meta.metadata.custom.insert("href".to_string(), serde_json::json!(href));
+            
+            if let Some(block_mut) = doc.get_block_mut(&block_id) {
+                block_mut.add_edge(edge_with_meta);
+            }
+        }
+        Ok(block_id)
+    }
+    fn process_table(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+    ) -> Result<ucm_core::BlockId> {
+        let rows: Vec<Vec<String>> = node
+            .select("tr")
+            .iter()
+            .map(|tr| {
+                tr.select("td, th")
+                    .iter()
+                    .map(|cell| cell.text().trim().to_string())
+                    .collect()
+            })
+            .collect();
+        let table_content = Content::table(rows);
+        let block = Block::new(table_content, Some("table"));
+        doc.add_block(block, parent_id)
+    }
+    fn process_text_content(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+    ) -> Result<ucm_core::BlockId> {
+        let text = if self.config.preserve_whitespace {
+            node.text()
+        } else {
+            node.text().trim().to_string()
+        };
+        if !text.is_empty() {
+            let block = Block::new(Content::text(&text), Some("text"));
+            doc.add_block(block, parent_id)
+        } else {
+            Ok(*parent_id)
+        }
+    }
+    fn process_children(
+        &self,
+        doc: &mut Document,
+        parent_id: &ucm_core::BlockId,
+        node: &Node,
+        depth: usize,
+    ) -> Result<ucm_core::BlockId> {
+        let mut current_parent = *parent_id;
+        
+        for child in node.children() {
+            current_parent = self.process_node(doc, &current_parent, &child, depth)?;
+        }
+        Ok(current_parent)
+    }
+    /// Extract text content while preserving some formatting information
+    fn extract_formatted_text(&self, node: &Node) -> Result<String> {
+        let mut result = String::new();
+        
+        for child in node.children() {
+            match child.tag_name().as_deref() {
+                Some("br") => result.push('\n'),
+                Some("strong" | "b") => {
+                    result.push_str("**");
+                    result.push_str(&child.text());
+                    result.push_str("**");
+                }
+                Some("em" | "i") => {
+                    result.push('*');
+                    result.push_str(&child.text());
+                    result.push('*');
+                }
+                Some("code") => {
+                    result.push('`');
+                    result.push_str(&child.text());
+                    result.push('`');
+                }
+                Some("a") if self.config.extract_links => {
+                    let text = child.text();
+                    let href = child.get_attribute("href").unwrap_or_default();
+                    result.push_str(&format!("[{}]({})", text, href));
+                }
+                _ => result.push_str(&child.text()),
+            }
+        }
+        Ok(result.trim().to_string())
+    }
+}
+impl Default for HtmlParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_parse_simple_html() {
+        let html = r#"
+        <html>
+            <body>
+                <h1>Hello World</h1>
+                <p>This is a paragraph.</p>
+                <ul>
+                    <li>Item 1</li>
+                    <li>Item 2</li>
+                </ul>
+            </body>
+        </html>
+        "#;
+        let parser = HtmlParser::new();
+        let doc = parser.parse(html).unwrap();
+        assert!(doc.block_count() > 1);
+        
+        // Check for heading
+        let has_heading = doc.blocks.values().any(|b| {
+            b.metadata.semantic_role.as_ref()
+                .map(|r| r.category == ucm_core::metadata::RoleCategory::Heading1)
+                .unwrap_or(false)
+        });
+        assert!(has_heading);
+    }
+    #[test]
+    fn test_extract_links() {
+        let html = r#"<p>Check out <a href="https://example.com">this link</a>!</p>"#;
+        let parser = HtmlParser::new();
+        let doc = parser.parse(html).unwrap();
+        // Should have extracted the link
+        let has_link = doc.blocks.values().any(|b| {
+            b.metadata.semantic_role.as_ref()
+                .map(|r| r.category == ucm_core::metadata::RoleCategory::Link)
+                .unwrap_or(false)
+        });
+        assert!(has_link);
+    }
+}
+4. Update Workspace Members
+Add to root Cargo.toml:
+
+toml
+members = [
+    # ... existing members ...
+    "crates/translators/html",
+]
+5. Add to Workspace Dependencies
+toml
+[workspace.dependencies]
+# ... existing dependencies ...
+ucp-translator-html = { path = "crates/translators/html" }
+6. Usage Examples
+rust
+use ucp_translator_html::{HtmlParser, HtmlParserConfig, HeadingStrategy};
+// Basic HTML parsing
+let parser = HtmlParser::new();
+let doc = parser.parse("<h1>Title</h1><p>Content</p>")?;
+// Custom configuration
+let config = HtmlParserConfig {
+    preserve_whitespace: true,
+    extract_images: false,
+    extract_links: true,
+    heading_strategy: HeadingStrategy::Flatten,
+};
+let parser = HtmlParser::with_config(config);
+let doc = parser.parse(html_content)?;
+Benefits of Selectolax
+Performance: Uses modern CSS selectors and is very fast
+Memory efficient: Doesn't build full DOM tree unnecessarily
+CSS selectors: Familiar query syntax
+Robust error handling: Graceful handling of malformed HTML
+UTF-8 support: Built-in Unicode handling
+This gives you a robust HTML-to-UCM translation capability that can handle web content extraction, HTML document conversion, and integration with web scraping workflows.
+
+Feedback submitted
+
+
+
+
+Command Awaiting Approval
+
+
+
+
+
+
+

@@ -12,6 +12,11 @@ import {
   removeTag,
   blockHasTag,
   findBlocksByTag,
+  writeSection,
+  findSectionByPath,
+  getAllSections,
+  clearSectionWithUndo,
+  restoreDeletedSection,
   PromptBuilder,
   IdMapper,
   UclBuilder,
@@ -94,6 +99,31 @@ describe('Document Operations', () => {
 
     removeTag(doc, paragraph.id, 'important')
     expect(blockHasTag(doc, paragraph.id, 'important')).toBe(false)
+  })
+
+  it('supports section clear and restore', () => {
+    const doc = parseMarkdown('# Intro\n\n## Getting Started\n\nParagraph')
+    
+    // Find the H1 heading block
+    const h1Block = Array.from(doc.blocks.values()).find(b => b.metadata?.semanticRole === 'heading1')
+    const h1Id = h1Block?.id
+    if (!h1Id) {
+      throw new Error('Section "Intro" not found')
+    }
+
+    const originalCount = doc.blocks.size
+    const snapshot = clearSectionWithUndo(doc, h1Id)
+    expect(snapshot.removedIds.length).toBeGreaterThan(0)
+
+    // Add replacement content
+    const replacementId = addBlock(doc, h1Id, 'Replacement')
+    expect(doc.blocks.has(replacementId)).toBe(true)
+
+    const restored = restoreDeletedSection(doc, snapshot.deletedContent)
+    expect(restored.length).toBe(snapshot.removedIds.length)
+    expect(doc.blocks.has(replacementId)).toBe(false)
+    expect(doc.blocks.size).toBe(originalCount)
+    expect(findSectionByPath(doc, 'Intro > Getting Started')).toBeDefined()
   })
 })
 
