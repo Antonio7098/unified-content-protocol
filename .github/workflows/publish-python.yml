@@ -1,9 +1,6 @@
 name: publish-python
 
 on:
-  pull_request:
-    branches:
-      - main
   push:
     tags:
       - "v*"
@@ -18,10 +15,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-          fetch-tags: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,11 +22,10 @@ jobs:
           python-version: "3.12"
 
       - name: Verify version consistency
-        run: python scripts/check_version_sync.py --quiet
+        run: python scripts/check_version_sync.py --quiet --require-tag
 
   publish:
     needs: version-check
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:

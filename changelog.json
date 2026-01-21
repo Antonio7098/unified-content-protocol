@@ -19,8 +19,8 @@
   },
   "entries": [
     {
-      "version": "v0.1.4",
-      "date": "2026-01-19",
+      "version": "v0.1.5",
+      "date": "2026-01-20",
       "changes": [
         {
           "type": "added",
@@ -67,6 +67,23 @@
           "files_affected": [
             "README.md",
             "docs/README.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "ucm-editor",
+          "description": "Shipped the ucm-editor React package with dedicated docs (integration guide, store/hooks, components, views) and surfaced links across the docs site.",
+          "commit": "pending",
+          "files_affected": [
+            "packages/ucm-editor/package.json",
+            "packages/ucm-editor/src",
+            "docs/index.md",
+            "docs/ucm-editor/README.md",
+            "docs/ucm-editor/integration.md",
+            "docs/ucm-editor/store.md",
+            "docs/ucm-editor/components.md",
+            "docs/ucm-editor/views.md"
           ],
           "issues": []
         }

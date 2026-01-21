@@ -203,7 +203,8 @@ impl HtmlParser {
                 // Inline code - treat as text
                 let code_text = element.text().collect::<String>();
                 if !code_text.trim().is_empty() {
-                    let block = Block::new(Content::text(format!("`{}`", code_text)), Some("code"));
+                    let formatted = format!("`{}`", code_text);
+                    let block = Block::new(Content::text(&formatted), Some("code"));
                     Ok(Some(doc.add_block(block, parent_id)?))
                 } else {
                     Ok(None)
