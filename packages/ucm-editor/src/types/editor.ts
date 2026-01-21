@@ -2,7 +2,7 @@
  * Core editor types for UCM Editor.
  */
 
-import type { BlockId, Document, Block, ContentType, SemanticRole, EdgeType } from 'ucp-js'
+import type { BlockId, Document, Block, ContentType, SemanticRole, EdgeType } from 'ucp-content'
 
 // =============================================================================
 // EDITOR STATE

@@ -19,7 +19,6 @@
   "scripts": {
     "build": "vite build && tsc --emitDeclarationOnly",
     "dev": "vite build --watch",
-    "pretest": "npm run build --prefix ../ucp-js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts,.tsx",
@@ -30,7 +29,7 @@
     "react-dom": ">=18.0.0"
   },
   "dependencies": {
-    "ucp-js": "file:../ucp-js"
+    "ucp-content": "^0.1.5"
   },
   "devDependencies": {
     "@eslint/js": "^8.57.0",

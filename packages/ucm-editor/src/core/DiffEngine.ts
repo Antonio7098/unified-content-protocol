@@ -4,7 +4,7 @@
  * Provides block-level and text-level diffing for UCM documents.
  */
 
-import type { BlockId, Document, Block } from 'ucp-js'
+import type { BlockId, Document, Block } from 'ucp-content'
 import type {
   DocumentDiff,
   BlockDiff,

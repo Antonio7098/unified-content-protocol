@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState } from 'react'
-import type { Block, ContentType } from 'ucp-js'
+import type { Block, ContentType } from 'ucp-content'
 import type { EditorStoreInstance } from '../core/EditorStore.js'
 import { useEditorState } from '../hooks/useEditor.js'
 

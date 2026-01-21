@@ -28,7 +28,7 @@ pnpm add ucm-editor
 
 ```tsx
 import { Editor } from 'ucm-editor'
-import { parseMarkdown } from 'ucp-js'
+import { parseMarkdown } from 'ucp-content'
 
 // Parse a markdown document
 const doc = parseMarkdown(`# Hello World
@@ -131,7 +131,7 @@ interface EditorConfig {
 
 ```typescript
 import { createEditorStore } from 'ucm-editor'
-import { parseMarkdown } from 'ucp-js'
+import { parseMarkdown } from 'ucp-content'
 
 const store = createEditorStore()
 

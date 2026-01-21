@@ -4,7 +4,7 @@
  * Events are used for observability, logging, and extensibility.
  */
 
-import type { BlockId, ContentType, EdgeType } from 'ucp-js'
+import type { BlockId, ContentType, EdgeType } from 'ucp-content'
 import type { EditorView, EditorMode, DiffChangeType, GraphLayout } from './editor.js'
 
 // =============================================================================

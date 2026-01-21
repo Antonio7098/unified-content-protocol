@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
-import type { BlockId, Document } from 'ucp-js'
+import type { BlockId, Document } from 'ucp-content'
 import type { EditorStoreInstance } from '../core/EditorStore.js'
 import type { GraphLayout, GraphNode, GraphEdge } from '../types/editor.js'
 import { useEditorState } from '../hooks/useEditor.js'

@@ -5,7 +5,7 @@
  */
 
 import { useRef, useEffect, useSyncExternalStore, useCallback } from 'react'
-import type { Document } from 'ucp-js'
+import type { Document } from 'ucp-content'
 import { createEditorStore, type EditorStoreInstance } from '../core/EditorStore.js'
 import type { EditorStoreState, EditorConfig } from '../types/editor.js'
 

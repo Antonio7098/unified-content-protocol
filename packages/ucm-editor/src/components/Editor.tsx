@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react'
-import type { Document } from 'ucp-js'
+import type { Document } from 'ucp-content'
 import type { EditorStoreInstance } from '../core/EditorStore.js'
 import type { EditorConfig, EditorView } from '../types/editor.js'
 import {
@@ -141,7 +141,7 @@ export interface EditorProps {
  * @example
  * ```tsx
  * import { Editor } from 'ucm-editor'
- * import { parseMarkdown } from 'ucp-js'
+ * import { parseMarkdown } from 'ucp-content'
  *
  * function App() {
  *   const doc = parseMarkdown('# Hello\n\nWorld')
