@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createEditorStore, type EditorStoreInstance } from '../../src/core/EditorStore.js'
-import { parseMarkdown, createDocument } from 'ucp-js'
+import { parseMarkdown, createDocument } from 'ucp-content'
 
 describe('EditorStore', () => {
   let store: EditorStoreInstance

@@ -5,7 +5,7 @@
  * Implements SOLID principles with clear separation of concerns.
  */
 
-import type { BlockId, Document, ContentType, EdgeType } from 'ucp-js'
+import type { BlockId, Document, ContentType, EdgeType } from 'ucp-content'
 import {
   createDocument as createUcpDocument,
   addBlock as addUcpBlock,
@@ -17,7 +17,7 @@ import {
   serializeDocument,
   SnapshotManager,
   validateDocument,
-} from 'ucp-js'
+} from 'ucp-content'
 
 import type {
   EditorStoreState,

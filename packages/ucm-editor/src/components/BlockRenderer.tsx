@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useState, useRef } from 'react'
-import type { Block, Document, BlockId } from 'ucp-js'
+import type { Block, Document, BlockId } from 'ucp-content'
 import type { EditorStoreInstance } from '../core/EditorStore.js'
 import { useEditorState } from '../hooks/useEditor.js'
 import { MetadataTooltip } from './MetadataTooltip.js'

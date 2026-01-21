@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react'
-import type { BlockId, Block } from 'ucp-js'
+import type { BlockId, Block } from 'ucp-content'
 import type { EditorStoreInstance } from '../core/EditorStore.js'
 import type { DocumentDiff, BlockDiff, TextDiff, DiffChangeType } from '../types/editor.js'
 import { useEditorState } from '../hooks/useEditor.js'

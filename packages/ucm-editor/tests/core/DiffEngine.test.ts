@@ -11,7 +11,7 @@ import {
   formatTextDiff,
   hasDiffChanges,
 } from '../../src/core/DiffEngine.js'
-import { parseMarkdown, createDocument, addBlock, editBlock, deleteBlock } from 'ucp-js'
+import { parseMarkdown, createDocument, addBlock, editBlock, deleteBlock } from 'ucp-content'
 
 describe('DiffEngine', () => {
   describe('computeDocumentDiff', () => {

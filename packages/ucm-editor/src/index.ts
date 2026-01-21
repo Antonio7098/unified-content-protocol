@@ -12,7 +12,7 @@
  * @example
  * ```tsx
  * import { Editor } from 'ucm-editor'
- * import { parseMarkdown } from 'ucp-js'
+ * import { parseMarkdown } from 'ucp-content'
  *
  * const doc = parseMarkdown('# Hello World\n\nWelcome to UCM Editor!')
  *

@@ -5,7 +5,7 @@
  */
 
 import React from 'react'
-import type { Block } from 'ucp-js'
+import type { Block } from 'ucp-content'
 
 // =============================================================================
 // STYLES

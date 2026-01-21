@@ -4,7 +4,7 @@
  * Manages block selection, text selection, and keyboard navigation.
  */
 
-import type { BlockId, Document } from 'ucp-js'
+import type { BlockId, Document } from 'ucp-content'
 import type { SelectionState, TextSelection } from '../types/editor.js'
 import { Logger } from './Logger.js'
 
