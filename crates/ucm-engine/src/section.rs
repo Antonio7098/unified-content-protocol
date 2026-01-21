@@ -307,7 +307,8 @@ fn integrate_subtree(
     added_blocks.push(new_id);
 
     // Add to parent's children
-    doc.structure.entry(*parent_id).or_default().push(new_id);
+    let parent_children = doc.structure.entry(*parent_id).or_default();
+    parent_children.push(new_id);
 
     // Initialize structure for new block
     doc.structure.entry(new_id).or_default();
