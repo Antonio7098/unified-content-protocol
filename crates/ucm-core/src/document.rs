@@ -20,11 +20,8 @@ impl DocumentId {
     }
 
     pub fn generate() -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        // Use chrono for WASM compatibility (chrono supports wasmbind feature)
+        let ts = Utc::now().timestamp_nanos_opt().unwrap_or(0);
         Self(format!("doc_{:x}", ts))
     }
 }

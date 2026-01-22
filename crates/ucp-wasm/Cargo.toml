@@ -1,0 +1,30 @@
+[package]
+name = "ucp-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "WebAssembly bindings for UCP (Unified Content Protocol)"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+js-sys = "0.3"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-wasm-bindgen = "0.6"
+ucm-core = { path = "../ucm-core" }
+ucm-engine = { path = "../ucm-engine" }
+ucl-parser = { path = "../ucl-parser" }
+ucp-api = { path = "../ucp-api" }
+ucp-llm = { path = "../ucp-llm" }
+ucp-translator-markdown = { path = "../translators/markdown" }
+chrono = { version = "0.4", features = ["serde", "wasmbind"] }
+console_error_panic_hook = "0.1"
+
+[profile.release]
+opt-level = "s"
+lto = true

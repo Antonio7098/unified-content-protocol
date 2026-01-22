@@ -13,11 +13,8 @@ pub struct TransactionId(pub String);
 
 impl TransactionId {
     pub fn generate() -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        use chrono::Utc;
+        let ts = Utc::now().timestamp_nanos_opt().unwrap_or(0);
         Self(format!("txn_{:x}", ts))
     }
 

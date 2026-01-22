@@ -1,0 +1,21 @@
+{
+  "template": {
+    "id": "BUG-YYYYMMDD-XX",
+    "title": "Short summary of the defect",
+    "status": "open | in_progress | closed",
+    "severity": "low | medium | high | critical",
+    "area": "subsystem or feature name",
+    "introduced_in": "commit hash or version where the bug first appeared",
+    "fixed_in": "commit hash or version containing the fix",
+    "reported_by": "person or automation that caught the bug",
+    "owner": "engineer responsible for the fix",
+    "created_at": "ISO-8601 timestamp when the bug was logged",
+    "resolved_at": "ISO-8601 timestamp when the bug was closed (null if open)",
+    "description": "Detailed description, reproduction steps, and observed behavior",
+    "resolution": "Summary of the fix or mitigation",
+    "links": [
+      "Optional URLs to PRs, tickets, dashboards"
+    ]
+  },
+  "bugs": []
+}

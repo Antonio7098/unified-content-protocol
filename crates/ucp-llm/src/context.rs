@@ -36,7 +36,7 @@ pub struct ContextBlock {
     pub relevance_score: f32,
     pub token_estimate: usize,
     pub access_count: usize,
-    pub last_accessed: std::time::SystemTime,
+    pub last_accessed: chrono::DateTime<chrono::Utc>,
     pub compressed: bool,
     pub original_content: Option<String>,
 }
@@ -54,8 +54,8 @@ pub struct ContextRelation {
 pub struct ContextMetadata {
     pub focus_area: Option<BlockId>,
     pub task_description: Option<String>,
-    pub created_at: Option<std::time::SystemTime>,
-    pub last_modified: Option<std::time::SystemTime>,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Constraints for the context window
@@ -171,7 +171,7 @@ impl ContextWindow {
             blocks: HashMap::new(),
             relationships: Vec::new(),
             metadata: ContextMetadata {
-                created_at: Some(std::time::SystemTime::now()),
+                created_at: Some(chrono::Utc::now()),
                 ..Default::default()
             },
             constraints,
@@ -264,7 +264,7 @@ impl ContextManager {
     ) -> ContextUpdateResult {
         self.window.metadata.focus_area = Some(focus_id);
         self.window.metadata.task_description = Some(task_description.to_string());
-        self.window.metadata.last_modified = Some(std::time::SystemTime::now());
+        self.window.metadata.last_modified = Some(chrono::Utc::now());
 
         let mut result = ContextUpdateResult::default();
 
@@ -306,7 +306,7 @@ impl ContextManager {
     ) -> ContextUpdateResult {
         self.window.metadata.focus_area = Some(target_id);
         self.window.metadata.task_description = Some(task_description.to_string());
-        self.window.metadata.last_modified = Some(std::time::SystemTime::now());
+        self.window.metadata.last_modified = Some(chrono::Utc::now());
 
         let mut result = ContextUpdateResult::default();
 
@@ -356,7 +356,7 @@ impl ContextManager {
             result.blocks_removed.push(block_id);
         }
 
-        self.window.metadata.last_modified = Some(std::time::SystemTime::now());
+        self.window.metadata.last_modified = Some(chrono::Utc::now());
         result.total_tokens = self.window.total_tokens();
         result.total_blocks = self.window.block_count();
         result
@@ -401,7 +401,7 @@ impl ContextManager {
         let pruned = self.prune_if_needed();
         result.blocks_removed = pruned;
 
-        self.window.metadata.last_modified = Some(std::time::SystemTime::now());
+        self.window.metadata.last_modified = Some(chrono::Utc::now());
         result.total_tokens = self.window.total_tokens();
         result.total_blocks = self.window.block_count();
         result
@@ -553,7 +553,7 @@ impl ContextManager {
             // Update access count
             if let Some(cb) = self.window.blocks.get_mut(&block_id) {
                 cb.access_count += 1;
-                cb.last_accessed = std::time::SystemTime::now();
+                cb.last_accessed = chrono::Utc::now();
             }
             return;
         }
@@ -567,7 +567,7 @@ impl ContextManager {
                 relevance_score: relevance,
                 token_estimate,
                 access_count: 1,
-                last_accessed: std::time::SystemTime::now(),
+                last_accessed: chrono::Utc::now(),
                 compressed: false,
                 original_content: None,
             };
