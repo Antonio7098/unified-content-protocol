@@ -1,46 +1,70 @@
 # Installation
 
-This guide covers how to install and configure UCP for your Rust project.
+This guide covers how to install and configure UCP for your project.
 
 ## Requirements
 
-- **Rust**: 1.70 or later
-- **Cargo**: Latest stable version
+=== "Rust"
+    - **Rust**: 1.70 or later
+    - **Cargo**: Latest stable version
+
+=== "Python"
+    - **Python**: 3.8 or later
+    - **pip**: Latest stable version
+
+=== "JavaScript"
+    - **Node.js**: 16 or later
+    - **npm**: Latest stable version
 
 ## Adding UCP to Your Project
 
-### Using the High-Level API (Recommended)
+=== "Rust"
+    ### Using the High-Level API (Recommended)
 
-For most use cases, add `ucp-api` which re-exports everything you need:
+    For most use cases, add `ucp-api` which re-exports everything you need:
 
-```toml
-[dependencies]
-ucp-api = "0.1.6"
-```
+    ```toml
+    [dependencies]
+    ucp-api = "0.1.6"
+    ```
 
-### Individual Crates
+    ### Individual Crates
 
-For fine-grained control, you can depend on specific crates:
+    For fine-grained control, you can depend on specific crates:
 
-```toml
-[dependencies]
-# Core types only
-ucm-core = "0.1.6"
+    ```toml
+    [dependencies]
+    # Core types only
+    ucm-core = "0.1.6"
 
-# Core + transformation engine
-ucm-engine = "0.1.6"
+    # Core + transformation engine
+    ucm-engine = "0.1.6"
 
-# UCL command parsing
-ucl-parser = "0.1.6"
+    # UCL command parsing
+    ucl-parser = "0.1.6"
 
-# Markdown conversion
-ucp-translator-markdown = "0.1.6"
+    # Markdown conversion
+    ucp-translator-markdown = "0.1.6"
 
-# Observability utilities
-ucp-observe = "0.1.6"
-```
+    # Observability utilities
+    ucp-observe = "0.1.6"
+    ```
 
-## Feature Flags
+=== "Python"
+    Install the `ucp-content` package from PyPI:
+
+    ```bash
+    pip install ucp-content
+    ```
+
+=== "JavaScript"
+    Install the `ucp-content` package from npm:
+
+    ```bash
+    npm install ucp-content
+    ```
+
+## Feature Flags (Rust only)
 
 ### ucm-core
 
@@ -58,27 +82,62 @@ ucp-observe = "0.1.6"
 
 Create a simple test program:
 
-```rust
-use ucp_api::UcpClient;
-use ucm_core::{Block, Content, Document};
+=== "Rust"
+    ```rust
+    use ucp_api::UcpClient;
+    use ucm_core::{Block, Content, Document};
 
-fn main() {
-    // Create a client
-    let client = UcpClient::new();
-    
+    fn main() {
+        // Create a client
+        let client = UcpClient::new();
+        
+        // Create a document
+        let doc = client.create_document();
+        
+        println!("Document created with {} block(s)", doc.block_count());
+        println!("Root block ID: {}", doc.root);
+    }
+    ```
+
+    Run with:
+
+    ```bash
+    cargo run
+    ```
+
+=== "Python"
+    ```python
+    from ucp_content import Document
+
+    # Create a document
+    doc = Document.create()
+
+    print(f"Document created with {doc.block_count()} block(s)")
+    print(f"Root block ID: {doc.root_id}")
+    ```
+
+    Run with:
+
+    ```bash
+    python test_ucp.py
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { Document } from 'ucp-content';
+
     // Create a document
-    let doc = client.create_document();
-    
-    println!("Document created with {} block(s)", doc.block_count());
-    println!("Root block ID: {}", doc.root);
-}
-```
+    const doc = Document.create();
 
-Run with:
+    console.log(`Document created with ${doc.blockCount()} block(s)`);
+    console.log(`Root block ID: ${doc.rootId}`);
+    ```
 
-```bash
-cargo run
-```
+    Run with:
+
+    ```bash
+    node test_ucp.js
+    ```
 
 Expected output:
 

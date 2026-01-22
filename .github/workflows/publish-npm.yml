@@ -31,12 +31,12 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        working-directory: packages/ucp-js
+        working-directory: crates/ucp-wasm/pkg
         run: npm ci
 
       - name: Run tests
-        working-directory: packages/ucp-js
-        run: npm run test
+        working-directory: crates/ucp-wasm/tests
+        run: npm test
 
   publish:
     needs: version-check
@@ -64,13 +64,13 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        working-directory: packages/ucp-js
+        working-directory: crates/ucp-wasm/pkg
         run: npm ci
 
       - name: Build package
-        working-directory: packages/ucp-js
+        working-directory: crates/ucp-wasm/pkg
         run: npm run build
 
       - name: Publish to npm (trusted publisher)
-        working-directory: packages/ucp-js
+        working-directory: crates/ucp-wasm/pkg
         run: npm publish --provenance --access public

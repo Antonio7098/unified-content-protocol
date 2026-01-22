@@ -13,10 +13,17 @@ The engine is the execution layer of UCP, responsible for:
 
 ## Installation
 
-```toml
-[dependencies]
-ucm-engine = "0.1.6"
-```
+=== "Rust"
+    ```toml
+    [dependencies]
+    ucm-engine = "0.1.6"
+    ```
+
+=== "Python"
+    *The engine is internal to the Rust core, but its functionality (operations, snapshots) is exposed through the high-level `ucp-content` package.*
+
+=== "JavaScript"
+    *The engine is internal to the Rust core, but its functionality (operations, snapshots) is exposed through the high-level `ucp-content` package.*
 
 ## Module Overview
 
@@ -30,30 +37,31 @@ ucm-engine = "0.1.6"
 
 ## Quick Example
 
-```rust
-use ucm_engine::{Engine, Operation};
-use ucm_core::{Content, Document};
+=== "Rust"
+    ```rust
+    use ucm_engine::{Engine, Operation};
+    use ucm_core::{Content, Document};
 
-fn main() {
-    let engine = Engine::new();
-    let mut doc = Document::create();
-    let root = doc.root.clone();
-    
-    // Execute an operation
-    let result = engine.execute(&mut doc, Operation::Append {
-        parent_id: root,
-        content: Content::text("Hello, Engine!"),
-        label: Some("greeting".into()),
-        tags: vec!["example".into()],
-        semantic_role: Some("intro".into()),
-        index: None,
-    }).unwrap();
-    
-    if result.success {
-        println!("Added block: {:?}", result.affected_blocks);
+    fn main() {
+        let engine = Engine::new();
+        let mut doc = Document::create();
+        let root = doc.root.clone();
+        
+        // Execute an operation
+        let result = engine.execute(&mut doc, Operation::Append {
+            parent_id: root,
+            content: Content::text("Hello, Engine!"),
+            label: Some("greeting".into()),
+            tags: vec!["example".into()],
+            semantic_role: Some("intro".into()),
+            index: None,
+        }).unwrap();
+        
+        if result.success {
+            println!("Added block: {:?}", result.affected_blocks);
+        }
     }
-}
-```
+    ```
 
 ## Public API
 
@@ -69,18 +77,19 @@ pub use validate::{ValidationPipeline, ValidationResult};
 
 ## Engine Configuration
 
-```rust
-use ucm_engine::{Engine, EngineConfig};
+=== "Rust"
+    ```rust
+    use ucm_engine::{Engine, EngineConfig};
 
-let config = EngineConfig {
-    validate_on_operation: true,   // Validate after each operation
-    max_batch_size: 10000,         // Maximum operations per batch
-    enable_transactions: true,      // Enable transaction support
-    enable_snapshots: true,         // Enable snapshot support
-};
+    let config = EngineConfig {
+        validate_on_operation: true,   // Validate after each operation
+        max_batch_size: 10000,         // Maximum operations per batch
+        enable_transactions: true,      // Enable transaction support
+        enable_snapshots: true,         // Enable snapshot support
+    };
 
-let engine = Engine::with_config(config);
-```
+    let engine = Engine::with_config(config);
+    ```
 
 ## Operations
 
@@ -102,60 +111,106 @@ The engine supports these operations:
 
 Group operations for atomic execution:
 
-```rust
-let mut engine = Engine::new();
-let mut doc = Document::create();
+=== "Rust"
+    ```rust
+    let mut engine = Engine::new();
+    let mut doc = Document::create();
 
-// Begin transaction
-let txn_id = engine.begin_transaction();
+    // Begin transaction
+    let txn_id = engine.begin_transaction();
 
-// Add operations
-engine.add_to_transaction(&txn_id, Operation::Append { ... })?;
-engine.add_to_transaction(&txn_id, Operation::Edit { ... })?;
+    // Add operations
+    engine.add_to_transaction(&txn_id, Operation::Append { ... })?;
+    engine.add_to_transaction(&txn_id, Operation::Edit { ... })?;
 
-// Commit (executes all operations)
-let results = engine.commit_transaction(&txn_id, &mut doc)?;
+    // Commit (executes all operations)
+    let results = engine.commit_transaction(&txn_id, &mut doc)?;
 
-// Or rollback
-// engine.rollback_transaction(&txn_id)?;
-```
+    // Or rollback
+    // engine.rollback_transaction(&txn_id)?;
+    ```
 
 ## Snapshots
 
 Version and restore documents:
 
-```rust
-let mut engine = Engine::new();
-let doc = Document::create();
+=== "Rust"
+    ```rust
+    let mut engine = Engine::new();
+    let doc = Document::create();
 
-// Create snapshot
-engine.create_snapshot("v1", &doc, Some("Initial version".into()))?;
+    // Create snapshot
+    engine.create_snapshot("v1", &doc, Some("Initial version".into()))?;
 
-// Make changes...
+    // Make changes...
 
-// Restore
-let restored = engine.restore_snapshot("v1")?;
-```
+    // Restore
+    let restored = engine.restore_snapshot("v1")?;
+    ```
+
+=== "Python"
+    ```python
+    from ucp_content import SnapshotManager
+    
+    manager = SnapshotManager()
+    
+    # Create snapshot
+    manager.create_snapshot("v1", doc, description="Initial version")
+    
+    # Restore
+    restored_doc = manager.restore_snapshot("v1")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { SnapshotManager } from 'ucp-content';
+    
+    const manager = new SnapshotManager();
+    
+    // Create snapshot
+    manager.createSnapshot("v1", doc, "Initial version");
+    
+    // Restore
+    const restoredDoc = manager.restoreSnapshot("v1");
+    ```
 
 ## Validation
 
 Validate document integrity:
 
-```rust
-let engine = Engine::new();
-let result = engine.validate(&doc);
+=== "Rust"
+    ```rust
+    let engine = Engine::new();
+    let result = engine.validate(&doc);
 
-if result.valid {
-    println!("Document is valid");
-} else {
-    for issue in result.errors() {
-        eprintln!("Error: {}", issue.message);
+    if result.valid {
+        println!("Document is valid");
+    } else {
+        for issue in result.errors() {
+            eprintln!("Error: {}", issue.message);
+        }
+        for issue in result.warnings() {
+            println!("Warning: {}", issue.message);
+        }
     }
-    for issue in result.warnings() {
-        println!("Warning: {}", issue.message);
+    ```
+
+=== "Python"
+    ```python
+    # Validation is built into the Document class
+    issues = doc.validate()
+    if not issues:
+        print("Valid")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    // Validation is built into the Document class
+    const issues = doc.validate();
+    if (!issues) {
+        console.log("Valid");
     }
-}
-```
+    ```
 
 ## See Also
 
@@ -163,3 +218,4 @@ if result.valid {
 - [Transactions](./transactions.md) - Transaction management
 - [Snapshots](./snapshots.md) - Snapshot system
 - [Validation](./validation.md) - Validation pipeline
+

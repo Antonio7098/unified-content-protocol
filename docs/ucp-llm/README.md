@@ -14,22 +14,55 @@
 
 Token budgets collapse quickly when every UCL command references `blk_a1b2…`. `IdMapper` provides a deterministic mapping so prompts can use `1`, `2`, `3`, … instead. Key APIs:
 
-```rust
-use ucp_llm::IdMapper;
-use ucm_core::{Content, Document};
+=== "Rust"
+    ```rust
+    use ucp_llm::IdMapper;
+    use ucm_core::{Content, Document};
 
-let mut doc = Document::create();
-let root = doc.root.clone();
-let heading = doc.add_block(Content::text("Intro"), Some("heading1"), &root)?;
+    let mut doc = Document::create();
+    let root = doc.root.clone();
+    let heading = doc.add_block(Content::text("Intro"), Some("heading1"), &root).unwrap();
 
-let mapper = IdMapper::from_document(&doc);
-assert_eq!(mapper.to_short_id(&root), Some(1));
-assert!(mapper.to_short_id(&heading).is_some());
+    let mapper = IdMapper::from_document(&doc);
+    assert_eq!(mapper.to_short_id(&root), Some(1));
+    assert!(mapper.to_short_id(&heading).is_some());
 
-let long = "EDIT blk_ff00000000000000000000 SET text = \"Hello\"";
-let short = mapper.shorten_ucl(long);
-assert_eq!(short, "EDIT 1 SET text = \"Hello\"");
-```
+    let long = "EDIT blk_ff00000000000000000000 SET text = \"Hello\"";
+    let short = mapper.shorten_ucl(long);
+    assert_eq!(short, "EDIT 1 SET text = \"Hello\"");
+    ```
+
+=== "Python"
+    ```python
+    from ucp_content import IdMapper, Document
+
+    doc = Document.create()
+    root = doc.root_id
+    heading = doc.add_block(root, "Intro", role="heading1")
+
+    mapper = IdMapper.from_document(doc)
+    print(mapper.to_short_id(root)) # 1
+
+    long_cmd = f'EDIT {root} SET text = "Hello"'
+    short_cmd = mapper.shorten_ucl(long_cmd)
+    print(short_cmd) # EDIT 1 SET text = "Hello"
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { IdMapper, Document } from 'ucp-content';
+
+    const doc = Document.create();
+    const root = doc.rootId;
+    const heading = doc.addBlock(root, "Intro", "heading1");
+
+    const mapper = IdMapper.fromDocument(doc);
+    console.log(mapper.toShortId(root)); // 1
+
+    const longCmd = `EDIT ${root} SET text = "Hello"`;
+    const shortCmd = mapper.shortenUcl(longCmd);
+    console.log(shortCmd); // EDIT 1 SET text = "Hello"
+    ```
 
 Highlights:
 - Deterministic ordering (root first, remaining blocks sorted by ID)
@@ -60,31 +93,79 @@ Blocks:
 
 `PromptBuilder` assembles the system/task instructions LLMs need to safely emit UCL.
 
-```rust
-use ucp_llm::{PromptBuilder, UclCapability};
+=== "Rust"
+    ```rust
+    use ucp_llm::{PromptBuilder, UclCapability};
 
-let builder = PromptBuilder::new()
-    .with_capability(UclCapability::Edit)
-    .with_capability(UclCapability::Append)
-    .with_rule("Never delete blocks unless explicitly asked")
-    .with_short_ids(true);
+    let builder = PromptBuilder::new()
+        .with_capability(UclCapability::Edit)
+        .with_capability(UclCapability::Append)
+        .with_rule("Never delete blocks unless explicitly asked")
+        .with_short_ids(true);
 
-let system_prompt = builder.build_system_prompt();
-let doc_context = "Document structure:\n1: 2\n2:\n\nBlocks:\n1 type=text content=\"\"\n2 type=text content=\"Hello\"";
-let final_prompt = builder.build_prompt(&doc_context, "Update block 2 to mention the date");
-```
+    let system_prompt = builder.build_system_prompt();
+    let doc_context = "Document structure:\n1: 2\n2:\n\nBlocks:\n1 type=text content=\"\"\n2 type=text content=\"Hello\"";
+    let final_prompt = builder.build_prompt(&doc_context, "Update block 2 to mention the date");
+    ```
+
+=== "Python"
+    ```python
+    from ucp_content import PromptBuilder, UclCapability
+
+    builder = PromptBuilder() \
+        .with_capability(UclCapability.Edit) \
+        .with_capability(UclCapability.Append) \
+        .with_rule("Never delete blocks unless explicitly asked") \
+        .with_short_ids(True)
+
+    system_prompt = builder.build_system_prompt()
+    # ...
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { PromptBuilder, UclCapability } from 'ucp-content';
+
+    const builder = new PromptBuilder()
+        .withCapability(UclCapability.Edit)
+        .withCapability(UclCapability.Append)
+        .withRule("Never delete blocks unless explicitly asked")
+        .withShortIds(true);
+
+    const systemPrompt = builder.buildSystemPrompt();
+    // ...
+    ```
 
 Capabilities gate which command documentation is included (`EDIT`, `APPEND`, `MOVE`, `DELETE`, `LINK`, `SNAPSHOT`, `TRANSACTION`). Short-ID mode automatically updates rule text so the model knows IDs like `1`, `2`, `3` will appear.
 
 ### Presets
 
-```rust
-use ucp_llm::presets;
+=== "Rust"
+    ```rust
+    use ucp_llm::presets;
 
-let editing = presets::basic_editing();      // EDIT/APPEND/DELETE
-let structural = presets::structure_manipulation();
-let token_efficient = presets::token_efficient();
-```
+    let editing = presets::basic_editing();      // EDIT/APPEND/DELETE
+    let structural = presets::structure_manipulation();
+    let token_efficient = presets::token_efficient();
+    ```
+
+=== "Python"
+    ```python
+    from ucp_content import PromptPresets
+
+    editing = PromptPresets.basic_editing()
+    structural = PromptPresets.structure_manipulation()
+    token_efficient = PromptPresets.token_efficient()
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { PromptPresets } from 'ucp-content';
+
+    const editing = PromptPresets.basicEditing();
+    const structural = PromptPresets.structureManipulation();
+    const tokenEfficient = PromptPresets.tokenEfficient();
+    ```
 
 Use these as starting points for common workflows.
 

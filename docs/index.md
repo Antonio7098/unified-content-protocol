@@ -2,6 +2,24 @@
 
 Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major area below.
 
+## Quick Install
+
+=== "Rust"
+    ```toml
+    [dependencies]
+    ucp-api = "0.1.6"
+    ```
+
+=== "Python"
+    ```bash
+    pip install ucp-content
+    ```
+
+=== "JavaScript"
+    ```bash
+    npm install ucp-content
+    ```
+
 ## Getting Started
 
 - [Installation](./getting-started/installation.md)

@@ -319,29 +319,36 @@ WHERE references CONTAINS @blk_target
 
 Conditions are represented in the AST as:
 
-```rust
-pub enum Condition {
-    Comparison { path: Path, op: ComparisonOp, value: Value },
-    Contains { path: Path, value: Value },
-    StartsWith { path: Path, prefix: String },
-    EndsWith { path: Path, suffix: String },
-    Matches { path: Path, regex: String },
-    Exists { path: Path },
-    IsNull { path: Path },
-    And(Box<Condition>, Box<Condition>),
-    Or(Box<Condition>, Box<Condition>),
-    Not(Box<Condition>),
-}
+=== "Rust"
+    ```rust
+    pub enum Condition {
+        Comparison { path: Path, op: ComparisonOp, value: Value },
+        Contains { path: Path, value: Value },
+        StartsWith { path: Path, prefix: String },
+        EndsWith { path: Path, suffix: String },
+        Matches { path: Path, regex: String },
+        Exists { path: Path },
+        IsNull { path: Path },
+        And(Box<Condition>, Box<Condition>),
+        Or(Box<Condition>, Box<Condition>),
+        Not(Box<Condition>),
+    }
 
-pub enum ComparisonOp {
-    Eq,  // =
-    Ne,  // !=
-    Gt,  // >
-    Ge,  // >=
-    Lt,  // <
-    Le,  // <=
-}
-```
+    pub enum ComparisonOp {
+        Eq,  // =
+        Ne,  // !=
+        Gt,  // >
+        Ge,  // >=
+        Lt,  // <
+        Le,  // <=
+    }
+    ```
+
+=== "Python"
+    *The UCL AST is handled internally by the Rust core and is not directly exposed in the Python bindings.*
+
+=== "JavaScript"
+    *The UCL AST is handled internally by the Rust core and is not directly exposed in the JavaScript bindings.*
 
 ## Best Practices
 
