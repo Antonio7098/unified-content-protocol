@@ -101,7 +101,9 @@ impl PyDocument {
 
     /// Get the parent of a block.
     fn parent(&self, child_id: &PyBlockId) -> Option<PyBlockId> {
-        self.inner.parent(child_id.inner()).map(|id| PyBlockId::from(*id))
+        self.inner
+            .parent(child_id.inner())
+            .map(|id| PyBlockId::from(*id))
     }
 
     /// Get all ancestors of a block (from parent to root).
@@ -131,7 +133,8 @@ impl PyDocument {
 
     /// Check if one block is an ancestor of another.
     fn is_ancestor(&self, potential_ancestor: &PyBlockId, block: &PyBlockId) -> bool {
-        self.inner.is_ancestor(potential_ancestor.inner(), block.inner())
+        self.inner
+            .is_ancestor(potential_ancestor.inner(), block.inner())
     }
 
     /// Add a new block to the document.
@@ -151,7 +154,10 @@ impl PyDocument {
         if let Some(t) = tags {
             block.metadata.tags = t;
         }
-        let id = self.inner.add_block(block, parent_id.inner()).into_py_result()?;
+        let id = self
+            .inner
+            .add_block(block, parent_id.inner())
+            .into_py_result()?;
         Ok(PyBlockId::from(id))
     }
 
@@ -171,9 +177,13 @@ impl PyDocument {
         }
 
         let id = if let Some(idx) = index {
-            self.inner.add_block_at(block, parent_id.inner(), idx).into_py_result()?
+            self.inner
+                .add_block_at(block, parent_id.inner(), idx)
+                .into_py_result()?
         } else {
-            self.inner.add_block(block, parent_id.inner()).into_py_result()?
+            self.inner
+                .add_block(block, parent_id.inner())
+                .into_py_result()?
         };
         Ok(PyBlockId::from(id))
     }
@@ -191,7 +201,10 @@ impl PyDocument {
         if let Some(l) = label {
             block.metadata.label = Some(l.to_string());
         }
-        let id = self.inner.add_block(block, parent_id.inner()).into_py_result()?;
+        let id = self
+            .inner
+            .add_block(block, parent_id.inner())
+            .into_py_result()?;
         Ok(PyBlockId::from(id))
     }
 
@@ -231,9 +244,13 @@ impl PyDocument {
         index: Option<usize>,
     ) -> PyResult<()> {
         if let Some(idx) = index {
-            self.inner.move_block_at(id.inner(), new_parent_id.inner(), idx).into_py_result()
+            self.inner
+                .move_block_at(id.inner(), new_parent_id.inner(), idx)
+                .into_py_result()
         } else {
-            self.inner.move_block(id.inner(), new_parent_id.inner()).into_py_result()
+            self.inner
+                .move_block(id.inner(), new_parent_id.inner())
+                .into_py_result()
         }
     }
 
@@ -292,10 +309,9 @@ impl PyDocument {
         let et: EdgeType = edge_type.into();
         let edge = Edge::new(et, *target_id.inner());
 
-        let block = self
-            .inner
-            .get_block_mut(source_id.inner())
-            .ok_or_else(|| crate::errors::PyBlockNotFoundError::new_err(source_id.to_string_repr()))?;
+        let block = self.inner.get_block_mut(source_id.inner()).ok_or_else(|| {
+            crate::errors::PyBlockNotFoundError::new_err(source_id.to_string_repr())
+        })?;
         block.add_edge(edge.clone());
 
         // Also update edge index
@@ -312,14 +328,15 @@ impl PyDocument {
     ) -> PyResult<bool> {
         let et: EdgeType = edge_type.into();
 
-        let block = self
-            .inner
-            .get_block_mut(source_id.inner())
-            .ok_or_else(|| crate::errors::PyBlockNotFoundError::new_err(source_id.to_string_repr()))?;
+        let block = self.inner.get_block_mut(source_id.inner()).ok_or_else(|| {
+            crate::errors::PyBlockNotFoundError::new_err(source_id.to_string_repr())
+        })?;
         let removed = block.remove_edge(target_id.inner(), &et);
 
         if removed {
-            self.inner.edge_index.remove_edge(source_id.inner(), target_id.inner(), &et);
+            self.inner
+                .edge_index
+                .remove_edge(source_id.inner(), target_id.inner(), &et);
         }
         Ok(removed)
     }
@@ -371,7 +388,11 @@ impl PyDocument {
 
     /// Find orphaned blocks (unreachable from root).
     fn find_orphans(&self) -> Vec<PyBlockId> {
-        self.inner.find_orphans().into_iter().map(PyBlockId::from).collect()
+        self.inner
+            .find_orphans()
+            .into_iter()
+            .map(PyBlockId::from)
+            .collect()
     }
 
     /// Prune unreachable blocks.
@@ -400,7 +421,11 @@ impl PyDocument {
 
     /// Get all block IDs in the document.
     fn block_ids(&self) -> Vec<PyBlockId> {
-        self.inner.blocks.keys().map(|id| PyBlockId::from(*id)).collect()
+        self.inner
+            .blocks
+            .keys()
+            .map(|id| PyBlockId::from(*id))
+            .collect()
     }
 
     /// Iterate over all blocks.

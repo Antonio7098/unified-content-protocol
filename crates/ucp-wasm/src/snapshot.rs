@@ -1,7 +1,7 @@
 //! Snapshot management wrapper for WASM.
 
-use wasm_bindgen::prelude::*;
 use ucm_engine::SnapshotManager;
+use wasm_bindgen::prelude::*;
 
 use crate::Document;
 
@@ -50,12 +50,28 @@ impl WasmSnapshotManager {
         match self.inner.get(name) {
             Some(s) => {
                 let obj = js_sys::Object::new();
-                let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("name"), &JsValue::from_str(&s.id.0));
+                let _ = js_sys::Reflect::set(
+                    &obj,
+                    &JsValue::from_str("name"),
+                    &JsValue::from_str(&s.id.0),
+                );
                 if let Some(desc) = &s.description {
-                    let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("description"), &JsValue::from_str(desc));
+                    let _ = js_sys::Reflect::set(
+                        &obj,
+                        &JsValue::from_str("description"),
+                        &JsValue::from_str(desc),
+                    );
                 }
-                let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("createdAt"), &JsValue::from_str(&s.created_at.to_rfc3339()));
-                let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("version"), &JsValue::from_f64(s.document_version.counter as f64));
+                let _ = js_sys::Reflect::set(
+                    &obj,
+                    &JsValue::from_str("createdAt"),
+                    &JsValue::from_str(&s.created_at.to_rfc3339()),
+                );
+                let _ = js_sys::Reflect::set(
+                    &obj,
+                    &JsValue::from_str("version"),
+                    &JsValue::from_f64(s.document_version.counter as f64),
+                );
                 obj.into()
             }
             None => JsValue::NULL,

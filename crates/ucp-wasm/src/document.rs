@@ -78,45 +78,77 @@ impl Document {
         match self.inner.get_block(&block_id) {
             Some(block) => {
                 let obj = js_sys::Object::new();
-                
+
                 // Set id
-                js_sys::Reflect::set(&obj, &JsValue::from_str("id"), &JsValue::from_str(&block.id.to_string()))?;
-                
+                js_sys::Reflect::set(
+                    &obj,
+                    &JsValue::from_str("id"),
+                    &JsValue::from_str(&block.id.to_string()),
+                )?;
+
                 // Set contentType
-                js_sys::Reflect::set(&obj, &JsValue::from_str("contentType"), &JsValue::from_str(block.content_type()))?;
-                
+                js_sys::Reflect::set(
+                    &obj,
+                    &JsValue::from_str("contentType"),
+                    &JsValue::from_str(block.content_type()),
+                )?;
+
                 // Set text/language/source based on content type
                 match &block.content {
                     ucm_core::Content::Text(t) => {
-                        js_sys::Reflect::set(&obj, &JsValue::from_str("text"), &JsValue::from_str(&t.text))?;
+                        js_sys::Reflect::set(
+                            &obj,
+                            &JsValue::from_str("text"),
+                            &JsValue::from_str(&t.text),
+                        )?;
                     }
                     ucm_core::Content::Code(c) => {
-                        js_sys::Reflect::set(&obj, &JsValue::from_str("language"), &JsValue::from_str(&c.language))?;
-                        js_sys::Reflect::set(&obj, &JsValue::from_str("source"), &JsValue::from_str(&c.source))?;
+                        js_sys::Reflect::set(
+                            &obj,
+                            &JsValue::from_str("language"),
+                            &JsValue::from_str(&c.language),
+                        )?;
+                        js_sys::Reflect::set(
+                            &obj,
+                            &JsValue::from_str("source"),
+                            &JsValue::from_str(&c.source),
+                        )?;
                     }
                     _ => {}
                 }
-                
+
                 // Set role
                 if let Some(role) = &block.metadata.semantic_role {
-                    js_sys::Reflect::set(&obj, &JsValue::from_str("role"), &JsValue::from_str(role.category.as_str()))?;
+                    js_sys::Reflect::set(
+                        &obj,
+                        &JsValue::from_str("role"),
+                        &JsValue::from_str(role.category.as_str()),
+                    )?;
                 }
-                
+
                 // Set label
                 if let Some(label) = &block.metadata.label {
-                    js_sys::Reflect::set(&obj, &JsValue::from_str("label"), &JsValue::from_str(label))?;
+                    js_sys::Reflect::set(
+                        &obj,
+                        &JsValue::from_str("label"),
+                        &JsValue::from_str(label),
+                    )?;
                 }
-                
+
                 // Set tags
                 let tags_arr = js_sys::Array::new();
                 for tag in &block.metadata.tags {
                     tags_arr.push(&JsValue::from_str(tag));
                 }
                 js_sys::Reflect::set(&obj, &JsValue::from_str("tags"), &tags_arr)?;
-                
+
                 // Set version
-                js_sys::Reflect::set(&obj, &JsValue::from_str("version"), &JsValue::from_f64(block.version.counter as f64))?;
-                
+                js_sys::Reflect::set(
+                    &obj,
+                    &JsValue::from_str("version"),
+                    &JsValue::from_f64(block.version.counter as f64),
+                )?;
+
                 Ok(obj.into())
             }
             None => Ok(JsValue::UNDEFINED),
@@ -174,10 +206,7 @@ impl Document {
             .parse()
             .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", parent_id)))?;
 
-        let mut block = ucm_core::Block::new(
-            ucm_core::Content::text(content),
-            role.as_deref(),
-        );
+        let mut block = ucm_core::Block::new(ucm_core::Content::text(content), role.as_deref());
         if let Some(l) = label {
             block.metadata.label = Some(l);
         }
@@ -232,7 +261,12 @@ impl Document {
 
     /// Edit a block's content.
     #[wasm_bindgen(js_name = editBlock)]
-    pub fn edit_block(&mut self, id: &str, content: &str, role: Option<String>) -> Result<(), JsValue> {
+    pub fn edit_block(
+        &mut self,
+        id: &str,
+        content: &str,
+        role: Option<String>,
+    ) -> Result<(), JsValue> {
         let block_id: ucm_core::BlockId = id
             .parse()
             .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", id)))?;
@@ -248,7 +282,12 @@ impl Document {
 
     /// Move a block to a new parent.
     #[wasm_bindgen(js_name = moveBlock)]
-    pub fn move_block(&mut self, id: &str, new_parent_id: &str, index: Option<usize>) -> Result<(), JsValue> {
+    pub fn move_block(
+        &mut self,
+        id: &str,
+        new_parent_id: &str,
+        index: Option<usize>,
+    ) -> Result<(), JsValue> {
         let block_id: ucm_core::BlockId = id
             .parse()
             .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", id)))?;
@@ -257,15 +296,23 @@ impl Document {
             .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", new_parent_id)))?;
 
         if let Some(idx) = index {
-            self.inner.move_block_at(&block_id, &new_parent, idx).into_wasm_result()
+            self.inner
+                .move_block_at(&block_id, &new_parent, idx)
+                .into_wasm_result()
         } else {
-            self.inner.move_block(&block_id, &new_parent).into_wasm_result()
+            self.inner
+                .move_block(&block_id, &new_parent)
+                .into_wasm_result()
         }
     }
 
     /// Delete a block.
     #[wasm_bindgen(js_name = deleteBlock)]
-    pub fn delete_block(&mut self, id: &str, cascade: Option<bool>) -> Result<js_sys::Array, JsValue> {
+    pub fn delete_block(
+        &mut self,
+        id: &str,
+        cascade: Option<bool>,
+    ) -> Result<js_sys::Array, JsValue> {
         let block_id: ucm_core::BlockId = id
             .parse()
             .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", id)))?;
@@ -298,7 +345,12 @@ impl Document {
         if !block.metadata.tags.contains(&tag.to_string()) {
             block.metadata.tags.push(tag.to_string());
             // Update the tag index
-            self.inner.indices.by_tag.entry(tag.to_string()).or_default().insert(block_id);
+            self.inner
+                .indices
+                .by_tag
+                .entry(tag.to_string())
+                .or_default()
+                .insert(block_id);
         }
         Ok(())
     }
@@ -357,35 +409,63 @@ impl Document {
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<JsValue, JsValue> {
         let obj = js_sys::Object::new();
-        
+
         // Set id
-        js_sys::Reflect::set(&obj, &JsValue::from_str("id"), &JsValue::from_str(&self.inner.id.0))?;
-        
+        js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("id"),
+            &JsValue::from_str(&self.inner.id.0),
+        )?;
+
         // Set root
-        js_sys::Reflect::set(&obj, &JsValue::from_str("root"), &JsValue::from_str(&self.inner.root.to_string()))?;
-        
+        js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("root"),
+            &JsValue::from_str(&self.inner.root.to_string()),
+        )?;
+
         // Set blocks as object
         let blocks_obj = js_sys::Object::new();
         for (id, block) in &self.inner.blocks {
             let block_obj = js_sys::Object::new();
-            js_sys::Reflect::set(&block_obj, &JsValue::from_str("id"), &JsValue::from_str(&id.to_string()))?;
-            js_sys::Reflect::set(&block_obj, &JsValue::from_str("contentType"), &JsValue::from_str(block.content_type()))?;
-            
+            js_sys::Reflect::set(
+                &block_obj,
+                &JsValue::from_str("id"),
+                &JsValue::from_str(&id.to_string()),
+            )?;
+            js_sys::Reflect::set(
+                &block_obj,
+                &JsValue::from_str("contentType"),
+                &JsValue::from_str(block.content_type()),
+            )?;
+
             match &block.content {
                 ucm_core::Content::Text(t) => {
-                    js_sys::Reflect::set(&block_obj, &JsValue::from_str("text"), &JsValue::from_str(&t.text))?;
+                    js_sys::Reflect::set(
+                        &block_obj,
+                        &JsValue::from_str("text"),
+                        &JsValue::from_str(&t.text),
+                    )?;
                 }
                 ucm_core::Content::Code(c) => {
-                    js_sys::Reflect::set(&block_obj, &JsValue::from_str("language"), &JsValue::from_str(&c.language))?;
-                    js_sys::Reflect::set(&block_obj, &JsValue::from_str("source"), &JsValue::from_str(&c.source))?;
+                    js_sys::Reflect::set(
+                        &block_obj,
+                        &JsValue::from_str("language"),
+                        &JsValue::from_str(&c.language),
+                    )?;
+                    js_sys::Reflect::set(
+                        &block_obj,
+                        &JsValue::from_str("source"),
+                        &JsValue::from_str(&c.source),
+                    )?;
                 }
                 _ => {}
             }
-            
+
             js_sys::Reflect::set(&blocks_obj, &JsValue::from_str(&id.to_string()), &block_obj)?;
         }
         js_sys::Reflect::set(&obj, &JsValue::from_str("blocks"), &blocks_obj)?;
-        
+
         // Set structure as object
         let structure_obj = js_sys::Object::new();
         for (parent_id, children) in &self.inner.structure {
@@ -393,22 +473,42 @@ impl Document {
             for child_id in children {
                 children_arr.push(&JsValue::from_str(&child_id.to_string()));
             }
-            js_sys::Reflect::set(&structure_obj, &JsValue::from_str(&parent_id.to_string()), &children_arr)?;
+            js_sys::Reflect::set(
+                &structure_obj,
+                &JsValue::from_str(&parent_id.to_string()),
+                &children_arr,
+            )?;
         }
         js_sys::Reflect::set(&obj, &JsValue::from_str("structure"), &structure_obj)?;
-        
+
         // Set metadata
         let metadata_obj = js_sys::Object::new();
         if let Some(title) = &self.inner.metadata.title {
-            js_sys::Reflect::set(&metadata_obj, &JsValue::from_str("title"), &JsValue::from_str(title))?;
+            js_sys::Reflect::set(
+                &metadata_obj,
+                &JsValue::from_str("title"),
+                &JsValue::from_str(title),
+            )?;
         }
         if let Some(desc) = &self.inner.metadata.description {
-            js_sys::Reflect::set(&metadata_obj, &JsValue::from_str("description"), &JsValue::from_str(desc))?;
+            js_sys::Reflect::set(
+                &metadata_obj,
+                &JsValue::from_str("description"),
+                &JsValue::from_str(desc),
+            )?;
         }
-        js_sys::Reflect::set(&metadata_obj, &JsValue::from_str("createdAt"), &JsValue::from_str(&self.inner.metadata.created_at.to_rfc3339()))?;
-        js_sys::Reflect::set(&metadata_obj, &JsValue::from_str("modifiedAt"), &JsValue::from_str(&self.inner.metadata.modified_at.to_rfc3339()))?;
+        js_sys::Reflect::set(
+            &metadata_obj,
+            &JsValue::from_str("createdAt"),
+            &JsValue::from_str(&self.inner.metadata.created_at.to_rfc3339()),
+        )?;
+        js_sys::Reflect::set(
+            &metadata_obj,
+            &JsValue::from_str("modifiedAt"),
+            &JsValue::from_str(&self.inner.metadata.modified_at.to_rfc3339()),
+        )?;
         js_sys::Reflect::set(&obj, &JsValue::from_str("metadata"), &metadata_obj)?;
-        
+
         Ok(obj.into())
     }
 
@@ -493,15 +593,15 @@ impl Document {
             .parse()
             .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", parent_id)))?;
 
-        let mut block = ucm_core::Block::new(
-            ucm_core::Content::text(content),
-            role.as_deref(),
-        );
+        let mut block = ucm_core::Block::new(ucm_core::Content::text(content), role.as_deref());
         if let Some(l) = label {
             block.metadata.label = Some(l);
         }
 
-        let id = self.inner.add_block_at(block, &parent, index).into_wasm_result()?;
+        let id = self
+            .inner
+            .add_block_at(block, &parent, index)
+            .into_wasm_result()?;
         Ok(id.to_string())
     }
 
@@ -541,7 +641,7 @@ impl Document {
         let len_before = block.metadata.tags.len();
         block.metadata.tags.retain(|t| t != tag);
         let removed = block.metadata.tags.len() < len_before;
-        
+
         if removed {
             // Update the tag index
             if let Some(set) = self.inner.indices.by_tag.get_mut(tag) {

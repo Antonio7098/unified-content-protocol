@@ -131,7 +131,9 @@ impl PyIdMapper {
 
     /// Get BlockId for a short ID.
     fn to_block_id(&self, short_id: u32) -> Option<PyBlockId> {
-        self.inner.to_block_id(short_id).map(|id| PyBlockId::from(*id))
+        self.inner
+            .to_block_id(short_id)
+            .map(|id| PyBlockId::from(*id))
     }
 
     /// Convert a string containing block IDs to use short IDs.
@@ -216,7 +218,10 @@ impl PyPromptBuilder {
     /// Add multiple capabilities.
     fn with_capabilities(&self, caps: Vec<PyUclCapability>) -> Self {
         Self {
-            inner: self.inner.clone().with_capabilities(caps.into_iter().map(|c| c.into())),
+            inner: self
+                .inner
+                .clone()
+                .with_capabilities(caps.into_iter().map(|c| c.into())),
         }
     }
 
@@ -272,7 +277,10 @@ impl PyPromptBuilder {
 
     /// Get a list of enabled capabilities.
     fn capabilities(&self) -> Vec<PyUclCapability> {
-        self.inner.capabilities().map(PyUclCapability::from).collect()
+        self.inner
+            .capabilities()
+            .map(PyUclCapability::from)
+            .collect()
     }
 
     fn __repr__(&self) -> String {

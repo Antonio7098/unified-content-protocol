@@ -1,7 +1,7 @@
 //! LLM utilities wrapper for WASM.
 
-use wasm_bindgen::prelude::*;
 use ucp_llm::{IdMapper, PromptBuilder, UclCapability};
+use wasm_bindgen::prelude::*;
 
 use crate::Document;
 
@@ -126,9 +126,21 @@ impl WasmIdMapper {
     pub fn estimate_token_savings(&self, text: &str) -> JsValue {
         let (original, shortened, savings) = self.inner.estimate_token_savings(text);
         let obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("originalTokens"), &JsValue::from_f64(original as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("shortenedTokens"), &JsValue::from_f64(shortened as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("savings"), &JsValue::from_f64(savings as f64));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("originalTokens"),
+            &JsValue::from_f64(original as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("shortenedTokens"),
+            &JsValue::from_f64(shortened as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("savings"),
+            &JsValue::from_f64(savings as f64),
+        );
         obj.into()
     }
 

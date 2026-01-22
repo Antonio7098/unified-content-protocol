@@ -23,18 +23,18 @@ use block::PyBlock;
 use content::PyContent;
 use document::PyDocument;
 use edge::{PyEdge, PyEdgeType};
+use engine::{
+    PyEngine, PyEngineConfig, PyResourceLimits, PyTransactionId, PyTraversalConfig,
+    PyTraversalDirection, PyTraversalEngine, PyTraversalFilter, PyTraversalNode, PyTraversalResult,
+    PyValidationIssue, PyValidationPipeline, PyValidationResult,
+};
 use errors::{
     PyBlockNotFoundError, PyCycleDetectedError, PyInvalidBlockIdError, PyParseError, PyUcpError,
     PyValidationError,
 };
-use engine::{
-    PyEngine, PyEngineConfig, PyResourceLimits, PyTraversalConfig, PyTraversalDirection,
-    PyTraversalEngine, PyTraversalFilter, PyTraversalNode, PyTraversalResult, PyTransactionId,
-    PyValidationIssue, PyValidationPipeline, PyValidationResult,
-};
 use llm::{PyIdMapper, PyPromptBuilder, PyPromptPresets, PyUclCapability};
 use observe::{PyAuditEntry, PyEventBus, PyMetricsRecorder, PyUcpEvent};
-use section::{PyClearResult, PyDeletedContent, PyWriteSectionResult, write_section};
+use section::{write_section, PyClearResult, PyDeletedContent, PyWriteSectionResult};
 use snapshot::{PySnapshotInfo, PySnapshotManager};
 use types::PyBlockId;
 
@@ -42,8 +42,8 @@ use types::PyBlockId;
 #[pyfunction]
 #[pyo3(name = "parse")]
 fn parse_markdown(markdown: &str) -> PyResult<PyDocument> {
-    let doc =
-        ucp_translator_markdown::parse_markdown(markdown).map_err(|e| PyUcpError::new_err(e.to_string()))?;
+    let doc = ucp_translator_markdown::parse_markdown(markdown)
+        .map_err(|e| PyUcpError::new_err(e.to_string()))?;
     Ok(PyDocument::new(doc))
 }
 
@@ -51,27 +51,36 @@ fn parse_markdown(markdown: &str) -> PyResult<PyDocument> {
 #[pyfunction]
 #[pyo3(name = "render")]
 fn render_markdown(doc: &PyDocument) -> PyResult<String> {
-    ucp_translator_markdown::render_markdown(doc.inner()).map_err(|e| PyUcpError::new_err(e.to_string()))
+    ucp_translator_markdown::render_markdown(doc.inner())
+        .map_err(|e| PyUcpError::new_err(e.to_string()))
 }
 
 /// Parse HTML into a Document.
 #[pyfunction]
 fn parse_html(html: &str) -> PyResult<PyDocument> {
-    let doc = ucp_translator_html::parse_html(html).map_err(|e| PyUcpError::new_err(e.to_string()))?;
+    let doc =
+        ucp_translator_html::parse_html(html).map_err(|e| PyUcpError::new_err(e.to_string()))?;
     Ok(PyDocument::new(doc))
 }
 
 /// Clear a section's content with undo support.
 #[pyfunction]
-fn clear_section_with_undo(doc: &mut PyDocument, section_id: &PyBlockId) -> PyResult<PyClearResult> {
-    let result = ucm_engine::section::clear_section_content_with_undo(doc.inner_mut(), section_id.inner())
-        .map_err(|e| PyUcpError::new_err(e.to_string()))?;
+fn clear_section_with_undo(
+    doc: &mut PyDocument,
+    section_id: &PyBlockId,
+) -> PyResult<PyClearResult> {
+    let result =
+        ucm_engine::section::clear_section_content_with_undo(doc.inner_mut(), section_id.inner())
+            .map_err(|e| PyUcpError::new_err(e.to_string()))?;
     Ok(PyClearResult::from(result))
 }
 
 /// Restore previously deleted section content.
 #[pyfunction]
-fn restore_deleted_section(doc: &mut PyDocument, deleted: &PyDeletedContent) -> PyResult<Vec<PyBlockId>> {
+fn restore_deleted_section(
+    doc: &mut PyDocument,
+    deleted: &PyDeletedContent,
+) -> PyResult<Vec<PyBlockId>> {
     let restored = ucm_engine::section::restore_deleted_content(doc.inner_mut(), deleted.inner())
         .map_err(|e| PyUcpError::new_err(e.to_string()))?;
     Ok(restored.into_iter().map(PyBlockId::from).collect())
@@ -140,7 +149,10 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "CycleDetectedError",
         m.py().get_type_bound::<PyCycleDetectedError>(),
     )?;
-    m.add("ValidationError", m.py().get_type_bound::<PyValidationError>())?;
+    m.add(
+        "ValidationError",
+        m.py().get_type_bound::<PyValidationError>(),
+    )?;
     m.add("ParseError", m.py().get_type_bound::<PyParseError>())?;
 
     // Register classes

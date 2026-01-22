@@ -194,7 +194,7 @@ impl TraversalEngine {
         result.metadata.start_id = Some(start);
         result.metadata.direction = Some(direction);
         result.metadata.max_depth = Some(max_depth);
-        
+
         #[cfg(not(target_arch = "wasm32"))]
         {
             result.metadata.execution_time_ms = Some(start_time.elapsed().as_millis() as u64);

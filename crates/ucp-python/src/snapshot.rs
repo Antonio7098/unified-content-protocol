@@ -1,7 +1,7 @@
 //! Snapshot management wrapper for Python.
 
 use pyo3::prelude::*;
-use ucm_engine::{SnapshotManager, Snapshot};
+use ucm_engine::{Snapshot, SnapshotManager};
 
 use crate::document::PyDocument;
 
@@ -109,7 +109,11 @@ impl PySnapshotManager {
 
     /// List all snapshots (most recent first).
     fn list(&self) -> Vec<PySnapshotInfo> {
-        self.inner.list().iter().map(|s| PySnapshotInfo::from(*s)).collect()
+        self.inner
+            .list()
+            .iter()
+            .map(|s| PySnapshotInfo::from(*s))
+            .collect()
     }
 
     /// Delete a snapshot.

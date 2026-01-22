@@ -175,10 +175,6 @@ impl PyEdge {
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "Edge({} -> {})",
-            self.0.edge_type.as_str(),
-            self.0.target
-        )
+        format!("Edge({} -> {})", self.0.edge_type.as_str(), self.0.target)
     }
 }

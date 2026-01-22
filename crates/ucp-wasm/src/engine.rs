@@ -2,13 +2,13 @@
 //!
 //! Exposes the UCM Engine with transaction support, validation, and traversal.
 
-use wasm_bindgen::prelude::*;
 use ucm_engine::engine::{Engine, EngineConfig};
-use ucm_engine::validate::{ResourceLimits, ValidationPipeline, ValidationResult};
 use ucm_engine::traversal::{
     NavigateDirection, TraversalConfig, TraversalEngine, TraversalFilter, TraversalOutput,
     TraversalResult,
 };
+use ucm_engine::validate::{ResourceLimits, ValidationPipeline, ValidationResult};
+use wasm_bindgen::prelude::*;
 
 use crate::Document;
 
@@ -209,11 +209,31 @@ impl WasmResourceLimits {
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> JsValue {
         let obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("maxDocumentSize"), &JsValue::from_f64(self.inner.max_document_size as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("maxBlockCount"), &JsValue::from_f64(self.inner.max_block_count as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("maxBlockSize"), &JsValue::from_f64(self.inner.max_block_size as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("maxNestingDepth"), &JsValue::from_f64(self.inner.max_nesting_depth as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("maxEdgesPerBlock"), &JsValue::from_f64(self.inner.max_edges_per_block as f64));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("maxDocumentSize"),
+            &JsValue::from_f64(self.inner.max_document_size as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("maxBlockCount"),
+            &JsValue::from_f64(self.inner.max_block_count as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("maxBlockSize"),
+            &JsValue::from_f64(self.inner.max_block_size as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("maxNestingDepth"),
+            &JsValue::from_f64(self.inner.max_nesting_depth as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("maxEdgesPerBlock"),
+            &JsValue::from_f64(self.inner.max_edges_per_block as f64),
+        );
         obj.into()
     }
 }
@@ -263,14 +283,21 @@ impl WasmValidationResult {
     /// Get warning count.
     #[wasm_bindgen(getter, js_name = warningCount)]
     pub fn warning_count(&self) -> usize {
-        self.issues.iter().filter(|i| i.severity == "warning").count()
+        self.issues
+            .iter()
+            .filter(|i| i.severity == "warning")
+            .count()
     }
 
     /// Convert to JSON object.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> JsValue {
         let obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("valid"), &JsValue::from_bool(self.valid));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("valid"),
+            &JsValue::from_bool(self.valid),
+        );
         let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("issues"), &self.issues());
         obj.into()
     }
@@ -316,9 +343,21 @@ impl WasmValidationIssue {
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> JsValue {
         let obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("severity"), &JsValue::from_str(&self.severity));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("code"), &JsValue::from_str(&self.code));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("message"), &JsValue::from_str(&self.message));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("severity"),
+            &JsValue::from_str(&self.severity),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("code"),
+            &JsValue::from_str(&self.code),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("message"),
+            &JsValue::from_str(&self.message),
+        );
         obj.into()
     }
 }
@@ -556,32 +595,72 @@ fn traversal_result_to_js(result: &TraversalResult) -> JsValue {
     let nodes_arr = js_sys::Array::new();
     for node in &result.nodes {
         let node_obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&node_obj, &JsValue::from_str("id"), &JsValue::from_str(&node.id.to_string()));
-        let _ = js_sys::Reflect::set(&node_obj, &JsValue::from_str("depth"), &JsValue::from_f64(node.depth as f64));
+        let _ = js_sys::Reflect::set(
+            &node_obj,
+            &JsValue::from_str("id"),
+            &JsValue::from_str(&node.id.to_string()),
+        );
+        let _ = js_sys::Reflect::set(
+            &node_obj,
+            &JsValue::from_str("depth"),
+            &JsValue::from_f64(node.depth as f64),
+        );
         if let Some(parent) = &node.parent_id {
-            let _ = js_sys::Reflect::set(&node_obj, &JsValue::from_str("parentId"), &JsValue::from_str(&parent.to_string()));
+            let _ = js_sys::Reflect::set(
+                &node_obj,
+                &JsValue::from_str("parentId"),
+                &JsValue::from_str(&parent.to_string()),
+            );
         }
         if let Some(preview) = &node.content_preview {
-            let _ = js_sys::Reflect::set(&node_obj, &JsValue::from_str("contentPreview"), &JsValue::from_str(preview));
+            let _ = js_sys::Reflect::set(
+                &node_obj,
+                &JsValue::from_str("contentPreview"),
+                &JsValue::from_str(preview),
+            );
         }
         if let Some(role) = &node.semantic_role {
-            let _ = js_sys::Reflect::set(&node_obj, &JsValue::from_str("semanticRole"), &JsValue::from_str(role));
+            let _ = js_sys::Reflect::set(
+                &node_obj,
+                &JsValue::from_str("semanticRole"),
+                &JsValue::from_str(role),
+            );
         }
-        let _ = js_sys::Reflect::set(&node_obj, &JsValue::from_str("childCount"), &JsValue::from_f64(node.child_count as f64));
-        let _ = js_sys::Reflect::set(&node_obj, &JsValue::from_str("edgeCount"), &JsValue::from_f64(node.edge_count as f64));
+        let _ = js_sys::Reflect::set(
+            &node_obj,
+            &JsValue::from_str("childCount"),
+            &JsValue::from_f64(node.child_count as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &node_obj,
+            &JsValue::from_str("edgeCount"),
+            &JsValue::from_f64(node.edge_count as f64),
+        );
         nodes_arr.push(&node_obj);
     }
     let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("nodes"), &nodes_arr);
 
     // Summary
     let summary_obj = js_sys::Object::new();
-    let _ = js_sys::Reflect::set(&summary_obj, &JsValue::from_str("totalNodes"), &JsValue::from_f64(result.summary.total_nodes as f64));
-    let _ = js_sys::Reflect::set(&summary_obj, &JsValue::from_str("maxDepth"), &JsValue::from_f64(result.summary.max_depth as f64));
+    let _ = js_sys::Reflect::set(
+        &summary_obj,
+        &JsValue::from_str("totalNodes"),
+        &JsValue::from_f64(result.summary.total_nodes as f64),
+    );
+    let _ = js_sys::Reflect::set(
+        &summary_obj,
+        &JsValue::from_str("maxDepth"),
+        &JsValue::from_f64(result.summary.max_depth as f64),
+    );
     let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("summary"), &summary_obj);
 
     // Metadata
     if let Some(time) = result.metadata.execution_time_ms {
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("executionTimeMs"), &JsValue::from_f64(time as f64));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("executionTimeMs"),
+            &JsValue::from_f64(time as f64),
+        );
     }
 
     obj.into()

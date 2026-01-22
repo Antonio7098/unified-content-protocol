@@ -4,11 +4,11 @@
 
 use pyo3::prelude::*;
 use ucm_engine::engine::{Engine, EngineConfig};
-use ucm_engine::validate::{ResourceLimits, ValidationPipeline, ValidationResult};
 use ucm_engine::traversal::{
     NavigateDirection, TraversalConfig, TraversalEngine, TraversalFilter, TraversalOutput,
     TraversalResult,
 };
+use ucm_engine::validate::{ResourceLimits, ValidationPipeline, ValidationResult};
 
 use crate::document::PyDocument;
 use crate::types::PyBlockId;
@@ -662,7 +662,11 @@ impl PyTraversalEngine {
     fn expand(&self, doc: &PyDocument, node_id: &PyBlockId) -> PyResult<PyTraversalResult> {
         let result = self
             .inner
-            .expand(doc.inner(), node_id.inner(), TraversalOutput::StructureWithPreviews)
+            .expand(
+                doc.inner(),
+                node_id.inner(),
+                TraversalOutput::StructureWithPreviews,
+            )
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
 
         Ok(PyTraversalResult::from(result))

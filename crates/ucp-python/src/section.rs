@@ -2,7 +2,10 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use ucm_engine::section::{clear_section_content_with_undo, integrate_section_blocks, restore_deleted_content, ClearResult, DeletedContent};
+use ucm_engine::section::{
+    clear_section_content_with_undo, integrate_section_blocks, restore_deleted_content,
+    ClearResult, DeletedContent,
+};
 
 use crate::document::PyDocument;
 use crate::types::PyBlockId;
@@ -27,7 +30,8 @@ pub fn write_section(
             e
         ))
     })?;
-    let removed_ids_py: Vec<PyBlockId> = removed_ids.iter().map(|id| PyBlockId::from(*id)).collect();
+    let removed_ids_py: Vec<PyBlockId> =
+        removed_ids.iter().map(|id| PyBlockId::from(*id)).collect();
 
     // Parse new markdown into a temporary document
     let temp_doc = ucp_translator_markdown::parse_markdown(markdown)
@@ -94,7 +98,11 @@ pub struct PyClearResult {
 impl From<ClearResult> for PyClearResult {
     fn from(result: ClearResult) -> Self {
         Self {
-            removed_ids: result.removed_ids.into_iter().map(PyBlockId::from).collect(),
+            removed_ids: result
+                .removed_ids
+                .into_iter()
+                .map(PyBlockId::from)
+                .collect(),
             deleted_content: PyDeletedContent::from(result.deleted_content),
         }
     }
@@ -159,7 +167,11 @@ impl PyDeletedContent {
 
     /// Get all block IDs in the deleted content.
     fn block_ids(&self) -> Vec<PyBlockId> {
-        self.inner.block_ids().into_iter().map(PyBlockId::from).collect()
+        self.inner
+            .block_ids()
+            .into_iter()
+            .map(PyBlockId::from)
+            .collect()
     }
 
     /// Get the parent block ID where this content was attached.
@@ -180,10 +192,15 @@ impl PyDeletedContent {
         dict.set_item("parent_id", self.inner.parent_id.to_string())?;
         dict.set_item("block_count", self.inner.block_count())?;
         dict.set_item("deleted_at", self.inner.deleted_at.to_rfc3339())?;
-        
-        let block_ids: Vec<String> = self.inner.block_ids().iter().map(|id| id.to_string()).collect();
+
+        let block_ids: Vec<String> = self
+            .inner
+            .block_ids()
+            .iter()
+            .map(|id| id.to_string())
+            .collect();
         dict.set_item("block_ids", block_ids)?;
-        
+
         Ok(dict.into())
     }
 

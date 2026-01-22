@@ -140,7 +140,7 @@ impl Transaction {
     pub fn is_timed_out(&self) -> bool {
         #[cfg(not(target_arch = "wasm32"))]
         return self.started_at.elapsed() > self.timeout;
-        
+
         #[cfg(target_arch = "wasm32")]
         false
     }

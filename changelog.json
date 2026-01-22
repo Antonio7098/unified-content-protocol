@@ -49,6 +49,20 @@
           "issues": []
         },
         {
+          "type": "changed",
+          "area": "sdk.core",
+          "description": "Replaced the legacy Python and JavaScript SDK re-implementations with direct PyO3/wasm-bindgen bindings to the Rust engine, ensuring parity with core features and reducing drift.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/src",
+            "crates/ucp-wasm/tests/ucp.test.js",
+            "docs/ucm-engine"
+          ],
+          "issues": []
+        },
+        {
           "type": "fixed",
           "area": "wasm.compat",
           "description": "Fixed WASM panic related to std::time::Instant by adding conditional compilation for wasm32 target.",

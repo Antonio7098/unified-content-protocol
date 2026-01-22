@@ -88,7 +88,11 @@ impl PyUcpEvent {
     }
 
     fn __repr__(&self) -> String {
-        format!("UcpEvent(type={}, doc={})", self.event_type, self.document_id.as_deref().unwrap_or("None"))
+        format!(
+            "UcpEvent(type={}, doc={})",
+            self.event_type,
+            self.document_id.as_deref().unwrap_or("None")
+        )
     }
 }
 

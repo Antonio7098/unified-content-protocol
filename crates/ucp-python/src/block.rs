@@ -57,7 +57,11 @@ impl PyBlock {
     /// Get the semantic role if set.
     #[getter]
     fn role(&self) -> Option<String> {
-        self.0.metadata.semantic_role.as_ref().map(|r| r.to_string())
+        self.0
+            .metadata
+            .semantic_role
+            .as_ref()
+            .map(|r| r.to_string())
     }
 
     /// Get the label if set.
@@ -97,7 +101,11 @@ impl PyBlock {
     /// Get edges of a specific type.
     fn edges_of_type(&self, edge_type: PyEdgeType) -> Vec<PyEdge> {
         let et: ucm_core::EdgeType = edge_type.into();
-        self.0.edges_of_type(&et).into_iter().map(PyEdge::from).collect()
+        self.0
+            .edges_of_type(&et)
+            .into_iter()
+            .map(PyEdge::from)
+            .collect()
     }
 
     /// Get the estimated token count.

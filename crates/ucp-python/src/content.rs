@@ -2,7 +2,9 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
-use ucm_core::content::{BinaryEncoding, CompositeLayout, Media, MediaSource, MediaType, Math, MathFormat};
+use ucm_core::content::{
+    BinaryEncoding, CompositeLayout, Math, MathFormat, Media, MediaSource, MediaType,
+};
 use ucm_core::{BlockId, Content};
 
 // Helper for creating a new dict (PyO3 0.22 API)
@@ -55,10 +57,8 @@ impl PyContent {
             .import_bound("json")?
             .call_method1("dumps", (value,))?
             .extract()?;
-        let json_value: serde_json::Value =
-            serde_json::from_str(&json_str).map_err(|e| {
-                pyo3::exceptions::PyValueError::new_err(format!("Invalid JSON: {}", e))
-            })?;
+        let json_value: serde_json::Value = serde_json::from_str(&json_str)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid JSON: {}", e)))?;
         Ok(PyContent(Content::json(json_value)))
     }
 
@@ -76,9 +76,12 @@ impl PyContent {
             "latex" => MathFormat::LaTeX,
             "mathml" => MathFormat::MathML,
             "asciimath" => MathFormat::AsciiMath,
-            _ => return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Unknown math format: {}. Use 'latex', 'mathml', or 'asciimath'", format)
-            )),
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Unknown math format: {}. Use 'latex', 'mathml', or 'asciimath'",
+                    format
+                )))
+            }
         };
         Ok(PyContent(Content::Math(Math {
             format: math_format,
@@ -102,9 +105,12 @@ impl PyContent {
             "audio" => MediaType::Audio,
             "video" => MediaType::Video,
             "document" => MediaType::Document,
-            _ => return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Unknown media type: {}. Use 'image', 'audio', 'video', or 'document'", media_type)
-            )),
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Unknown media type: {}. Use 'image', 'audio', 'video', or 'document'",
+                    media_type
+                )))
+            }
         };
         let mut media = Media::image(MediaSource::url(url));
         media.media_type = mt;
@@ -125,9 +131,12 @@ impl PyContent {
             "raw" => BinaryEncoding::Raw,
             "base64" => BinaryEncoding::Base64,
             "hex" => BinaryEncoding::Hex,
-            _ => return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Unknown encoding: {}. Use 'raw', 'base64', or 'hex'", encoding)
-            )),
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Unknown encoding: {}. Use 'raw', 'base64', or 'hex'",
+                    encoding
+                )))
+            }
         };
         Ok(PyContent(Content::Binary {
             mime_type: mime_type.to_string(),
@@ -146,7 +155,8 @@ impl PyContent {
             "tabs" => CompositeLayout::Tabs,
             s if s.starts_with("grid") => {
                 // Parse "grid:N" or "grid(N)" format
-                let cols = s.trim_start_matches("grid")
+                let cols = s
+                    .trim_start_matches("grid")
                     .trim_start_matches(':')
                     .trim_start_matches('(')
                     .trim_end_matches(')')
@@ -154,9 +164,12 @@ impl PyContent {
                     .unwrap_or(2);
                 CompositeLayout::Grid(cols)
             }
-            _ => return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Unknown layout: {}. Use 'vertical', 'horizontal', 'tabs', or 'grid:N'", layout)
-            )),
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Unknown layout: {}. Use 'vertical', 'horizontal', 'tabs', or 'grid:N'",
+                    layout
+                )))
+            }
         };
         let child_ids: Vec<BlockId> = children
             .unwrap_or_default()
@@ -208,7 +221,10 @@ impl PyContent {
         match &self.0 {
             Content::Json { value, .. } => {
                 let json_str = serde_json::to_string(value).map_err(|e| {
-                    pyo3::exceptions::PyValueError::new_err(format!("JSON serialization error: {}", e))
+                    pyo3::exceptions::PyValueError::new_err(format!(
+                        "JSON serialization error: {}",
+                        e
+                    ))
                 })?;
                 let json_module = py.import_bound("json")?;
                 let obj = json_module.call_method1("loads", (json_str,))?;
@@ -258,9 +274,9 @@ impl PyContent {
     /// Get the binary data if this is a binary block.
     fn as_binary<'py>(&self, py: Python<'py>) -> Option<(String, Bound<'py, PyBytes>)> {
         match &self.0 {
-            Content::Binary { mime_type, data, .. } => {
-                Some((mime_type.clone(), PyBytes::new_bound(py, data)))
-            }
+            Content::Binary {
+                mime_type, data, ..
+            } => Some((mime_type.clone(), PyBytes::new_bound(py, data))),
             _ => None,
         }
     }
@@ -270,17 +286,24 @@ impl PyContent {
         match &self.0 {
             Content::Table(t) => {
                 let columns: Vec<String> = t.columns.iter().map(|c| c.name.clone()).collect();
-                let rows: Vec<Vec<String>> = t.rows.iter().map(|r| {
-                    r.cells.iter().map(|c| match c {
-                        ucm_core::content::Cell::Null => "null".to_string(),
-                        ucm_core::content::Cell::Text(s) => s.clone(),
-                        ucm_core::content::Cell::Number(n) => n.to_string(),
-                        ucm_core::content::Cell::Boolean(b) => b.to_string(),
-                        ucm_core::content::Cell::Date(d) => d.clone(),
-                        ucm_core::content::Cell::DateTime(dt) => dt.clone(),
-                        ucm_core::content::Cell::Json(v) => v.to_string(),
-                    }).collect()
-                }).collect();
+                let rows: Vec<Vec<String>> = t
+                    .rows
+                    .iter()
+                    .map(|r| {
+                        r.cells
+                            .iter()
+                            .map(|c| match c {
+                                ucm_core::content::Cell::Null => "null".to_string(),
+                                ucm_core::content::Cell::Text(s) => s.clone(),
+                                ucm_core::content::Cell::Number(n) => n.to_string(),
+                                ucm_core::content::Cell::Boolean(b) => b.to_string(),
+                                ucm_core::content::Cell::Date(d) => d.clone(),
+                                ucm_core::content::Cell::DateTime(dt) => dt.clone(),
+                                ucm_core::content::Cell::Json(v) => v.to_string(),
+                            })
+                            .collect()
+                    })
+                    .collect();
                 Some((columns, rows))
             }
             _ => None,
@@ -322,7 +345,9 @@ impl PyContent {
                 let obj = json_module.call_method1("loads", (json_str,))?;
                 dict.set_item("value", obj)?;
             }
-            Content::Binary { mime_type, data, .. } => {
+            Content::Binary {
+                mime_type, data, ..
+            } => {
                 dict.set_item("mime_type", mime_type)?;
                 dict.set_item("size", data.len())?;
             }

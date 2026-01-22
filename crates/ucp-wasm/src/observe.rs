@@ -1,7 +1,7 @@
 //! Observability bindings for WASM.
 
-use wasm_bindgen::prelude::*;
 use ucp_observe::{AuditEntry, MetricsRecorder, UcpEvent};
+use wasm_bindgen::prelude::*;
 
 /// UCP event wrapper for WASM.
 #[wasm_bindgen]
@@ -26,7 +26,12 @@ impl WasmUcpEvent {
 
     /// Create a block added event.
     #[wasm_bindgen(js_name = blockAdded)]
-    pub fn block_added(document_id: &str, block_id: &str, parent_id: &str, content_type: &str) -> WasmUcpEvent {
+    pub fn block_added(
+        document_id: &str,
+        block_id: &str,
+        parent_id: &str,
+        content_type: &str,
+    ) -> WasmUcpEvent {
         let event = UcpEvent::BlockAdded {
             document_id: document_id.to_string(),
             block_id: block_id.to_string(),
@@ -88,12 +93,28 @@ impl WasmUcpEvent {
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> JsValue {
         let obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("eventType"), &JsValue::from_str(&self.event_type));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("eventType"),
+            &JsValue::from_str(&self.event_type),
+        );
         if let Some(doc_id) = &self.document_id {
-            let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("documentId"), &JsValue::from_str(doc_id));
+            let _ = js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("documentId"),
+                &JsValue::from_str(doc_id),
+            );
         }
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("timestamp"), &JsValue::from_str(&self.timestamp));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("details"), &JsValue::from_str(&self.details));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("timestamp"),
+            &JsValue::from_str(&self.timestamp),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("details"),
+            &JsValue::from_str(&self.details),
+        );
         obj.into()
     }
 }
@@ -185,14 +206,38 @@ impl WasmAuditEntry {
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> JsValue {
         let obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("operation"), &JsValue::from_str(&self.inner.operation));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("documentId"), &JsValue::from_str(&self.inner.document_id));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("operation"),
+            &JsValue::from_str(&self.inner.operation),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("documentId"),
+            &JsValue::from_str(&self.inner.document_id),
+        );
         if let Some(user_id) = &self.inner.user_id {
-            let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("userId"), &JsValue::from_str(user_id));
+            let _ = js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("userId"),
+                &JsValue::from_str(user_id),
+            );
         }
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("success"), &JsValue::from_bool(self.inner.success));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("durationMs"), &JsValue::from_f64(self.inner.duration_ms as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("timestamp"), &JsValue::from_str(&self.inner.timestamp.to_rfc3339()));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("success"),
+            &JsValue::from_bool(self.inner.success),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("durationMs"),
+            &JsValue::from_f64(self.inner.duration_ms as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("timestamp"),
+            &JsValue::from_str(&self.inner.timestamp.to_rfc3339()),
+        );
         obj.into()
     }
 }
@@ -271,11 +316,31 @@ impl WasmMetricsRecorder {
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> JsValue {
         let obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("operationsTotal"), &JsValue::from_f64(self.inner.operations_total as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("operationsFailed"), &JsValue::from_f64(self.inner.operations_failed as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("blocksCreated"), &JsValue::from_f64(self.inner.blocks_created as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("blocksDeleted"), &JsValue::from_f64(self.inner.blocks_deleted as f64));
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("snapshotsCreated"), &JsValue::from_f64(self.inner.snapshots_created as f64));
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("operationsTotal"),
+            &JsValue::from_f64(self.inner.operations_total as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("operationsFailed"),
+            &JsValue::from_f64(self.inner.operations_failed as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("blocksCreated"),
+            &JsValue::from_f64(self.inner.blocks_created as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("blocksDeleted"),
+            &JsValue::from_f64(self.inner.blocks_deleted as f64),
+        );
+        let _ = js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("snapshotsCreated"),
+            &JsValue::from_f64(self.inner.snapshots_created as f64),
+        );
         obj.into()
     }
 }
