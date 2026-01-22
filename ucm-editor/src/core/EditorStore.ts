@@ -279,13 +279,13 @@ export function createEditorStore(
       // Validate before saving
       const validation = state.document.validate()
       if (!validation.valid) {
-        const errors = validation.issues.filter((i: any) => i.severity === 'error')
+        const errors = validation.issues.filter((i: { severity: string }) => i.severity === 'error')
         if (errors.length > 0) {
           throw new EditorError({
             code: 'UCM_E071',
             message: 'Document validation failed',
             category: 'document',
-            data: { validationErrors: errors.map((e: any) => e.message) },
+            data: { validationErrors: errors.map((e: { message: string }) => e.message) },
           })
         }
       }

@@ -5,7 +5,6 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react'
-import type { Document, ContentType, EdgeType } from 'ucp-content'
 
 // Type alias for BlockId since it's not exported
 type BlockId = string

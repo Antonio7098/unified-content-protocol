@@ -16,7 +16,7 @@ export interface Block {
   label?: string
   tags: string[]
   children: BlockId[]
-  edges: Array<{ edgeType: EdgeType; target: BlockId; metadata?: any }>
+  edges: Array<{ edgeType: EdgeType; target: BlockId; metadata?: Record<string, unknown> }>
 }
 
 /**

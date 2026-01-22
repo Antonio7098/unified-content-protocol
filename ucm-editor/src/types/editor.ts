@@ -5,8 +5,13 @@
 import type { Document, ContentType, EdgeType } from 'ucp-content'
 
 // Type aliases for types not exported from WASM
-type BlockId = string
-interface Block {
+export type BlockId = string
+export interface EdgeMetadata {
+  confidence?: number
+  rationale?: string
+  [key: string]: unknown
+}
+export interface Block {
   id: BlockId
   content: string
   type: ContentType
@@ -14,7 +19,7 @@ interface Block {
   label?: string
   tags: string[]
   children: BlockId[]
-  edges: Array<{ edgeType: EdgeType; target: BlockId; metadata?: any }>
+  edges: Array<{ edgeType: EdgeType; target: BlockId; metadata?: EdgeMetadata }>
 }
 type SemanticRole = string
 
@@ -149,6 +154,7 @@ export interface GraphEdge {
   edgeType: EdgeType | 'parent_child'
   points: Array<{ x: number; y: number }>
   isHighlighted: boolean
+  metadata?: EdgeMetadata
 }
 
 /** Graph view state */
