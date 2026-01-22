@@ -25,6 +25,11 @@ use errors::{
     PyBlockNotFoundError, PyCycleDetectedError, PyInvalidBlockIdError, PyParseError, PyUcpError,
     PyValidationError,
 };
+use engine::{
+    PyEngine, PyEngineConfig, PyResourceLimits, PyTraversalConfig, PyTraversalDirection,
+    PyTraversalEngine, PyTraversalFilter, PyTraversalNode, PyTraversalResult, PyTransactionId,
+    PyValidationIssue, PyValidationPipeline, PyValidationResult,
+};
 use llm::{PyIdMapper, PyPromptBuilder, PyPromptPresets, PyUclCapability};
 use observe::{PyAuditEntry, PyEventBus, PyMetricsRecorder, PyUcpEvent};
 use section::{PyClearResult, PyDeletedContent};
@@ -163,6 +168,23 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Section utilities
     m.add_class::<PyClearResult>()?;
     m.add_class::<PyDeletedContent>()?;
+
+    // Engine and validation classes
+    m.add_class::<PyEngine>()?;
+    m.add_class::<PyEngineConfig>()?;
+    m.add_class::<PyTransactionId>()?;
+    m.add_class::<PyResourceLimits>()?;
+    m.add_class::<PyValidationPipeline>()?;
+    m.add_class::<PyValidationResult>()?;
+    m.add_class::<PyValidationIssue>()?;
+
+    // Traversal classes
+    m.add_class::<PyTraversalEngine>()?;
+    m.add_class::<PyTraversalConfig>()?;
+    m.add_class::<PyTraversalFilter>()?;
+    m.add_class::<PyTraversalDirection>()?;
+    m.add_class::<PyTraversalResult>()?;
+    m.add_class::<PyTraversalNode>()?;
 
     // Register functions
     m.add_function(wrap_pyfunction!(parse_markdown, m)?)?;

@@ -883,3 +883,266 @@ describe('SnapshotManager', () => {
     expect(mgr.exists('v1')).toBe(false);
   });
 });
+
+describe('WasmEngine', () => {
+  test('creates engine', () => {
+    const engine = new ucp.WasmEngine();
+    expect(engine).toBeDefined();
+  });
+
+  test('creates engine with config', () => {
+    const config = new ucp.WasmEngineConfig(false, 5000, true, false);
+    expect(config.validateOnOperation).toBe(false);
+    expect(config.maxBatchSize).toBe(5000);
+    expect(config.enableTransactions).toBe(true);
+    expect(config.enableSnapshots).toBe(false);
+
+    const engine = new ucp.WasmEngine(config);
+    expect(engine).toBeDefined();
+  });
+
+  test('validates document', () => {
+    const engine = new ucp.WasmEngine();
+    const doc = ucp.parseMarkdown('# Hello\n\nWorld');
+
+    const result = engine.validate(doc);
+    expect(result.valid).toBe(true);
+    expect(result.errorCount).toBe(0);
+  });
+
+  test('begins transaction', () => {
+    const engine = new ucp.WasmEngine();
+    const txnId = engine.beginTransaction();
+    expect(txnId).toBeDefined();
+    expect(txnId.startsWith('txn_')).toBe(true);
+  });
+
+  test('begins named transaction', () => {
+    const engine = new ucp.WasmEngine();
+    const txnId = engine.beginNamedTransaction('my_txn');
+    expect(txnId).toBe('my_txn');
+  });
+
+  test('rollbacks transaction', () => {
+    const engine = new ucp.WasmEngine();
+    const txnId = engine.beginTransaction();
+    engine.rollbackTransaction(txnId);
+    // Should not throw
+  });
+
+  test('creates and restores snapshot', () => {
+    const engine = new ucp.WasmEngine();
+    const doc = ucp.parseMarkdown('# Original\n\nContent');
+
+    engine.createSnapshot('v1', doc, 'First version');
+
+    // Modify document
+    doc.addBlock(doc.rootId, 'New content');
+    const modifiedCount = doc.blockCount();
+
+    // Restore
+    const restored = engine.restoreSnapshot('v1');
+    expect(restored.blockCount()).toBeLessThan(modifiedCount);
+  });
+
+  test('lists snapshots', () => {
+    const engine = new ucp.WasmEngine();
+    const doc = ucp.parseMarkdown('# Test');
+
+    engine.createSnapshot('v1', doc);
+    engine.createSnapshot('v2', doc);
+
+    const snapshots = engine.listSnapshots();
+    expect(snapshots).toContain('v1');
+    expect(snapshots).toContain('v2');
+  });
+
+  test('deletes snapshot', () => {
+    const engine = new ucp.WasmEngine();
+    const doc = ucp.parseMarkdown('# Test');
+
+    engine.createSnapshot('to_delete', doc);
+    expect(engine.deleteSnapshot('to_delete')).toBe(true);
+    expect(engine.deleteSnapshot('nonexistent')).toBe(false);
+  });
+});
+
+describe('WasmResourceLimits', () => {
+  test('creates default limits', () => {
+    const limits = ucp.WasmResourceLimits.defaultLimits();
+    expect(limits.maxBlockCount).toBe(100000);
+    expect(limits.maxNestingDepth).toBe(50);
+    expect(limits.maxEdgesPerBlock).toBe(1000);
+  });
+
+  test('creates custom limits', () => {
+    const limits = new ucp.WasmResourceLimits(null, 1000, null, 10, 50);
+    expect(limits.maxBlockCount).toBe(1000);
+    expect(limits.maxNestingDepth).toBe(10);
+    expect(limits.maxEdgesPerBlock).toBe(50);
+  });
+
+  test('converts to JSON', () => {
+    const limits = ucp.WasmResourceLimits.defaultLimits();
+    const json = limits.toJson();
+    expect(json.maxBlockCount).toBe(100000);
+    expect(json.maxNestingDepth).toBe(50);
+  });
+});
+
+describe('WasmValidationPipeline', () => {
+  test('validates with default limits', () => {
+    const pipeline = new ucp.WasmValidationPipeline();
+    const doc = ucp.parseMarkdown('# Test\n\nContent');
+
+    const result = pipeline.validate(doc);
+    expect(result.valid).toBe(true);
+  });
+
+  test('validates with custom limits', () => {
+    const limits = new ucp.WasmResourceLimits(null, 2, null, null, null);
+    const pipeline = new ucp.WasmValidationPipeline(limits);
+
+    // Create a document with more than 2 blocks
+    const doc = ucp.parseMarkdown('# Title\n\n## Section 1\n\n## Section 2\n\n## Section 3');
+
+    const result = pipeline.validate(doc);
+    expect(result.valid).toBe(false);
+    expect(result.errorCount).toBeGreaterThan(0);
+  });
+
+  test('validation result to JSON', () => {
+    const pipeline = new ucp.WasmValidationPipeline();
+    const doc = ucp.parseMarkdown('# Test');
+
+    const result = pipeline.validate(doc);
+    const json = result.toJson();
+    expect(json.valid).toBe(true);
+    expect(Array.isArray(json.issues)).toBe(true);
+  });
+});
+
+describe('WasmTraversalEngine', () => {
+  test('creates traversal engine', () => {
+    const engine = new ucp.WasmTraversalEngine();
+    expect(engine).toBeDefined();
+  });
+
+  test('creates with config', () => {
+    const config = new ucp.WasmTraversalConfig(50, 5000, false);
+    expect(config.maxDepth).toBe(50);
+    expect(config.maxNodes).toBe(5000);
+
+    const engine = new ucp.WasmTraversalEngine(config);
+    expect(engine).toBeDefined();
+  });
+
+  test('navigates down', () => {
+    const doc = ucp.parseMarkdown(`
+# Title
+
+## Section 1
+
+Content 1
+
+## Section 2
+
+Content 2
+`);
+
+    const engine = new ucp.WasmTraversalEngine();
+    const result = engine.navigate(doc, 'down');
+
+    expect(result.summary.totalNodes).toBeGreaterThan(0);
+    expect(result.nodes.length).toBeGreaterThan(0);
+  });
+
+  test('navigates up', () => {
+    const doc = ucp.parseMarkdown('# Title\n\n## Section\n\nContent');
+    const engine = new ucp.WasmTraversalEngine();
+
+    // Get a non-root block
+    const blocks = doc.blocks();
+    const nonRoot = blocks.find(b => b.id !== doc.rootId);
+
+    if (nonRoot) {
+      const result = engine.navigate(doc, 'up', nonRoot.id);
+      expect(result.summary.totalNodes).toBeGreaterThan(0);
+    }
+  });
+
+  test('navigates with depth limit', () => {
+    const doc = ucp.parseMarkdown('# Title\n\n## Section\n\n### Subsection\n\nContent');
+    const engine = new ucp.WasmTraversalEngine();
+
+    const result = engine.navigate(doc, 'down', null, 1);
+    expect(result.summary.maxDepth).toBeLessThanOrEqual(1);
+  });
+
+  test('expands node', () => {
+    const doc = ucp.parseMarkdown('# Title\n\nChild 1\n\nChild 2');
+    const engine = new ucp.WasmTraversalEngine();
+
+    const result = engine.expand(doc, doc.rootId);
+    expect(result.nodes.length).toBeGreaterThan(0);
+  });
+
+  test('gets path to root', () => {
+    const doc = ucp.parseMarkdown('# Title\n\n## Section\n\nContent');
+    const engine = new ucp.WasmTraversalEngine();
+
+    // Get a non-root block
+    const blocks = doc.blocks();
+    const nonRoot = blocks.find(b => b.id !== doc.rootId);
+
+    if (nonRoot) {
+      const path = engine.pathToRoot(doc, nonRoot.id);
+      expect(path.length).toBeGreaterThanOrEqual(2);
+      expect(path[0]).toBe(doc.rootId);
+    }
+  });
+
+  test('finds paths between nodes', () => {
+    const doc = ucp.parseMarkdown('# Title\n\n## Section\n\nContent');
+    const engine = new ucp.WasmTraversalEngine();
+
+    // Get a descendant block
+    const blocks = doc.blocks();
+    const descendant = blocks.find(b => b.id !== doc.rootId);
+
+    if (descendant) {
+      const paths = engine.findPaths(doc, doc.rootId, descendant.id);
+      expect(paths.length).toBeGreaterThanOrEqual(1);
+      expect(paths[0][0]).toBe(doc.rootId);
+    }
+  });
+
+  test('navigates with filter', () => {
+    const doc = ucp.parseMarkdown(`
+# Title
+
+## Section 1
+
+Content 1
+
+## Section 2
+
+Content 2
+`);
+
+    const engine = new ucp.WasmTraversalEngine();
+    const filter = new ucp.WasmTraversalFilter(['heading1', 'heading2']);
+
+    const result = engine.navigate(doc, 'down', null, null, filter);
+    // Should filter to heading blocks
+    expect(result.nodes.length).toBeGreaterThan(0);
+  });
+
+  test('traversal result has execution time', () => {
+    const doc = ucp.parseMarkdown('# Title\n\nContent');
+    const engine = new ucp.WasmTraversalEngine();
+
+    const result = engine.navigate(doc, 'down');
+    expect(result.executionTimeMs).toBeDefined();
+  });
+});
