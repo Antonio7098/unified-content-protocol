@@ -15,7 +15,7 @@ The Markdown translator enables:
 
 ```toml
 [dependencies]
-ucp-translator-markdown = "0.1.5"
+ucp-translator-markdown = "0.1.6"
 ```
 
 ## Quick Start

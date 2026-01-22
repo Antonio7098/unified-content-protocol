@@ -1,6 +1,6 @@
 {
   "name": "ucp-content",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Unified Content Protocol - JavaScript/TypeScript SDK for LLM content manipulation",
   "type": "module",
   "main": "./dist/index.js",

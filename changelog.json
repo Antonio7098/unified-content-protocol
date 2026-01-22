@@ -19,7 +19,7 @@
   },
   "entries": [
     {
-      "version": "v0.1.5",
+      "version": "v0.1.6",
       "date": "2026-01-20",
       "changes": [
         {
@@ -220,5 +220,14 @@
         }
       ]
     }
-  ]
+  ],
+  "v0.1.6": {
+    "date": "2026-01-22",
+    "changes": [
+      "Publish Rust-based ucp-content packages (Python and JavaScript/WASM)",
+      "Replace legacy hand-written SDKs with Rust bindings",
+      "Fix WASM time compatibility with chrono wasmbind feature",
+      "Update ucm-editor to use new WASM API (partial)"
+    ]
+  }
 }

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ucp-content"
-version = "0.1.5"
+version = "0.1.6"
 description = "Unified Content Protocol - Python SDK for LLM content manipulation"
 readme = "README.md"
 license = {text = "MIT"}
