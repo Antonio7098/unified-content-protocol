@@ -1,6 +1,5 @@
 """Tests for Document operations."""
 
-import pytest
 
 
 class TestDocumentCreation:
@@ -29,7 +28,7 @@ class TestDocumentCreation:
 
     def test_block_count(self, empty_doc):
         """Test block count starts at 1 (root block)."""
-        assert empty_doc.block_count() == 1
+        assert empty_doc.block_count == 1
 
     def test_document_version(self, empty_doc):
         """Test document version exists."""
@@ -50,7 +49,7 @@ class TestBlockOperations:
         block_id = empty_doc.add_block(root, "Hello, World!")
 
         assert block_id is not None
-        assert empty_doc.block_count() == 2
+        assert empty_doc.block_count == 2
 
     def test_add_block_with_role(self, empty_doc):
         """Test adding a block with a role."""
@@ -79,7 +78,6 @@ class TestBlockOperations:
 
     def test_add_code_block(self, empty_doc):
         """Test adding a code block."""
-        import ucp
         root = empty_doc.root_id
         block_id = empty_doc.add_code(root, "python", "print('hello')")
 
@@ -137,23 +135,23 @@ class TestBlockOperations:
     def test_delete_block(self, doc_with_blocks):
         """Test deleting a block."""
         doc, root, block1, block2, block3 = doc_with_blocks
-        initial_count = doc.block_count()
+        initial_count = doc.block_count
 
         # Delete block2 (no children)
         doc.delete_block(block2)
 
-        assert doc.block_count() == initial_count - 1
+        assert doc.block_count == initial_count - 1
         assert doc.get_block(block2) is None
 
     def test_delete_block_cascade(self, doc_with_blocks):
         """Test deleting a block with cascade."""
         doc, root, block1, block2, block3 = doc_with_blocks
-        initial_count = doc.block_count()
+        initial_count = doc.block_count
 
         # Delete block1 with cascade (should also delete block3)
         doc.delete_block(block1, cascade=True)
 
-        assert doc.block_count() == initial_count - 2
+        assert doc.block_count == initial_count - 2
         assert doc.get_block(block1) is None
         assert doc.get_block(block3) is None
 
@@ -341,7 +339,7 @@ class TestSerialization:
         """Test getting all blocks."""
         doc, root, block1, block2, block3 = doc_with_blocks
 
-        blocks = doc.blocks()
+        blocks = doc.blocks
         assert len(blocks) == 4
 
 

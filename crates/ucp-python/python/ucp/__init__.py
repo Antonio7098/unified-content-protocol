@@ -18,6 +18,25 @@ from ucp._core import (
     Document,
     Edge,
     EdgeType,
+    # Engine and validation
+    Engine,
+    EngineConfig,
+    TransactionId,
+    ResourceLimits,
+    ValidationPipeline,
+    ValidationResult,
+    ValidationIssue,
+    # Traversal
+    TraversalEngine,
+    TraversalConfig,
+    TraversalFilter,
+    TraversalDirection,
+    TraversalResult,
+    TraversalNode,
+    WriteSectionResult,
+    # Section utilities
+    ClearResult,
+    DeletedContent,
     # LLM utilities
     IdMapper,
     PromptBuilder,
@@ -26,11 +45,24 @@ from ucp._core import (
     # Snapshot management
     SnapshotManager,
     SnapshotInfo,
+    # Observability
+    UcpEvent,
+    EventBus,
+    AuditEntry,
+    MetricsRecorder,
     # Functions
     parse,
     render,
+    parse_html,
     execute_ucl,
     create,
+    # Section functions
+    clear_section_with_undo,
+    restore_deleted_section,
+    find_section_by_path,
+    get_all_sections,
+    get_section_depth,
+    write_section,
     # Exceptions
     UcpError,
     BlockNotFoundError,
@@ -40,7 +72,7 @@ from ucp._core import (
     ParseError,
 )
 
-__version__ = "0.1.5"
+__version__ = "0.1.7"
 __all__ = [
     # Classes
     "BlockId",
@@ -49,6 +81,25 @@ __all__ = [
     "Document",
     "Edge",
     "EdgeType",
+    # Engine and validation
+    "Engine",
+    "EngineConfig",
+    "TransactionId",
+    "ResourceLimits",
+    "ValidationPipeline",
+    "ValidationResult",
+    "ValidationIssue",
+    # Traversal
+    "TraversalEngine",
+    "TraversalConfig",
+    "TraversalFilter",
+    "TraversalDirection",
+    "TraversalResult",
+    "TraversalNode",
+    "WriteSectionResult",
+    # Section utilities
+    "ClearResult",
+    "DeletedContent",
     # LLM utilities
     "IdMapper",
     "PromptBuilder",
@@ -57,11 +108,24 @@ __all__ = [
     # Snapshot management
     "SnapshotManager",
     "SnapshotInfo",
+    # Observability
+    "UcpEvent",
+    "EventBus",
+    "AuditEntry",
+    "MetricsRecorder",
     # Functions
     "parse",
     "render",
+    "parse_html",
     "execute_ucl",
     "create",
+    # Section functions
+    "clear_section_with_undo",
+    "restore_deleted_section",
+    "find_section_by_path",
+    "get_all_sections",
+    "get_section_depth",
+    "write_section",
     # Exceptions
     "UcpError",
     "BlockNotFoundError",

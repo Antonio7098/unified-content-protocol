@@ -1,6 +1,5 @@
 """Tests for Engine, ValidationPipeline, and TraversalEngine."""
 
-import pytest
 
 
 class TestEngine:

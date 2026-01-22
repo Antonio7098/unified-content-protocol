@@ -163,6 +163,79 @@ Content here.
         assert restored.block_count == result.deleted_content.block_count
 
 
+class TestWriteSection:
+    """Tests for write_section helper."""
+
+    def test_write_section_replaces_children(self):
+        import ucp
+
+        doc = ucp.parse(
+            """
+# Intro
+
+## Old Section
+
+Old content
+"""
+        )
+
+        section_id = ucp.find_section_by_path(doc, "Intro")
+        assert section_id is not None
+        original_children = doc.children(section_id)
+        assert original_children
+
+        result = ucp.write_section(
+            doc,
+            section_id,
+            "## Replacement\n\nNew content",
+        )
+
+        assert result.success is True
+        # cleared blocks includes all descendants, so it might be more than just immediate children
+        assert len(result.blocks_removed) >= len(original_children)
+        assert len(result.blocks_added) > 0
+
+        new_children = doc.children(section_id)
+        assert new_children != original_children
+        new_heading = doc.get_block(new_children[0])
+        assert new_heading.content_type == "text"
+
+    def test_write_section_with_base_heading_level(self):
+        import ucp
+
+        doc = ucp.parse("# Intro")
+        section_id = ucp.find_section_by_path(doc, "Intro")
+
+        result = ucp.write_section(doc, section_id, "# Child Heading", base_heading_level=3)
+
+        assert result.success is True
+        new_block = doc.get_block(result.blocks_added[0])
+        assert new_block.role == "heading3"
+
+    def test_write_section_invalid_section(self):
+        import ucp
+
+        doc = ucp.parse("# Intro")
+        fake = ucp.parse("# Another")
+        other_id = ucp.find_section_by_path(fake, "Another")
+
+        with pytest.raises(RuntimeError):
+            ucp.write_section(doc, other_id, "# Replacement")
+
+    def test_document_write_section_method(self):
+        import ucp
+
+        doc = ucp.parse("# Intro")
+        section_id = doc.root_id
+
+        result = doc.write_section(section_id, "## Child\n\nContent", base_heading_level=4)
+
+        assert result.success is True
+        assert len(result.blocks_added) > 0
+        new_block = doc.get_block(result.blocks_added[0])
+        assert new_block.role == "heading5"
+
+
 class TestHtmlTranslator:
     """Test HTML parsing functionality."""
 

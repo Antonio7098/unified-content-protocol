@@ -1,7 +1,8 @@
 //! Section management bindings for WASM.
 
 use wasm_bindgen::prelude::*;
-use ucm_engine::section::{ClearResult, DeletedContent};
+use ucm_engine::section::{clear_section_content_with_undo, integrate_section_blocks, restore_deleted_content, ClearResult, DeletedContent};
+use ucp_translator_markdown::parse_markdown as parse_markdown_to_doc;
 
 use crate::Document;
 
@@ -124,7 +125,7 @@ pub fn clear_section_with_undo(doc: &mut Document, section_id: &str) -> Result<W
         .parse()
         .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", section_id)))?;
     
-    let result = ucm_engine::section::clear_section_content_with_undo(doc.inner_mut(), &block_id)
+    let result = clear_section_content_with_undo(doc.inner_mut(), &block_id)
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
     
     Ok(WasmClearResult::from(result))
@@ -133,7 +134,7 @@ pub fn clear_section_with_undo(doc: &mut Document, section_id: &str) -> Result<W
 /// Restore previously deleted section content.
 #[wasm_bindgen(js_name = restoreDeletedSection)]
 pub fn restore_deleted_section(doc: &mut Document, deleted: &WasmDeletedContent) -> Result<js_sys::Array, JsValue> {
-    let restored = ucm_engine::section::restore_deleted_content(doc.inner_mut(), deleted.inner())
+    let restored = restore_deleted_content(doc.inner_mut(), deleted.inner())
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
     
     let arr = js_sys::Array::new();
@@ -173,4 +174,87 @@ pub fn get_section_depth(doc: &Document, section_id: &str) -> Result<Option<usiz
         .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", section_id)))?;
     
     Ok(ucm_engine::section::get_section_depth(doc.inner(), &block_id))
+}
+
+/// Result of writing markdown into a section.
+#[wasm_bindgen]
+pub struct WasmWriteSectionResult {
+    success: bool,
+    section_id: String,
+    blocks_removed: Vec<String>,
+    blocks_added: Vec<String>,
+}
+
+#[wasm_bindgen]
+impl WasmWriteSectionResult {
+    #[wasm_bindgen(getter)]
+    pub fn success(&self) -> bool {
+        self.success
+    }
+
+    #[wasm_bindgen(getter, js_name = sectionId)]
+    pub fn section_id(&self) -> String {
+        self.section_id.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = blocksRemoved)]
+    pub fn blocks_removed(&self) -> js_sys::Array {
+        let arr = js_sys::Array::new();
+        for id in &self.blocks_removed {
+            arr.push(&JsValue::from_str(id));
+        }
+        arr
+    }
+
+    #[wasm_bindgen(getter, js_name = blocksAdded)]
+    pub fn blocks_added(&self) -> js_sys::Array {
+        let arr = js_sys::Array::new();
+        for id in &self.blocks_added {
+            arr.push(&JsValue::from_str(id));
+        }
+        arr
+    }
+}
+
+/// Write markdown content into a section, replacing its children.
+#[wasm_bindgen(js_name = writeSection)]
+pub fn write_section(
+    doc: &mut Document,
+    section_id: &str,
+    markdown: &str,
+    base_heading_level: Option<usize>,
+) -> Result<WasmWriteSectionResult, JsValue> {
+    let block_id: ucm_core::BlockId = section_id
+        .parse()
+        .map_err(|_| JsValue::from_str(&format!("Invalid block ID: {}", section_id)))?;
+
+    let ClearResult {
+        removed_ids,
+        deleted_content,
+    } = clear_section_content_with_undo(doc.inner_mut(), &block_id)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let removed_strings: Vec<String> = removed_ids.iter().map(|id| id.to_string()).collect();
+
+    let temp_doc = parse_markdown_to_doc(markdown).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let added_ids = integrate_section_blocks(
+        doc.inner_mut(),
+        &block_id,
+        &temp_doc,
+        base_heading_level,
+    )
+    .map_err(|e| {
+        let _ = restore_deleted_content(doc.inner_mut(), &deleted_content);
+        JsValue::from_str(&e.to_string())
+    })?;
+
+    let added_strings: Vec<String> = added_ids.iter().map(|id| id.to_string()).collect();
+
+    Ok(WasmWriteSectionResult {
+        success: true,
+        section_id: section_id.to_string(),
+        blocks_removed: removed_strings,
+        blocks_added: added_strings,
+    })
 }

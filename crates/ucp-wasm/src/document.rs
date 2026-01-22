@@ -3,6 +3,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::errors::IntoWasmResult;
+use crate::section::{write_section as wasm_write_section, WasmWriteSectionResult};
 use crate::types::{Content, EdgeType};
 
 /// A UCM document is a collection of blocks with hierarchical structure.
@@ -322,30 +323,15 @@ impl Document {
         arr
     }
 
-    /// Find a block by label.
-    #[wasm_bindgen(js_name = findByLabel)]
-    pub fn find_by_label(&self, label: &str) -> Option<String> {
-        self.inner.indices.find_by_label(label).map(|id| id.to_string())
-    }
-
-    /// Find orphaned blocks.
-    #[wasm_bindgen(js_name = findOrphans)]
-    pub fn find_orphans(&self) -> js_sys::Array {
-        let arr = js_sys::Array::new();
-        for id in self.inner.find_orphans() {
-            arr.push(&JsValue::from_str(&id.to_string()));
-        }
-        arr
-    }
-
-    /// Prune unreachable blocks.
-    #[wasm_bindgen(js_name = pruneUnreachable)]
-    pub fn prune_unreachable(&mut self) -> js_sys::Array {
-        let arr = js_sys::Array::new();
-        for block in self.inner.prune_unreachable() {
-            arr.push(&JsValue::from_str(&block.id.to_string()));
-        }
-        arr
+    /// Write markdown content into a section by block ID.
+    #[wasm_bindgen(js_name = writeSection)]
+    pub fn write_section(
+        &mut self,
+        section_id: &str,
+        markdown: &str,
+        base_heading_level: Option<usize>,
+    ) -> Result<WasmWriteSectionResult, JsValue> {
+        wasm_write_section(self, section_id, markdown, base_heading_level)
     }
 
     /// Validate the document.
@@ -365,16 +351,6 @@ impl Document {
             .collect();
 
         serde_wasm_bindgen::to_value(&issues).unwrap_or(JsValue::NULL)
-    }
-
-    /// Get all block IDs.
-    #[wasm_bindgen(js_name = blockIds)]
-    pub fn block_ids(&self) -> js_sys::Array {
-        let arr = js_sys::Array::new();
-        for id in self.inner.blocks.keys() {
-            arr.push(&JsValue::from_str(&id.to_string()));
-        }
-        arr
     }
 
     /// Serialize to JSON object.
@@ -720,6 +696,25 @@ impl Document {
             .collect();
 
         serde_wasm_bindgen::to_value(&blocks).map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Get all block IDs in the document.
+    #[wasm_bindgen(js_name = blockIds)]
+    pub fn block_ids(&self) -> js_sys::Array {
+        let arr = js_sys::Array::new();
+        for id in self.inner.blocks.keys() {
+            arr.push(&JsValue::from_str(&id.to_string()));
+        }
+        arr
+    }
+
+    /// Find a block by its label.
+    #[wasm_bindgen(js_name = findByLabel)]
+    pub fn find_by_label(&self, label: &str) -> Option<String> {
+        self.inner
+            .indices
+            .find_by_label(label)
+            .map(|id| id.to_string())
     }
 
     /// Get the siblings of a block (children of same parent, excluding self).

@@ -47,7 +47,7 @@ This guide covers how to install and configure UCP for your project.
     ucp-translator-markdown = "0.1.6"
 
     # Observability utilities
-    ucp-observe = "0.1.6"
+    ucp-observe = "0.1.7"
     ```
 
 === "Python"
@@ -184,7 +184,7 @@ If you're using multiple UCP crates, ensure they're all from the same version:
 
 ```toml
 [dependencies]
-ucm-core = "0.1.6"
+ucm-core = "0.1.7"
 ucm-engine = "0.1.6"  # Must match ucm-core version
 ```
 

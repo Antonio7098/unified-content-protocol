@@ -1,6 +1,5 @@
 """Tests for Snapshot management."""
 
-import pytest
 
 
 class TestSnapshotManager:
@@ -52,13 +51,13 @@ class TestSnapshotManager:
 
         # Make changes to original document
         doc.add_block(root, "New block after snapshot")
-        original_count = doc.block_count()
+        original_count = doc.block_count
 
         # Restore
         restored = mgr.restore("v1")
 
         # Restored should have fewer blocks
-        assert restored.block_count() < original_count
+        assert restored.block_count < original_count
 
     def test_get_snapshot_info(self, doc_with_blocks):
         """Test getting snapshot information."""
@@ -183,18 +182,18 @@ class TestSnapshotManager:
         mgr.create("v1", doc)
 
         # Add more content
-        new_block = doc.add_block(root, "New content")
+        doc.add_block(root, "New content")
 
         # Snapshot v2
         mgr.create("v2", doc)
 
         # Restore v1 - should not have new_block
         restored_v1 = mgr.restore("v1")
-        assert restored_v1.block_count() == 4
+        assert restored_v1.block_count == 4
 
         # Restore v2 - should have new_block
         restored_v2 = mgr.restore("v2")
-        assert restored_v2.block_count() == 5
+        assert restored_v2.block_count == 5
 
 
 class TestSnapshotInfo:

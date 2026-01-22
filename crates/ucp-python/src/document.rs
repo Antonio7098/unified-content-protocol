@@ -7,6 +7,7 @@ use crate::block::PyBlock;
 use crate::content::PyContent;
 use crate::edge::PyEdgeType;
 use crate::errors::IntoPyResult;
+use crate::section::{write_section as write_section_fn, PyWriteSectionResult};
 use crate::types::PyBlockId;
 
 /// A UCM document is a collection of blocks with hierarchical structure.
@@ -79,6 +80,7 @@ impl PyDocument {
     }
 
     /// Get the total block count.
+    #[getter]
     fn block_count(&self) -> usize {
         self.inner.block_count()
     }
@@ -402,6 +404,7 @@ impl PyDocument {
     }
 
     /// Iterate over all blocks.
+    #[getter]
     fn blocks(&self) -> Vec<PyBlock> {
         self.inner.blocks.values().map(PyBlock::from).collect()
     }
@@ -510,6 +513,17 @@ impl PyDocument {
         } else {
             None
         }
+    }
+
+    /// Write markdown content into a section by block ID.
+    #[pyo3(signature = (section_id, markdown, base_heading_level=None))]
+    fn write_section(
+        &mut self,
+        section_id: &PyBlockId,
+        markdown: &str,
+        base_heading_level: Option<usize>,
+    ) -> PyResult<PyWriteSectionResult> {
+        write_section_fn(self, section_id, markdown, base_heading_level)
     }
 
     fn __repr__(&self) -> String {

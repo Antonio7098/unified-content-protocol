@@ -1,6 +1,5 @@
 """Tests for Edge operations."""
 
-import pytest
 
 
 class TestEdgeTypes:

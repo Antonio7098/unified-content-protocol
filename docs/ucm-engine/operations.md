@@ -178,6 +178,29 @@ Persist `DeletedContent` if you want a full rollback. Restoring first clears wha
 - **Python**: `ucp.clear_section_with_undo(doc, section_id)` and `ucp.restore_deleted_section(doc, deleted_content)` mirror the Rust helpers. Restoration always removes the "replacement" subtree before reattaching the saved blocks.
 - **JavaScript**: `clearSectionWithUndo(doc, sectionId)` returns `{ removedIds, deletedContent }` and `restoreDeletedSection(doc, deletedContent)` restores it.
 
+### Convenience API
+
+The `Document` class provides a direct method for writing sections:
+
+=== "Python"
+    ```python
+    # Write markdown to a section
+    result = doc.write_section(section_id, "## New Content\n\nThis replaces old content.")
+    
+    if result.success:
+        print(f"Replaced {len(result.blocks_removed)} blocks with {len(result.blocks_added)} blocks")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    // Write markdown to a section
+    const result = doc.writeSection(sectionId, "## New Content\n\nThis replaces old content.");
+    
+    if (result.success) {
+        console.log(`Replaced ${result.blocksRemoved.length} blocks with ${result.blocksAdded.length} blocks`);
+    }
+    ```
+
 The deleted payload is pure JSON (blocks, structure, parent metadata), so you can persist it in durable storage to enable long-lived undo stacks.
 
 ## Move Operation

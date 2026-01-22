@@ -2,9 +2,86 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use ucm_engine::section::{ClearResult, DeletedContent};
+use ucm_engine::section::{clear_section_content_with_undo, integrate_section_blocks, restore_deleted_content, ClearResult, DeletedContent};
 
+use crate::document::PyDocument;
 use crate::types::PyBlockId;
+
+/// Write markdown content into a section, replacing its children.
+#[pyfunction]
+#[pyo3(signature = (doc, section_id, markdown, base_heading_level=None))]
+pub fn write_section(
+    doc: &mut PyDocument,
+    section_id: &PyBlockId,
+    markdown: &str,
+    base_heading_level: Option<usize>,
+) -> PyResult<PyWriteSectionResult> {
+    // Clear existing content with undo support
+    let ClearResult {
+        removed_ids,
+        deleted_content,
+    } = clear_section_content_with_undo(doc.inner_mut(), section_id.inner()).map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "Failed to clear section {}: {}",
+            section_id.inner(),
+            e
+        ))
+    })?;
+    let removed_ids_py: Vec<PyBlockId> = removed_ids.iter().map(|id| PyBlockId::from(*id)).collect();
+
+    // Parse new markdown into a temporary document
+    let temp_doc = ucp_translator_markdown::parse_markdown(markdown)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+    // Integrate parsed blocks into section
+    let added = integrate_section_blocks(
+        doc.inner_mut(),
+        section_id.inner(),
+        &temp_doc,
+        base_heading_level,
+    )
+    .map_err(|e| {
+        let _ = restore_deleted_content(doc.inner_mut(), &deleted_content);
+        pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "Failed to integrate section {}: {}",
+            section_id.inner(),
+            e
+        ))
+    })?;
+
+    Ok(PyWriteSectionResult {
+        success: true,
+        section_id: section_id.clone(),
+        blocks_removed: removed_ids_py,
+        blocks_added: added.into_iter().map(PyBlockId::from).collect(),
+    })
+}
+
+/// Result of writing markdown into a section.
+#[pyclass(name = "WriteSectionResult")]
+#[derive(Clone)]
+pub struct PyWriteSectionResult {
+    #[pyo3(get)]
+    success: bool,
+    #[pyo3(get)]
+    section_id: PyBlockId,
+    #[pyo3(get)]
+    blocks_removed: Vec<PyBlockId>,
+    #[pyo3(get)]
+    blocks_added: Vec<PyBlockId>,
+}
+
+#[pymethods]
+impl PyWriteSectionResult {
+    fn __repr__(&self) -> String {
+        format!(
+            "WriteSectionResult(success={}, removed={}, added={})",
+            self.success,
+            self.blocks_removed.len(),
+            self.blocks_added.len()
+        )
+    }
+}
 
 /// Result of a section clear operation with undo support.
 #[pyclass(name = "ClearResult")]

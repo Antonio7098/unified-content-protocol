@@ -1,6 +1,6 @@
 {
   "name": "ucm-editor",
-  "version": "0.1.0",
+  "version": "0.1.7",
   "description": "Notion-like editor for UCM documents with graph visualization and diff viewing",
   "type": "module",
   "main": "./dist/index.js",

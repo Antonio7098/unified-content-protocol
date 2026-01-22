@@ -19,6 +19,62 @@
   },
   "entries": [
     {
+      "version": "v0.1.7",
+      "date": "2026-01-22",
+      "changes": [
+        {
+          "type": "added",
+          "area": "sdk.engine",
+          "description": "Exposed Engine, Transaction Management, TraversalEngine, and ValidationPipeline in Python and JavaScript SDKs.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src/engine.rs",
+            "crates/ucp-wasm/src/engine.rs",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/src/lib.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.section",
+          "description": "Implemented write_section and Document convenience methods in SDKs for undoable section updates.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src/section.rs",
+            "crates/ucp-python/src/document.rs",
+            "crates/ucp-wasm/src/section.rs",
+            "crates/ucp-wasm/src/document.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "fixed",
+          "area": "wasm.compat",
+          "description": "Fixed WASM panic related to std::time::Instant by adding conditional compilation for wasm32 target.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucm-engine/src/transaction.rs",
+            "crates/ucm-engine/src/traversal.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped version to 0.1.7 across workspace and SDKs.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "packages/ucp-python/pyproject.toml",
+            "crates/ucp-wasm/Cargo.toml",
+            "packages/ucm-editor/package.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.6",
       "date": "2026-01-20",
       "changes": [

@@ -1,6 +1,5 @@
 """Tests for Content types."""
 
-import pytest
 
 
 class TestContentCreation:

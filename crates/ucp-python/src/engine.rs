@@ -3,7 +3,6 @@
 //! Exposes the UCM Engine with transaction support, validation, and batch operations.
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use ucm_engine::engine::{Engine, EngineConfig};
 use ucm_engine::validate::{ResourceLimits, ValidationPipeline, ValidationResult};
 use ucm_engine::traversal::{

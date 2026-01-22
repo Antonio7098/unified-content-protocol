@@ -19,7 +19,7 @@ Another paragraph here.
         doc = ucp.parse(md)
 
         assert doc is not None
-        assert doc.block_count() > 1
+        assert doc.block_count > 1
 
     def test_parse_markdown_with_code(self):
         """Test parsing markdown with code blocks."""
@@ -88,12 +88,12 @@ class TestUclExecution:
         import ucp
         doc, root, block1, block2, block3 = doc_with_blocks
 
-        initial_count = doc.block_count()
+        initial_count = doc.block_count
         ucl = f'APPEND {root} text :: "New block content"'
         results = ucp.execute_ucl(doc, ucl)
 
         assert len(results) > 0
-        assert doc.block_count() == initial_count + 1
+        assert doc.block_count == initial_count + 1
 
     def test_execute_move(self, doc_with_blocks):
         """Test executing MOVE command."""
@@ -114,12 +114,12 @@ class TestUclExecution:
         import ucp
         doc, root, block1, block2, block3 = doc_with_blocks
 
-        initial_count = doc.block_count()
+        initial_count = doc.block_count
         ucl = f'DELETE {block2}'
         results = ucp.execute_ucl(doc, ucl)
 
         assert len(results) > 0
-        assert doc.block_count() == initial_count - 1
+        assert doc.block_count == initial_count - 1
 
     def test_execute_multiple_commands(self, doc_with_blocks):
         """Test executing multiple UCL commands."""

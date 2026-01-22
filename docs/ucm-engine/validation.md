@@ -69,27 +69,33 @@ The validation pipeline ensures document integrity by checking for structural is
 
 === "Python"
     ```python
-    issues = doc.validate()
-    
-    if not issues:
+    import ucp
+
+    engine = ucp.Engine()
+    result = engine.validate(doc)
+
+    if result.valid:
         print("Document is valid!")
     else:
         print("Document has issues:")
-        for severity, code, message in issues:
-            print(f"  [{severity}] {message}")
+        for issue in result.issues:
+            print(f"  [{issue.severity}] {issue.message}")
     ```
 
 === "JavaScript"
     ```javascript
-    const issues = doc.validate();
-    
-    if (!issues || issues.length === 0) {
-        console.log("Document is valid!");
+    import { WasmEngine } from 'ucp-content';
+
+    const engine = new WasmEngine();
+    const result = engine.validate(doc);
+
+    if (result.valid) {
+        console.log('Document is valid!');
     } else {
-        console.log("Document has issues:");
-        for (const issue of issues) {
+        console.log('Document has issues:');
+        result.toJson().issues.forEach(issue => {
             console.log(`  [${issue.severity}] ${issue.message}`);
-        }
+        });
     }
     ```
 
@@ -116,10 +122,27 @@ The validation pipeline ensures document integrity by checking for structural is
     ```
 
 === "Python"
-    *Resource limits configuration is not currently exposed in the Python bindings.*
+    ```python
+    import ucp
+
+    limits = ucp.ResourceLimits(
+        max_block_count=50_000,
+        max_nesting_depth=20,
+        max_edges_per_block=500,
+    )
+
+    pipeline = ucp.ValidationPipeline(limits)
+    result = pipeline.validate(doc)
+    ```
 
 === "JavaScript"
-    *Resource limits configuration is not currently exposed in the JavaScript bindings.*
+    ```javascript
+    import { WasmValidationPipeline, WasmResourceLimits } from 'ucp-content';
+
+    const limits = new WasmResourceLimits(null, 50000, null, 20, 500);
+    const pipeline = new WasmValidationPipeline(limits);
+    const validation = pipeline.validate(doc);
+    ```
 
 ## Resource Limits
 

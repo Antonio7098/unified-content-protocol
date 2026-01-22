@@ -1,6 +1,5 @@
 """Tests for LLM utilities (IdMapper, PromptBuilder)."""
 
-import pytest
 
 
 class TestIdMapper:

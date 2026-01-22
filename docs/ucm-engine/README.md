@@ -16,14 +16,30 @@ The engine is the execution layer of UCP, responsible for:
 === "Rust"
     ```toml
     [dependencies]
-    ucm-engine = "0.1.6"
+    ucm-engine = "0.1.7"
     ```
 
 === "Python"
-    *The engine is internal to the Rust core, but its functionality (operations, snapshots) is exposed through the high-level `ucp-content` package.*
+    ```bash
+    pip install ucp-content
+    ```
+
+    ```python
+    from ucp_content import Engine
+
+    engine = Engine()  # Transaction, snapshot, validation, and traversal support
+    ```
 
 === "JavaScript"
-    *The engine is internal to the Rust core, but its functionality (operations, snapshots) is exposed through the high-level `ucp-content` package.*
+    ```bash
+    npm install ucp-content
+    ```
+
+    ```javascript
+    import { WasmEngine } from 'ucp-content';
+
+    const engine = new WasmEngine();
+    ```
 
 ## Module Overview
 
@@ -47,7 +63,6 @@ The engine is the execution layer of UCP, responsible for:
         let mut doc = Document::create();
         let root = doc.root.clone();
         
-        // Execute an operation
         let result = engine.execute(&mut doc, Operation::Append {
             parent_id: root,
             content: Content::text("Hello, Engine!"),
@@ -60,6 +75,38 @@ The engine is the execution layer of UCP, responsible for:
         if result.success {
             println!("Added block: {:?}", result.affected_blocks);
         }
+    }
+    ```
+
+=== "Python"
+    ```python
+    import ucp
+
+    engine = ucp.Engine()
+    doc = ucp.create("Hello Doc")
+
+    # Append content via UCL or operations
+    ucp.execute_ucl(doc, f"APPEND {doc.root_id} text :: \"Hello, Engine!\"")
+
+    # Validate using the same engine instance
+    result = engine.validate(doc)
+    if result.valid:
+        print("Document is valid")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { WasmEngine, parseMarkdown } from 'ucp-content';
+
+    const engine = new WasmEngine();
+    const doc = parseMarkdown('# Hello Engine');
+
+    // Execute UCL for now (operation helpers coming soon)
+    ucp.executeUcl(doc, `APPEND ${doc.rootId} text :: "Hello"`);
+
+    const result = engine.validate(doc);
+    if (result.valid) {
+        console.log('Document is valid');
     }
     ```
 
@@ -197,18 +244,32 @@ Validate document integrity:
 
 === "Python"
     ```python
-    # Validation is built into the Document class
-    issues = doc.validate()
-    if not issues:
-        print("Valid")
+    import ucp
+
+    engine = ucp.Engine()
+    result = engine.validate(doc)
+
+    if result.valid:
+        print("Document is valid")
+    else:
+        for issue in result.errors():
+            print(f"ERROR [{issue.code}]: {issue.message}")
     ```
 
 === "JavaScript"
     ```javascript
-    // Validation is built into the Document class
-    const issues = doc.validate();
-    if (!issues) {
-        console.log("Valid");
+    import { WasmEngine } from 'ucp-content';
+
+    const engine = new WasmEngine();
+    const result = engine.validate(doc);
+
+    if (result.valid) {
+        console.log('Document is valid');
+    } else {
+        const issues = result.toJson().issues;
+        issues.forEach(issue => {
+            console.error(`[${issue.severity}] ${issue.message}`);
+        });
     }
     ```
 

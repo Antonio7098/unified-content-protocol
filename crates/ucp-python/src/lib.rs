@@ -2,8 +2,10 @@
 //!
 //! This crate provides PyO3 bindings exposing the Rust UCP implementation to Python.
 
+#![allow(clippy::useless_conversion)]
+#![allow(unexpected_cfgs)]
+
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 mod block;
 mod content;
@@ -32,7 +34,7 @@ use engine::{
 };
 use llm::{PyIdMapper, PyPromptBuilder, PyPromptPresets, PyUclCapability};
 use observe::{PyAuditEntry, PyEventBus, PyMetricsRecorder, PyUcpEvent};
-use section::{PyClearResult, PyDeletedContent};
+use section::{PyClearResult, PyDeletedContent, PyWriteSectionResult, write_section};
 use snapshot::{PySnapshotInfo, PySnapshotManager};
 use types::PyBlockId;
 
@@ -168,6 +170,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Section utilities
     m.add_class::<PyClearResult>()?;
     m.add_class::<PyDeletedContent>()?;
+    m.add_class::<PyWriteSectionResult>()?;
 
     // Engine and validation classes
     m.add_class::<PyEngine>()?;
@@ -196,6 +199,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Section functions
     m.add_function(wrap_pyfunction!(clear_section_with_undo, m)?)?;
     m.add_function(wrap_pyfunction!(restore_deleted_section, m)?)?;
+    m.add_function(wrap_pyfunction!(write_section, m)?)?;
     m.add_function(wrap_pyfunction!(find_section_by_path, m)?)?;
     m.add_function(wrap_pyfunction!(get_all_sections, m)?)?;
     m.add_function(wrap_pyfunction!(get_section_depth, m)?)?;
