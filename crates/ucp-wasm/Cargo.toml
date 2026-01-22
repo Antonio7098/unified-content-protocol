@@ -26,6 +26,8 @@ ucl-parser = { path = "../ucl-parser" }
 ucp-api = { path = "../ucp-api" }
 ucp-llm = { path = "../ucp-llm" }
 ucp-translator-markdown = { path = "../translators/markdown" }
+ucp-translator-html = { path = "../translators/html" }
+ucp-observe = { path = "../ucp-observe" }
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 console_error_panic_hook = "0.1"
 

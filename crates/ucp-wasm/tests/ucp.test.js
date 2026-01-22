@@ -316,6 +316,54 @@ describe('Content', () => {
     expect(code.source).toBe('print("hi")');
   });
 
+  test('creates JSON content', () => {
+    const content = ucp.Content.json({ key: 'value', count: 42 });
+    expect(content.typeTag).toBe('json');
+    const json = content.asJson();
+    expect(json.key).toBe('value');
+    expect(json.count).toBe(42);
+  });
+
+  test('creates table content', () => {
+    const content = ucp.Content.table([['A', 'B'], ['1', '2']]);
+    expect(content.typeTag).toBe('table');
+    const table = content.asTable();
+    expect(table.columns.length).toBe(2);
+    expect(table.rows.length).toBe(2);
+  });
+
+  test('creates math content', () => {
+    const content = ucp.Content.math('E = mc^2', true, 'latex');
+    expect(content.typeTag).toBe('math');
+    const math = content.asMath();
+    expect(math.expression).toBe('E = mc^2');
+    expect(math.displayMode).toBe(true);
+    expect(math.format).toBe('latex');
+  });
+
+  test('creates media content', () => {
+    const content = ucp.Content.media('image', 'https://example.com/img.png', 'Alt text', 800, 600);
+    expect(content.typeTag).toBe('media');
+    const media = content.asMedia();
+    expect(media.mediaType).toBe('image');
+    expect(media.url).toBe('https://example.com/img.png');
+    expect(media.altText).toBe('Alt text');
+  });
+
+  test('creates binary content', () => {
+    const data = new Uint8Array([0, 1, 2, 3, 4]);
+    const content = ucp.Content.binary('application/octet-stream', data);
+    expect(content.typeTag).toBe('binary');
+    const binary = content.asBinary();
+    expect(binary.mimeType).toBe('application/octet-stream');
+    expect(binary.data.length).toBe(5);
+  });
+
+  test('creates composite content', () => {
+    const content = ucp.Content.composite('horizontal');
+    expect(content.typeTag).toBe('composite');
+  });
+
   test('checks if empty', () => {
     const empty = ucp.Content.text('');
     expect(empty.isEmpty).toBe(true);
@@ -566,6 +614,208 @@ describe('PromptPresets', () => {
     const builder = ucp.PromptPresets.tokenEfficient();
     const prompt = builder.buildSystemPrompt();
     expect(prompt).toContain('short numeric IDs');
+  });
+});
+
+describe('HTML Parsing', () => {
+  test('parses simple HTML', () => {
+    const html = '<html><body><h1>Hello</h1><p>World</p></body></html>';
+    const doc = ucp.parseHtml(html);
+    expect(doc).toBeDefined();
+    expect(doc.blockCount()).toBeGreaterThan(1);
+  });
+
+  test('parses nested HTML', () => {
+    const html = `
+      <html><body>
+        <h1>Title</h1>
+        <h2>Section 1</h2>
+        <p>Content</p>
+        <h2>Section 2</h2>
+        <p>More content</p>
+      </body></html>
+    `;
+    const doc = ucp.parseHtml(html);
+    expect(doc.blockCount()).toBeGreaterThanOrEqual(5);
+  });
+
+  test('parses empty HTML', () => {
+    const html = '<html><body></body></html>';
+    const doc = ucp.parseHtml(html);
+    expect(doc.blockCount()).toBe(1); // Just root
+  });
+});
+
+describe('Section Utilities', () => {
+  test('finds section by path', () => {
+    const md = `# Introduction
+
+Some text.
+
+## Getting Started
+
+More text.
+`;
+    const doc = ucp.parseMarkdown(md);
+    
+    const sectionId = ucp.findSectionByPath(doc, 'Introduction');
+    expect(sectionId).toBeDefined();
+  });
+
+  test('gets all sections', () => {
+    const md = `# Title
+
+## Section 1
+
+### Subsection
+
+## Section 2
+`;
+    const doc = ucp.parseMarkdown(md);
+    
+    const sections = ucp.getAllSections(doc);
+    expect(sections.length).toBeGreaterThanOrEqual(4);
+  });
+
+  test('clears section with undo', () => {
+    const md = `# Title
+
+## Section
+
+Content to clear.
+`;
+    const doc = ucp.parseMarkdown(md);
+    const sectionId = ucp.findSectionByPath(doc, 'Title > Section');
+    
+    if (sectionId) {
+      const initialCount = doc.blockCount();
+      const result = ucp.clearSectionWithUndo(doc, sectionId);
+      
+      expect(result.removedIds.length).toBeGreaterThanOrEqual(0);
+      expect(result.deletedContent).toBeDefined();
+    }
+  });
+
+  test('restores deleted section', () => {
+    const md = `# Title
+
+## Section
+
+Content.
+`;
+    const doc = ucp.parseMarkdown(md);
+    const sectionId = ucp.findSectionByPath(doc, 'Title > Section');
+    
+    if (sectionId) {
+      const initialCount = doc.blockCount();
+      const result = ucp.clearSectionWithUndo(doc, sectionId);
+      
+      // Restore
+      const restored = ucp.restoreDeletedSection(doc, result.deletedContent);
+      expect(doc.blockCount()).toBe(initialCount);
+    }
+  });
+
+  test('serializes deleted content', () => {
+    const md = `# Title
+
+## Section
+
+Content.
+`;
+    const doc = ucp.parseMarkdown(md);
+    const sectionId = ucp.findSectionByPath(doc, 'Title > Section');
+    
+    if (sectionId) {
+      const result = ucp.clearSectionWithUndo(doc, sectionId);
+      
+      // Serialize
+      const json = result.deletedContent.toJson();
+      expect(json).toBeDefined();
+      expect(json.length).toBeGreaterThan(0);
+      
+      // Deserialize
+      const restored = ucp.WasmDeletedContent.fromJson(json);
+      expect(restored.blockCount).toBe(result.deletedContent.blockCount);
+    }
+  });
+});
+
+describe('Observability', () => {
+  test('creates audit entry', () => {
+    const entry = new ucp.WasmAuditEntry('EDIT', 'doc_123');
+    expect(entry.operation).toBe('EDIT');
+    expect(entry.documentId).toBe('doc_123');
+    expect(entry.success).toBe(true);
+  });
+
+  test('audit entry with user', () => {
+    const entry = new ucp.WasmAuditEntry('CREATE', 'doc_456')
+      .withUser('user_789');
+    expect(entry.userId).toBe('user_789');
+  });
+
+  test('audit entry failed', () => {
+    const entry = new ucp.WasmAuditEntry('DELETE', 'doc_000')
+      .failed();
+    expect(entry.success).toBe(false);
+  });
+
+  test('audit entry to JSON', () => {
+    const entry = new ucp.WasmAuditEntry('UPDATE', 'doc_111');
+    const json = entry.toJson();
+    expect(json.operation).toBe('UPDATE');
+    expect(json.documentId).toBe('doc_111');
+  });
+
+  test('creates metrics recorder', () => {
+    const metrics = new ucp.WasmMetricsRecorder();
+    expect(metrics.operationsTotal).toBe(0);
+  });
+
+  test('records operations', () => {
+    const metrics = new ucp.WasmMetricsRecorder();
+    metrics.recordOperation(true);
+    metrics.recordOperation(false);
+    
+    expect(metrics.operationsTotal).toBe(2);
+    expect(metrics.operationsFailed).toBe(1);
+  });
+
+  test('records block operations', () => {
+    const metrics = new ucp.WasmMetricsRecorder();
+    metrics.recordBlockCreated();
+    metrics.recordBlockCreated();
+    metrics.recordBlockDeleted();
+    
+    expect(metrics.blocksCreated).toBe(2);
+    expect(metrics.blocksDeleted).toBe(1);
+  });
+
+  test('metrics to JSON', () => {
+    const metrics = new ucp.WasmMetricsRecorder();
+    metrics.recordOperation(true);
+    metrics.recordSnapshot();
+    
+    const json = metrics.toJson();
+    expect(json.operationsTotal).toBe(1);
+    expect(json.snapshotsCreated).toBe(1);
+  });
+
+  test('creates UCP events', () => {
+    const event = ucp.WasmUcpEvent.documentCreated('doc_123');
+    expect(event.eventType).toBe('document_created');
+    expect(event.documentId).toBe('doc_123');
+  });
+
+  test('creates block added event', () => {
+    const event = ucp.WasmUcpEvent.blockAdded('doc_1', 'blk_1', 'root', 'text');
+    expect(event.eventType).toBe('block_added');
+  });
+
+  test('creates block deleted event', () => {
+    const event = ucp.WasmUcpEvent.blockDeleted('doc_1', 'blk_1', true);
+    expect(event.eventType).toBe('block_deleted');
   });
 });
 

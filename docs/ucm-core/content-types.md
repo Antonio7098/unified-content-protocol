@@ -321,7 +321,21 @@ For tabular data with optional schema.
     ```
 
 === "JavaScript"
-    *Not currently exposed in JavaScript SDK v0.1.6.*
+    ```javascript
+    import { Content } from 'ucp-content';
+
+    // Simple table from rows
+    const table = Content.table([
+        ['Name', 'Age', 'City'],
+        ['Alice', '30', 'NYC'],
+        ['Bob', '25', 'LA']
+    ]);
+
+    // Access table data
+    const data = table.asTable();
+    console.log(data.columns); // ['col0', 'col1', 'col2']
+    console.log(data.rows);    // [['Name', 'Age', 'City'], ...]
+    ```
 
 ### Table Operations
 
@@ -401,10 +415,44 @@ For mathematical expressions in various formats.
     ```
 
 === "Python"
-    *Not currently exposed in Python SDK v0.1.6.*
+    ```python
+    from ucp_content import Content
+
+    # LaTeX (inline)
+    inline = Content.math(r"E = mc^2")
+
+    # LaTeX (display mode)
+    display = Content.math(r"\int_0^\infty e^{-x^2} dx", display_mode=True)
+
+    # MathML format
+    mathml = Content.math("<math>...</math>", format="mathml")
+
+    # AsciiMath format
+    ascii = Content.math("sum_(i=1)^n i^3", format="asciimath")
+
+    # Access math data
+    expr, is_display, fmt = inline.as_math()
+    ```
 
 === "JavaScript"
-    *Not currently exposed in JavaScript SDK v0.1.6.*
+    ```javascript
+    import { Content } from 'ucp-content';
+
+    // LaTeX (inline)
+    const inline = Content.math('E = mc^2');
+
+    // LaTeX (display mode)
+    const display = Content.math('\\int_0^\\infty e^{-x^2} dx', true, 'latex');
+
+    // MathML format
+    const mathml = Content.math('<math>...</math>', false, 'mathml');
+
+    // Access math data
+    const data = inline.asMath();
+    console.log(data.expression);  // 'E = mc^2'
+    console.log(data.displayMode); // false
+    console.log(data.format);      // 'latex'
+    ```
 
 ## Media Content
 
@@ -485,10 +533,50 @@ For images, audio, video, and documents.
     ```
 
 === "Python"
-    *Not currently exposed in Python SDK v0.1.6.*
+    ```python
+    from ucp_content import Content
+
+    # Image from URL
+    image = Content.media(
+        "image",
+        "https://example.com/image.png",
+        alt_text="Example image",
+        width=800,
+        height=600
+    )
+
+    # Video
+    video = Content.media("video", "https://example.com/video.mp4")
+
+    # Audio
+    audio = Content.media("audio", "https://example.com/audio.mp3")
+
+    # Access media data
+    media_type, url, alt = image.as_media()
+    ```
 
 === "JavaScript"
-    *Not currently exposed in JavaScript SDK v0.1.6.*
+    ```javascript
+    import { Content } from 'ucp-content';
+
+    // Image from URL
+    const image = Content.media(
+        'image',
+        'https://example.com/image.png',
+        'Example image',
+        800,
+        600
+    );
+
+    // Video
+    const video = Content.media('video', 'https://example.com/video.mp4');
+
+    // Access media data
+    const data = image.asMedia();
+    console.log(data.mediaType); // 'image'
+    console.log(data.url);       // 'https://example.com/image.png'
+    console.log(data.altText);   // 'Example image'
+    ```
 
 ## JSON Content
 
@@ -549,7 +637,20 @@ For structured JSON data with optional schema validation.
     ```
 
 === "JavaScript"
-    *Not currently exposed in JavaScript SDK v0.1.6.*
+    ```javascript
+    import { Content } from 'ucp-content';
+
+    // Simple JSON
+    const json = Content.json({
+        name: 'Alice',
+        age: 30,
+        tags: ['developer', 'javascript']
+    });
+
+    // Access JSON data
+    const data = json.asJson();
+    console.log(data.name); // 'Alice'
+    ```
 
 ## Binary Content
 
@@ -581,10 +682,33 @@ For raw binary data with MIME type.
     ```
 
 === "Python"
-    *Not currently exposed in Python SDK v0.1.6.*
+    ```python
+    from ucp_content import Content
+
+    # Binary from bytes
+    binary = Content.binary(
+        "application/pdf",
+        b"\x25\x50\x44\x46",  # PDF magic bytes
+        encoding="raw"
+    )
+
+    # Access binary data
+    mime, data = binary.as_binary()
+    ```
 
 === "JavaScript"
-    *Not currently exposed in JavaScript SDK v0.1.6.*
+    ```javascript
+    import { Content } from 'ucp-content';
+
+    // Binary from Uint8Array
+    const data = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+    const binary = Content.binary('application/pdf', data);
+
+    // Access binary data
+    const result = binary.asBinary();
+    console.log(result.mimeType); // 'application/pdf'
+    console.log(result.data);     // Uint8Array
+    ```
 
 ## Composite Content
 
@@ -622,10 +746,38 @@ For blocks that contain references to other blocks.
     ```
 
 === "Python"
-    *Not currently exposed in Python SDK v0.1.6.*
+    ```python
+    from ucp_content import Content
+
+    # Vertical layout (default)
+    composite = Content.composite("vertical")
+
+    # Horizontal layout
+    composite = Content.composite("horizontal")
+
+    # Grid layout with 3 columns
+    composite = Content.composite("grid:3")
+
+    # Tabs layout
+    composite = Content.composite("tabs")
+    ```
 
 === "JavaScript"
-    *Not currently exposed in JavaScript SDK v0.1.6.*
+    ```javascript
+    import { Content } from 'ucp-content';
+
+    // Vertical layout (default)
+    const composite = Content.composite('vertical');
+
+    // Horizontal layout
+    const horizontal = Content.composite('horizontal');
+
+    // Grid layout with 3 columns
+    const grid = Content.composite('grid:3');
+
+    // Tabs layout
+    const tabs = Content.composite('tabs');
+    ```
 
 ## Content Operations
 

@@ -1,8 +1,9 @@
 //! Content type wrapper for Python.
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use ucm_core::Content;
+use pyo3::types::{PyBytes, PyDict};
+use ucm_core::content::{BinaryEncoding, CompositeLayout, Media, MediaSource, MediaType, Math, MathFormat};
+use ucm_core::{BlockId, Content};
 
 // Helper for creating a new dict (PyO3 0.22 API)
 fn new_dict(py: Python<'_>) -> Bound<'_, PyDict> {
@@ -67,6 +68,107 @@ impl PyContent {
         PyContent(Content::table(rows))
     }
 
+    /// Create math content (LaTeX by default).
+    #[staticmethod]
+    #[pyo3(signature = (expression, display_mode=false, format="latex"))]
+    fn math(expression: &str, display_mode: bool, format: &str) -> PyResult<Self> {
+        let math_format = match format.to_lowercase().as_str() {
+            "latex" => MathFormat::LaTeX,
+            "mathml" => MathFormat::MathML,
+            "asciimath" => MathFormat::AsciiMath,
+            _ => return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Unknown math format: {}. Use 'latex', 'mathml', or 'asciimath'", format)
+            )),
+        };
+        Ok(PyContent(Content::Math(Math {
+            format: math_format,
+            expression: expression.to_string(),
+            display_mode,
+        })))
+    }
+
+    /// Create media content (image, audio, video, document).
+    #[staticmethod]
+    #[pyo3(signature = (media_type, url, alt_text=None, width=None, height=None))]
+    fn media(
+        media_type: &str,
+        url: &str,
+        alt_text: Option<&str>,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> PyResult<Self> {
+        let mt = match media_type.to_lowercase().as_str() {
+            "image" => MediaType::Image,
+            "audio" => MediaType::Audio,
+            "video" => MediaType::Video,
+            "document" => MediaType::Document,
+            _ => return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Unknown media type: {}. Use 'image', 'audio', 'video', or 'document'", media_type)
+            )),
+        };
+        let mut media = Media::image(MediaSource::url(url));
+        media.media_type = mt;
+        if let Some(alt) = alt_text {
+            media = media.with_alt(alt);
+        }
+        if let (Some(w), Some(h)) = (width, height) {
+            media = media.with_dimensions(w, h);
+        }
+        Ok(PyContent(Content::Media(media)))
+    }
+
+    /// Create binary content.
+    #[staticmethod]
+    #[pyo3(signature = (mime_type, data, encoding="raw"))]
+    fn binary(mime_type: &str, data: &Bound<'_, PyBytes>, encoding: &str) -> PyResult<Self> {
+        let enc = match encoding.to_lowercase().as_str() {
+            "raw" => BinaryEncoding::Raw,
+            "base64" => BinaryEncoding::Base64,
+            "hex" => BinaryEncoding::Hex,
+            _ => return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Unknown encoding: {}. Use 'raw', 'base64', or 'hex'", encoding)
+            )),
+        };
+        Ok(PyContent(Content::Binary {
+            mime_type: mime_type.to_string(),
+            data: data.as_bytes().to_vec(),
+            encoding: enc,
+        }))
+    }
+
+    /// Create composite content (container for other blocks).
+    #[staticmethod]
+    #[pyo3(signature = (layout="vertical", children=None))]
+    fn composite(layout: &str, children: Option<Vec<String>>) -> PyResult<Self> {
+        let composite_layout = match layout.to_lowercase().as_str() {
+            "vertical" => CompositeLayout::Vertical,
+            "horizontal" => CompositeLayout::Horizontal,
+            "tabs" => CompositeLayout::Tabs,
+            s if s.starts_with("grid") => {
+                // Parse "grid:N" or "grid(N)" format
+                let cols = s.trim_start_matches("grid")
+                    .trim_start_matches(':')
+                    .trim_start_matches('(')
+                    .trim_end_matches(')')
+                    .parse::<usize>()
+                    .unwrap_or(2);
+                CompositeLayout::Grid(cols)
+            }
+            _ => return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Unknown layout: {}. Use 'vertical', 'horizontal', 'tabs', or 'grid:N'", layout)
+            )),
+        };
+        let child_ids: Vec<BlockId> = children
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        Ok(PyContent(Content::Composite {
+            layout: composite_layout,
+            children: child_ids,
+        }))
+    }
+
     /// Get the content type tag (e.g., "text", "code", "table").
     #[getter]
     fn type_tag(&self) -> &'static str {
@@ -113,6 +215,75 @@ impl PyContent {
                 Ok(Some(obj.into()))
             }
             _ => Ok(None),
+        }
+    }
+
+    /// Get the math expression if this is a math block.
+    fn as_math(&self) -> Option<(String, bool, String)> {
+        match &self.0 {
+            Content::Math(m) => {
+                let format = match m.format {
+                    MathFormat::LaTeX => "latex",
+                    MathFormat::MathML => "mathml",
+                    MathFormat::AsciiMath => "asciimath",
+                };
+                Some((m.expression.clone(), m.display_mode, format.to_string()))
+            }
+            _ => None,
+        }
+    }
+
+    /// Get the media info if this is a media block.
+    fn as_media(&self) -> Option<(String, String, Option<String>)> {
+        match &self.0 {
+            Content::Media(m) => {
+                let media_type = match m.media_type {
+                    MediaType::Image => "image",
+                    MediaType::Audio => "audio",
+                    MediaType::Video => "video",
+                    MediaType::Document => "document",
+                };
+                let url = match &m.source {
+                    MediaSource::Url(u) => u.clone(),
+                    MediaSource::Base64(b) => format!("data:base64,{}", b),
+                    MediaSource::Reference(id) => format!("ref:{}", id),
+                    MediaSource::External(e) => format!("{}://{}/{}", e.provider, e.bucket, e.key),
+                };
+                Some((media_type.to_string(), url, m.alt_text.clone()))
+            }
+            _ => None,
+        }
+    }
+
+    /// Get the binary data if this is a binary block.
+    fn as_binary<'py>(&self, py: Python<'py>) -> Option<(String, Bound<'py, PyBytes>)> {
+        match &self.0 {
+            Content::Binary { mime_type, data, .. } => {
+                Some((mime_type.clone(), PyBytes::new_bound(py, data)))
+            }
+            _ => None,
+        }
+    }
+
+    /// Get the table data if this is a table block.
+    fn as_table(&self) -> Option<(Vec<String>, Vec<Vec<String>>)> {
+        match &self.0 {
+            Content::Table(t) => {
+                let columns: Vec<String> = t.columns.iter().map(|c| c.name.clone()).collect();
+                let rows: Vec<Vec<String>> = t.rows.iter().map(|r| {
+                    r.cells.iter().map(|c| match c {
+                        ucm_core::content::Cell::Null => "null".to_string(),
+                        ucm_core::content::Cell::Text(s) => s.clone(),
+                        ucm_core::content::Cell::Number(n) => n.to_string(),
+                        ucm_core::content::Cell::Boolean(b) => b.to_string(),
+                        ucm_core::content::Cell::Date(d) => d.clone(),
+                        ucm_core::content::Cell::DateTime(dt) => dt.clone(),
+                        ucm_core::content::Cell::Json(v) => v.to_string(),
+                    }).collect()
+                }).collect();
+                Some((columns, rows))
+            }
+            _ => None,
         }
     }
 

@@ -19,10 +19,14 @@ The **ucp-translator-html** crate converts HTML documents into the Unified Conte
     ```
 
 === "Python"
-    *The HTML translator is not currently exposed in the Python SDK.*
+    ```bash
+    pip install ucp-content
+    ```
 
 === "JavaScript"
-    *The HTML translator is not currently exposed in the JavaScript SDK.*
+    ```bash
+    npm install ucp-content
+    ```
 
 ## Quick Start
 
@@ -45,7 +49,43 @@ The **ucp-translator-html** crate converts HTML documents into the Unified Conte
     println!("Parsed {} blocks", doc.block_count());
     ```
 
-## Parser Configuration
+=== "Python"
+    ```python
+    import ucp
+
+    html = '''
+    <!doctype html>
+    <html>
+      <body>
+        <h1>Intro</h1>
+        <p>Hello <strong>HTML</strong>!</p>
+      </body>
+    </html>
+    '''
+
+    doc = ucp.parse_html(html)
+    print(f"Parsed {doc.block_count} blocks")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { parseHtml } from 'ucp-content';
+
+    const html = `
+    <!doctype html>
+    <html>
+      <body>
+        <h1>Intro</h1>
+        <p>Hello <strong>HTML</strong>!</p>
+      </body>
+    </html>
+    `;
+
+    const doc = parseHtml(html);
+    console.log(`Parsed ${doc.blockCount()} blocks`);
+    ```
+
+## Parser Configuration (Rust Only)
 
 === "Rust"
     ```rust

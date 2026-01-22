@@ -52,6 +52,95 @@ class TestContentCreation:
         assert result["key"] == "value"
         assert result["count"] == 42
 
+    def test_math_content(self):
+        """Test creating math content."""
+        import ucp
+        content = ucp.Content.math(r"E = mc^2", display_mode=True)
+
+        assert content.type_tag == "math"
+        expr, display, fmt = content.as_math()
+        assert expr == r"E = mc^2"
+        assert display is True
+        assert fmt == "latex"
+
+    def test_math_content_formats(self):
+        """Test math content with different formats."""
+        import ucp
+        # LaTeX (default)
+        content = ucp.Content.math(r"\frac{a}{b}")
+        _, _, fmt = content.as_math()
+        assert fmt == "latex"
+
+        # MathML
+        content = ucp.Content.math("<math><mi>x</mi></math>", format="mathml")
+        _, _, fmt = content.as_math()
+        assert fmt == "mathml"
+
+        # AsciiMath
+        content = ucp.Content.math("sum_(i=1)^n i^3", format="asciimath")
+        _, _, fmt = content.as_math()
+        assert fmt == "asciimath"
+
+    def test_media_content(self):
+        """Test creating media content."""
+        import ucp
+        content = ucp.Content.media(
+            "image",
+            "https://example.com/image.png",
+            alt_text="Example image",
+            width=800,
+            height=600
+        )
+
+        assert content.type_tag == "media"
+        media_type, url, alt = content.as_media()
+        assert media_type == "image"
+        assert url == "https://example.com/image.png"
+        assert alt == "Example image"
+
+    def test_media_types(self):
+        """Test different media types."""
+        import ucp
+        for media_type in ["image", "audio", "video", "document"]:
+            content = ucp.Content.media(media_type, "https://example.com/file")
+            result_type, _, _ = content.as_media()
+            assert result_type == media_type
+
+    def test_binary_content(self):
+        """Test creating binary content."""
+        import ucp
+        data = b"\x00\x01\x02\x03\x04"
+        content = ucp.Content.binary("application/octet-stream", data)
+
+        assert content.type_tag == "binary"
+        mime, result_data = content.as_binary()
+        assert mime == "application/octet-stream"
+        assert result_data == data
+
+    def test_composite_content(self):
+        """Test creating composite content."""
+        import ucp
+        content = ucp.Content.composite("horizontal")
+
+        assert content.type_tag == "composite"
+
+    def test_composite_layouts(self):
+        """Test different composite layouts."""
+        import ucp
+        for layout in ["vertical", "horizontal", "tabs", "grid:3"]:
+            content = ucp.Content.composite(layout)
+            assert content.type_tag == "composite"
+
+    def test_table_as_table(self):
+        """Test getting table data from table content."""
+        import ucp
+        rows = [["Name", "Age"], ["Alice", "30"], ["Bob", "25"]]
+        content = ucp.Content.table(rows)
+
+        columns, data = content.as_table()
+        assert len(columns) == 2
+        assert len(data) == 3
+
     def test_empty_content(self):
         """Test checking empty content."""
         import ucp

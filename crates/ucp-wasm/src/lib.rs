@@ -7,12 +7,16 @@ use wasm_bindgen::prelude::*;
 mod document;
 mod errors;
 mod llm;
+mod observe;
+mod section;
 mod snapshot;
 mod types;
 
 pub use document::*;
 pub use errors::*;
 pub use llm::*;
+pub use observe::*;
+pub use section::*;
 pub use snapshot::*;
 pub use types::*;
 
@@ -33,6 +37,13 @@ pub fn parse_markdown(markdown: &str) -> Result<Document, JsValue> {
 #[wasm_bindgen(js_name = renderMarkdown)]
 pub fn render_markdown(doc: &Document) -> Result<String, JsValue> {
     ucp_translator_markdown::render_markdown(doc.inner()).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+/// Parse HTML into a Document.
+#[wasm_bindgen(js_name = parseHtml)]
+pub fn parse_html(html: &str) -> Result<Document, JsValue> {
+    let doc = ucp_translator_html::parse_html(html).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    Ok(Document::new(doc))
 }
 
 /// Execute UCL commands on a document.

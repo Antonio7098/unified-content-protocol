@@ -19,12 +19,74 @@ UCP Observe helps you:
     ```
 
 === "Python"
-    *Observability utilities are not currently exposed in the Python SDK.*
+    ```bash
+    pip install ucp-content
+    ```
 
 === "JavaScript"
-    *Observability utilities are not currently exposed in the JavaScript SDK.*
+    ```bash
+    npm install ucp-content
+    ```
 
 ## Quick Start
+
+=== "Rust"
+    ```rust
+    use ucp_observe::{init_tracing, AuditEntry, MetricsRecorder};
+
+    fn main() {
+        init_tracing();
+        
+        let mut metrics = MetricsRecorder::new();
+        metrics.record_operation(true);
+        metrics.record_block_created();
+        
+        let audit = AuditEntry::new("create_document", "doc-123")
+            .with_user("alice")
+            .with_duration(42);
+    }
+    ```
+
+=== "Python"
+    ```python
+    import ucp
+
+    # Create metrics recorder
+    metrics = ucp.MetricsRecorder()
+    metrics.record_operation(True)
+    metrics.record_block_created()
+
+    print(f"Total ops: {metrics.operations_total}")
+    print(f"Blocks created: {metrics.blocks_created}")
+
+    # Create audit entry
+    audit = ucp.AuditEntry("CREATE", "doc-123")
+    audit = audit.with_user("alice").with_duration(42)
+
+    print(audit.to_dict())
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { WasmMetricsRecorder, WasmAuditEntry } from 'ucp-content';
+
+    // Create metrics recorder
+    const metrics = new WasmMetricsRecorder();
+    metrics.recordOperation(true);
+    metrics.recordBlockCreated();
+
+    console.log(`Total ops: ${metrics.operationsTotal}`);
+    console.log(`Blocks created: ${metrics.blocksCreated}`);
+
+    // Create audit entry
+    const audit = new WasmAuditEntry('CREATE', 'doc-123')
+        .withUser('alice')
+        .withDuration(42);
+
+    console.log(audit.toJson());
+    ```
+
+## Tracing (Rust Only)
 
 === "Rust"
     ```rust

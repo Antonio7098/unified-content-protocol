@@ -19,6 +19,8 @@ ucl-parser = { path = "../ucl-parser" }
 ucp-api = { path = "../ucp-api" }
 ucp-llm = { path = "../ucp-llm" }
 ucp-translator-markdown = { path = "../translators/markdown" }
+ucp-translator-html = { path = "../translators/html" }
+ucp-observe = { path = "../ucp-observe" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
