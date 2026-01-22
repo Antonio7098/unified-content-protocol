@@ -34,7 +34,7 @@ Use the pages above to go deeper into specific aspects of the editor.
 
 ## Related Packages
 
-- [`ucm-editor`](../../packages/ucm-editor/README.md) – package-level README with API reference, keyboard shortcuts, and development commands.
+- [`ucm-editor`](../../ucm-editor/README.md) – package-level README with API reference, keyboard shortcuts, and development commands.
 - [`ucp-js`](../../packages/ucp-js/README.md) – headless SDK for parsing, validating, and transforming documents that you load into the editor.
 
 ## Next Steps

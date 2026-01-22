@@ -82,7 +82,7 @@
             "Cargo.toml",
             "packages/ucp-python/pyproject.toml",
             "crates/ucp-wasm/Cargo.toml",
-            "packages/ucm-editor/package.json"
+            "ucm-editor/package.json"
           ],
           "issues": []
         }
@@ -146,8 +146,8 @@
           "description": "Shipped the ucm-editor React package with dedicated docs (integration guide, store/hooks, components, views) and surfaced links across the docs site.",
           "commit": "pending",
           "files_affected": [
-            "packages/ucm-editor/package.json",
-            "packages/ucm-editor/src",
+            "ucm-editor/package.json",
+            "ucm-editor/src",
             "docs/index.md",
             "docs/ucm-editor/README.md",
             "docs/ucm-editor/integration.md",

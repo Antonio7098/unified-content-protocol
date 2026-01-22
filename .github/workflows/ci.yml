@@ -73,3 +73,26 @@ jobs:
       - name: Run tests
         working-directory: crates/ucp-wasm/tests
         run: npm test
+
+  editor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: ucm-editor
+        run: npm ci
+
+      - name: Lint
+        working-directory: ucm-editor
+        run: npm run lint
+
+      - name: Test
+        working-directory: ucm-editor
+        run: npm run test

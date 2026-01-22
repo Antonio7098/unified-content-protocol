@@ -50,27 +50,27 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
-        working-directory: packages/ucm-editor
+        working-directory: ucm-editor
         run: npm install
 
       - name: Lint
-        working-directory: packages/ucm-editor
+        working-directory: ucm-editor
         run: npm run lint
 
       - name: Test
-        working-directory: packages/ucm-editor
+        working-directory: ucm-editor
         run: npm run test
 
       - name: Typecheck
-        working-directory: packages/ucm-editor
+        working-directory: ucm-editor
         run: npm run typecheck
 
       - name: Build package
-        working-directory: packages/ucm-editor
+        working-directory: ucm-editor
         run: npm run build
 
       - name: Publish to npm
-        working-directory: packages/ucm-editor
+        working-directory: ucm-editor
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
