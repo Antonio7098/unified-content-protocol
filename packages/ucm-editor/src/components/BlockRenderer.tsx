@@ -5,7 +5,10 @@
  */
 
 import React, { useCallback, useState, useRef } from 'react'
-import type { Block, Document, BlockId } from 'ucp-content'
+import type { Document, ContentType, EdgeType } from 'ucp-content'
+
+// Type alias for BlockId since it's not exported
+type BlockId = string
 import type { EditorStoreInstance } from '../core/EditorStore.js'
 import { useEditorState } from '../hooks/useEditor.js'
 import { MetadataTooltip } from './MetadataTooltip.js'

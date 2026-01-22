@@ -4,7 +4,10 @@
  * Provides block-level and text-level diffing for UCM documents.
  */
 
-import type { BlockId, Document, Block } from 'ucp-content'
+import type { Document, ContentType, EdgeType } from 'ucp-content'
+
+// Type alias for BlockId since it's not exported
+type BlockId = string
 import type {
   DocumentDiff,
   BlockDiff,

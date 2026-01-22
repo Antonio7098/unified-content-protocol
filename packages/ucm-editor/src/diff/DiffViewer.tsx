@@ -5,7 +5,10 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react'
-import type { BlockId, Block } from 'ucp-content'
+import type { Document, ContentType, EdgeType } from 'ucp-content'
+
+// Type alias for BlockId since it's not exported
+type BlockId = string
 import type { EditorStoreInstance } from '../core/EditorStore.js'
 import type { DocumentDiff, BlockDiff, TextDiff, DiffChangeType } from '../types/editor.js'
 import { useEditorState } from '../hooks/useEditor.js'

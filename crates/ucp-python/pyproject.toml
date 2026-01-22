@@ -3,8 +3,8 @@ requires = ["maturin>=1.4,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "ucp-core"
-version = "0.1.5"
+name = "ucp-content"
+version = "0.1.6"
 description = "Python bindings for UCP (Unified Content Protocol) - Rust implementation"
 readme = "README.md"
 requires-python = ">=3.8"

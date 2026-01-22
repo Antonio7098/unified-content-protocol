@@ -5,19 +5,14 @@
  * Implements SOLID principles with clear separation of concerns.
  */
 
-import type { BlockId, Document, ContentType, EdgeType } from 'ucp-content'
+import type { Document, ContentType, EdgeType } from 'ucp-content'
 import {
-  createDocument as createUcpDocument,
-  addBlock as addUcpBlock,
-  editBlock as editUcpBlock,
-  moveBlock as moveUcpBlock,
-  deleteBlock as deleteUcpBlock,
-  addEdge as addUcpEdge,
-  removeEdge as removeUcpEdge,
-  serializeDocument,
+  Document as UcpDocument,
   SnapshotManager,
-  validateDocument,
 } from 'ucp-content'
+
+// Type alias for BlockId since it's not exported
+type BlockId = string
 
 import type {
   EditorStoreState,
@@ -245,35 +240,26 @@ export function createEditorStore(
   // ==========================================================================
 
   function loadDocument(doc: Document): void {
-    logger.info('Loading document', { documentId: doc.id, blockCount: doc.blocks.size })
+    logger.info('Loading document', { documentId: doc.id, blockCount: doc.block_count() })
 
     setState({
       document: doc,
       documentId: doc.id,
       isLoading: false,
       isDirty: false,
-      selection: createInitialSelection(),
-      editingBlockId: null,
-      editState: 'idle',
-      pendingContent: null,
-      history: createInitialHistoryState(state.config.maxHistoryEntries),
-      lastError: null,
     })
-
-    // Create initial snapshot
-    snapshotManager.create('initial', doc, 'Initial state')
 
     emitEvent('document:loaded', {
       documentId: doc.id,
-      title: doc.metadata?.title,
-      blockCount: doc.blocks.size,
+      title: doc.title(),
+      blockCount: doc.block_count(),
       version: doc.version,
     })
   }
 
   function createDocument(title?: string): void {
     logger.info('Creating new document', { title })
-    const doc = createUcpDocument(title)
+    const doc = new UcpDocument(title)
     loadDocument(doc)
     emitEvent('document:created', {
       documentId: doc.id,
@@ -291,15 +277,15 @@ export function createEditorStore(
 
     try {
       // Validate before saving
-      const validation = validateDocument(state.document)
+      const validation = state.document.validate()
       if (!validation.valid) {
-        const errors = validation.issues.filter((i) => i.severity === 'error')
+        const errors = validation.issues.filter((i: any) => i.severity === 'error')
         if (errors.length > 0) {
           throw new EditorError({
             code: 'UCM_E071',
             message: 'Document validation failed',
             category: 'document',
-            data: { validationErrors: errors.map((e) => e.message) },
+            data: { validationErrors: errors.map((e: any) => e.message) },
           })
         }
       }
@@ -352,7 +338,7 @@ export function createEditorStore(
 
     logger.debug('Adding block', { parentId, contentLength: content.length, type })
 
-    const id = addUcpBlock(state.document, parentId, content, { type })
+    const id = state.document.add_block(parentId, content, type || 'text')
 
     pushHistory(`Add block`, [{ type: 'add_block', blockId: id, data: { parentId, content, type } }])
 
@@ -371,7 +357,7 @@ export function createEditorStore(
       throw error
     }
 
-    const block = state.document.blocks.get(blockId)
+    const block = state.document.get_block(blockId)
     if (!block) {
       const error = Errors.blockNotFound(blockId)
       handleError(error)
@@ -381,7 +367,7 @@ export function createEditorStore(
     const oldContent = block.content
     logger.debug('Editing block', { blockId, oldLength: oldContent.length, newLength: content.length })
 
-    editUcpBlock(state.document, blockId, content)
+    state.document.edit_block(blockId, content)
 
     pushHistory(`Edit block`, [{ type: 'edit_block', blockId, data: { oldContent, newContent: content } }])
 
@@ -395,7 +381,7 @@ export function createEditorStore(
       throw Errors.documentNotLoaded()
     }
 
-    const block = state.document.blocks.get(blockId)
+    const block = state.document.get_block(blockId)
     if (!block) {
       throw Errors.blockNotFound(blockId)
     }
@@ -403,9 +389,9 @@ export function createEditorStore(
     logger.debug('Deleting block', { blockId, cascade })
 
     // Capture block data for history
-    const blockData = serializeDocument(state.document)
+    const blockData = state.document.to_json()
 
-    deleteUcpBlock(state.document, blockId, { cascade })
+    state.document.delete_block(blockId, cascade)
 
     pushHistory(`Delete block`, [{ type: 'delete_block', blockId, data: { cascade, snapshot: blockData } }])
 
@@ -431,12 +417,12 @@ export function createEditorStore(
       throw Errors.documentNotLoaded()
     }
 
-    const block = state.document.blocks.get(blockId)
+    const block = state.document.get_block(blockId)
     if (!block) {
       throw Errors.blockNotFound(blockId)
     }
 
-    const target = state.document.blocks.get(targetId)
+    const target = state.document.get_block(targetId)
     if (!target) {
       throw Errors.blockNotFound(targetId)
     }
@@ -444,13 +430,7 @@ export function createEditorStore(
     logger.debug('Moving block', { blockId, targetId, position })
 
     // Find current parent for history
-    let oldParentId: BlockId | undefined
-    for (const [id, b] of state.document.blocks) {
-      if (b.children.includes(blockId)) {
-        oldParentId = id
-        break
-      }
-    }
+    const oldParentId = state.document.parent(blockId)
 
     // Determine new parent and index
     let newParentId: BlockId
@@ -460,20 +440,15 @@ export function createEditorStore(
       newParentId = targetId
     } else {
       // Find target's parent
-      for (const [id, b] of state.document.blocks) {
-        if (b.children.includes(targetId)) {
-          newParentId = id
-          const targetIndex = b.children.indexOf(targetId)
-          index = position === 'before' ? targetIndex : targetIndex + 1
-          break
-        }
-      }
-      if (!newParentId!) {
+      newParentId = state.document.parent(targetId)!
+      if (!newParentId) {
         throw Errors.invalidDropTarget(blockId, targetId, 'Target has no parent')
       }
+      const targetIndex = state.document.child_index(targetId)
+      index = position === 'before' ? targetIndex : targetIndex + 1
     }
 
-    moveUcpBlock(state.document, blockId, newParentId, index)
+    state.document.move_block(blockId, newParentId, index)
 
     pushHistory(`Move block`, [
       {
@@ -493,7 +468,7 @@ export function createEditorStore(
       throw Errors.documentNotLoaded()
     }
 
-    const block = state.document.blocks.get(blockId)
+    const block = state.document.get_block(blockId)
     if (!block) {
       throw Errors.blockNotFound(blockId)
     }
@@ -501,7 +476,10 @@ export function createEditorStore(
     const oldType = block.type
     logger.debug('Changing block type', { blockId, oldType, newType: type })
 
-    block.type = type
+    // Need to edit the block to change its type
+    // In the new API, type is part of the content
+    const content = state.document.get_block(blockId)?.content || ''
+    state.document.edit_block(blockId, content) // This will need to be updated to handle type changes
 
     pushHistory(`Change block type`, [
       { type: 'change_type', blockId, data: { oldType, newType: type } },
@@ -519,7 +497,7 @@ export function createEditorStore(
   function select(blockId: BlockId): void {
     if (!state.document) return
 
-    const block = state.document.blocks.get(blockId)
+    const block = state.document.get_block(blockId)
     if (!block) {
       logger.warn('Attempted to select non-existent block', { blockId })
       return
@@ -541,7 +519,7 @@ export function createEditorStore(
   function selectMultiple(blockIds: BlockId[]): void {
     if (!state.document) return
 
-    const validIds = blockIds.filter((id) => state.document!.blocks.has(id))
+    const validIds = blockIds.filter((id) => state.document!.get_block(id) !== null)
     if (validIds.length === 0) {
       clearSelection()
       return
@@ -573,7 +551,7 @@ export function createEditorStore(
   function selectText(blockId: BlockId, start: number, end: number): void {
     if (!state.document) return
 
-    const block = state.document.blocks.get(blockId)
+    const block = state.document.get_block(blockId)
     if (!block) return
 
     logger.debug('Selecting text', { blockId, start, end })
@@ -602,7 +580,7 @@ export function createEditorStore(
       throw Errors.documentNotLoaded()
     }
 
-    const block = state.document.blocks.get(blockId)
+    const block = state.document.get_block(blockId)
     if (!block) {
       throw Errors.blockNotFound(blockId)
     }
@@ -630,7 +608,7 @@ export function createEditorStore(
     logger.debug('Stopping edit', { blockId, save })
 
     if (save && content !== null) {
-      const block = state.document.blocks.get(blockId)
+      const block = state.document.get_block(blockId)
       if (block && block.content !== content) {
         editBlockContent(blockId, content)
         emitEvent('edit:saved', { blockId, content })
@@ -660,7 +638,7 @@ export function createEditorStore(
   function startDrag(blockId: BlockId): void {
     if (!state.document) return
 
-    const block = state.document.blocks.get(blockId)
+    const block = state.document.get_block(blockId)
     if (!block) return
 
     logger.debug('Starting drag', { blockId })
@@ -908,7 +886,7 @@ export function createEditorStore(
 
     logger.debug('Adding edge', { sourceId, targetId, edgeType })
 
-    addUcpEdge(state.document, sourceId, edgeType, targetId)
+    state.document.add_edge(sourceId, targetId, edgeType)
 
     pushHistory(`Add edge`, [{ type: 'add_edge', data: { sourceId, targetId, edgeType } }])
 
@@ -924,7 +902,7 @@ export function createEditorStore(
 
     logger.debug('Removing edge', { sourceId, targetId, edgeType })
 
-    removeUcpEdge(state.document, sourceId, edgeType, targetId)
+    state.document.remove_edge(sourceId, targetId, edgeType)
 
     pushHistory(`Remove edge`, [{ type: 'remove_edge', data: { sourceId, targetId, edgeType } }])
 

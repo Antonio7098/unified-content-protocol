@@ -4,7 +4,10 @@
  * Manages block selection, text selection, and keyboard navigation.
  */
 
-import type { BlockId, Document } from 'ucp-content'
+import type { Document, ContentType, EdgeType } from 'ucp-content'
+
+// Type alias for BlockId since it's not exported
+type BlockId = string
 import type { SelectionState, TextSelection } from '../types/editor.js'
 import { Logger } from './Logger.js'
 

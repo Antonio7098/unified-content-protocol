@@ -2,7 +2,21 @@
  * Core editor types for UCM Editor.
  */
 
-import type { BlockId, Document, Block, ContentType, SemanticRole, EdgeType } from 'ucp-content'
+import type { Document, ContentType, EdgeType } from 'ucp-content'
+
+// Type aliases for types not exported from WASM
+type BlockId = string
+interface Block {
+  id: BlockId
+  content: string
+  type: ContentType
+  role?: string
+  label?: string
+  tags: string[]
+  children: BlockId[]
+  edges: Array<{ edgeType: EdgeType; target: BlockId; metadata?: any }>
+}
+type SemanticRole = string
 
 // =============================================================================
 // EDITOR STATE

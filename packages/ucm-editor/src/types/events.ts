@@ -4,7 +4,10 @@
  * Events are used for observability, logging, and extensibility.
  */
 
-import type { BlockId, ContentType, EdgeType } from 'ucp-content'
+import type { ContentType, EdgeType } from 'ucp-content'
+
+// Type alias for BlockId since it's not exported
+type BlockId = string
 import type { EditorView, EditorMode, DiffChangeType, GraphLayout } from './editor.js'
 
 // =============================================================================
