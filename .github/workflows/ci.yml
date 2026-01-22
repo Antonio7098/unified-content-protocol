@@ -102,7 +102,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ucm-editor
-        run: npm ci
+        run: npm install
 
       - name: Lint
         working-directory: ucm-editor
