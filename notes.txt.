@@ -1,5 +1,11 @@
 introducing sections as a first class type. write to section. unable to set a non section block as a parent. write to section. 
 
+extended reasoning language. structured, machine parsable language for reasoning to be able to track and record reasoning process, ddecisions, progress.
+
+extended cli linting
+
+structured pocess for building pipelines. define requirements. build pipeline. unit, integration. all kinds of tests.
+
 Let me look at how PromptBuilder's build_prompt uses this.
 Looking at render_for_prompt() (context.rs:506-541), the context window doesn't explicitly convey its internal structure - it just outputs blocks as a flat list:
 [blk_xxx] heading: Introduction

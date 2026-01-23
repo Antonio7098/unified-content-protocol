@@ -20,8 +20,30 @@
   "entries": [
     {
       "version": "v0.1.7",
-      "date": "2026-01-22",
+      "date": "2025-01-23",
       "changes": [
+        {
+          "type": "added",
+          "area": "wasm",
+          "description": "Major WASM integration and SDK migration",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/src",
+            "crates/ucp-wasm/tests/ucp.test.js",
+            "docs/ucm-engine",
+            "ucm-editor/package.json",
+            "ucm-editor/src",
+            "docs/index.md",
+            "docs/ucm-editor/README.md",
+            "docs/ucm-editor/integration.md",
+            "docs/ucm-editor/store.md",
+            "docs/ucm-editor/components.md",
+            "docs/ucm-editor/views.md"
+          ],
+          "issues": []
+        },
         {
           "type": "added",
           "area": "sdk.engine",
