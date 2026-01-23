@@ -100,6 +100,16 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build WASM package
+        working-directory: crates/ucp-wasm
+        run: wasm-pack build --release --target nodejs --out-dir pkg
+
       - name: Install dependencies
         working-directory: ucm-editor
         run: npm install
