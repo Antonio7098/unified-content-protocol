@@ -284,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
         errors.append(
             f"packages/ucp-python/pyproject.toml version {python_version} does not match {workspace_version}."
         )
-    if js_version != workspace_version:
+    if js_version != workspace_version and js_version != "disabled":
         errors.append(
             f"packages/ucp-js/package.json version {js_version} does not match {workspace_version}."
         )

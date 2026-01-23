@@ -33,14 +33,7 @@
             "crates/ucp-wasm/src",
             "crates/ucp-wasm/tests/ucp.test.js",
             "docs/ucm-engine",
-            "ucm-editor/package.json",
-            "ucm-editor/src",
-            "docs/index.md",
-            "docs/ucm-editor/README.md",
-            "docs/ucm-editor/integration.md",
-            "docs/ucm-editor/store.md",
-            "docs/ucm-editor/components.md",
-            "docs/ucm-editor/views.md"
+            "docs/index.md"
           ],
           "issues": []
         },
