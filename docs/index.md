@@ -7,7 +7,7 @@ Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major a
 === "Rust"
     ```toml
     [dependencies]
-    ucp-api = "0.1.6"
+    ucp-api = "0.1.7"
     ```
 
 === "Python"
