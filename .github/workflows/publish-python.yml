@@ -50,7 +50,7 @@ jobs:
 
       - name: Build distribution
         working-directory: crates/ucp-python
-        run: python -m build
+        run: maturin build --compatibility manylinux_2_34_x86_64
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

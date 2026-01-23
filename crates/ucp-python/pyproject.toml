@@ -32,3 +32,4 @@ Repository = "https://github.com/unified-content/ucp"
 features = ["pyo3/extension-module"]
 python-source = "python"
 module-name = "ucp._core"
+manylinux = "2_34"
