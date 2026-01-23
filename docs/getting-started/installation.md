@@ -36,16 +36,12 @@ This guide covers how to install and configure UCP for your project.
     [dependencies]
     # Core types only
     ucm-core = "0.1.7"
-
     # Core + transformation engine
     ucm-engine = "0.1.7"
-
     # UCL command parsing
     ucl-parser = "0.1.7"
-
     # Markdown conversion
     ucp-translator-markdown = "0.1.7"
-
     # Observability utilities
     ucp-observe = "0.1.7"
     ```
@@ -185,7 +181,7 @@ If you're using multiple UCP crates, ensure they're all from the same version:
 ```toml
 [dependencies]
 ucm-core = "0.1.7"
-sucm-engine = "0.1.7"  # Must match ucm-core version
+ucm-engine = "0.1.7"
 ```
 
 ## Next Steps
