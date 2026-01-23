@@ -13,11 +13,11 @@ pub struct TransactionId(pub String);
 
 impl TransactionId {
     pub fn generate() -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        use chrono::Utc;
+        #[cfg(not(target_arch = "wasm32"))]
+        let ts = Utc::now().timestamp_nanos_opt().unwrap_or(0);
+        #[cfg(target_arch = "wasm32")]
+        let ts = 0; // Fallback for WASM if Utc::now() panics
         Self(format!("txn_{:x}", ts))
     }
 
@@ -55,8 +55,10 @@ pub struct Transaction {
     /// Current state
     pub state: TransactionState,
     /// Start time
+    #[cfg(not(target_arch = "wasm32"))]
     pub started_at: Instant,
     /// Created timestamp
+    #[cfg(not(target_arch = "wasm32"))]
     pub created_at: DateTime<Utc>,
     /// Timeout duration
     pub timeout: Duration,
@@ -67,6 +69,7 @@ pub struct Transaction {
 pub struct Savepoint {
     pub name: String,
     pub operation_index: usize,
+    #[cfg(not(target_arch = "wasm32"))]
     pub created_at: DateTime<Utc>,
 }
 
@@ -79,7 +82,9 @@ impl Transaction {
             operations: Vec::new(),
             savepoints: Vec::new(),
             state: TransactionState::Active,
+            #[cfg(not(target_arch = "wasm32"))]
             started_at: Instant::now(),
+            #[cfg(not(target_arch = "wasm32"))]
             created_at: Utc::now(),
             timeout,
         }
@@ -94,7 +99,9 @@ impl Transaction {
             operations: Vec::new(),
             savepoints: Vec::new(),
             state: TransactionState::Active,
+            #[cfg(not(target_arch = "wasm32"))]
             started_at: Instant::now(),
+            #[cfg(not(target_arch = "wasm32"))]
             created_at: Utc::now(),
             timeout,
         }
@@ -124,18 +131,27 @@ impl Transaction {
         self.savepoints.push(Savepoint {
             name: name.into(),
             operation_index: self.operations.len(),
+            #[cfg(not(target_arch = "wasm32"))]
             created_at: Utc::now(),
         });
     }
 
     /// Check if transaction has timed out
     pub fn is_timed_out(&self) -> bool {
-        self.started_at.elapsed() > self.timeout
+        #[cfg(not(target_arch = "wasm32"))]
+        return self.started_at.elapsed() > self.timeout;
+
+        #[cfg(target_arch = "wasm32")]
+        false
     }
 
     /// Get elapsed time
     pub fn elapsed(&self) -> Duration {
-        self.started_at.elapsed()
+        #[cfg(not(target_arch = "wasm32"))]
+        return self.started_at.elapsed();
+
+        #[cfg(target_arch = "wasm32")]
+        Duration::from_secs(0)
     }
 
     /// Get operation count

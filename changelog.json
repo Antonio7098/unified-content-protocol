@@ -19,7 +19,99 @@
   },
   "entries": [
     {
-      "version": "v0.1.5",
+      "version": "v0.1.7",
+      "date": "2025-01-23",
+      "changes": [
+        {
+          "type": "added",
+          "area": "wasm",
+          "description": "Major WASM integration and SDK migration",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/src",
+            "crates/ucp-wasm/tests/ucp.test.js",
+            "docs/ucm-engine",
+            "ucm-editor/package.json",
+            "ucm-editor/src",
+            "docs/index.md",
+            "docs/ucm-editor/README.md",
+            "docs/ucm-editor/integration.md",
+            "docs/ucm-editor/store.md",
+            "docs/ucm-editor/components.md",
+            "docs/ucm-editor/views.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.engine",
+          "description": "Exposed Engine, Transaction Management, TraversalEngine, and ValidationPipeline in Python and JavaScript SDKs.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src/engine.rs",
+            "crates/ucp-wasm/src/engine.rs",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/src/lib.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.section",
+          "description": "Implemented write_section and Document convenience methods in SDKs for undoable section updates.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src/section.rs",
+            "crates/ucp-python/src/document.rs",
+            "crates/ucp-wasm/src/section.rs",
+            "crates/ucp-wasm/src/document.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "sdk.core",
+          "description": "Replaced the legacy Python and JavaScript SDK re-implementations with direct PyO3/wasm-bindgen bindings to the Rust engine, ensuring parity with core features and reducing drift.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/src",
+            "crates/ucp-wasm/tests/ucp.test.js",
+            "docs/ucm-engine"
+          ],
+          "issues": []
+        },
+        {
+          "type": "fixed",
+          "area": "wasm.compat",
+          "description": "Fixed WASM panic related to std::time::Instant by adding conditional compilation for wasm32 target.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucm-engine/src/transaction.rs",
+            "crates/ucm-engine/src/traversal.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped version to 0.1.7 across workspace and SDKs.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "packages/ucp-python/pyproject.toml",
+            "crates/ucp-wasm/Cargo.toml",
+            "ucm-editor/package.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
+      "version": "v0.1.6",
       "date": "2026-01-20",
       "changes": [
         {
@@ -76,8 +168,8 @@
           "description": "Shipped the ucm-editor React package with dedicated docs (integration guide, store/hooks, components, views) and surfaced links across the docs site.",
           "commit": "pending",
           "files_affected": [
-            "packages/ucm-editor/package.json",
-            "packages/ucm-editor/src",
+            "ucm-editor/package.json",
+            "ucm-editor/src",
             "docs/index.md",
             "docs/ucm-editor/README.md",
             "docs/ucm-editor/integration.md",
@@ -220,5 +312,14 @@
         }
       ]
     }
-  ]
+  ],
+  "v0.1.6": {
+    "date": "2026-01-22",
+    "changes": [
+      "Publish Rust-based ucp-content packages (Python and JavaScript/WASM)",
+      "Replace legacy hand-written SDKs with Rust bindings",
+      "Fix WASM time compatibility with chrono wasmbind feature",
+      "Update ucm-editor to use new WASM API (partial)"
+    ]
+  }
 }

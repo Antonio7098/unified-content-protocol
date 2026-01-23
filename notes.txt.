@@ -1,0 +1,61 @@
+introducing sections as a first class type. write to section. unable to set a non section block as a parent. write to section. 
+
+extended reasoning language. structured, machine parsable language for reasoning to be able to track and record reasoning process, ddecisions, progress.
+
+extended cli linting
+
+structured pocess for building pipelines. define requirements. build pipeline. unit, integration. all kinds of tests.
+
+Let me look at how PromptBuilder's build_prompt uses this.
+Looking at render_for_prompt() (context.rs:506-541), the context window doesn't explicitly convey its internal structure - it just outputs blocks as a flat list:
+[blk_xxx] heading: Introduction
+[blk_yyy] paragraph: Some content
+[blk_zzz] code: let x = 1
+The structure is implicit - only the block IDs and semantic roles are shown, sorted by relevance.
+Two Different Things
+| Method | Purpose | Output |
+|--------|---------|--------|
+| render_for_prompt() | Context window (subset) | Flat list of selected blocks |
+| document_to_prompt() | Full document structure | Hierarchical tree with parent→child |
+Current Gap
+The context window output lacks explicit structural relationships. If blocks 2 and 3 are parent/child in the context window, the LLM only sees them as separate items with no indication of hierarchy.
+Possible Enhancement
+To convey context window structure, you'd need something like:
+Document structure (context window):
+1 (root): 2 3
+2: 4
+3:
+4:
+Blocks in context:
+1 role=root content=""
+2 role=heading content="Title"
+3 role=paragraph content="Body"
+4 role=code content="..."
+Or include it inline:
+[3] paragraph (child of 2): Content
+[4] code (child of 2): let x = 1
+The current render_for_prompt() is at context.rs:536:
+output.push_str(&format!("[{}] {}: {}\n", block_id, role, content));
+It doesn't include parent/child info. This is likely intentional - the LLM just needs to know which blocks exist and their content, not necessarily their relationships in the context window specifically.
+
+Yes, I agree completely.
+Without structural information, the LLM cannot:
+- Navigate parent→child relationships
+- Understand which blocks are connected via edges
+- Know the traversal path to reach a target block
+- Decide which direction to expand context (up/down/semantic)
+For knowledge graph navigation, the LLM needs to see:
+Context window structure:
+blk_root: blk_001 blk_002
+blk_001: blk_003
+blk_002:
+blk_003:
+Blocks:
+blk_001 role=heading content="Chapter 1"
+blk_002 role=paragraph content="Intro"
+blk_003 role=code content="let x = 1"
+Currently render_for_prompt() outputs a flat relevance-sorted list, losing:
+- Hierarchical position
+- Edge relationships (references, elaborates, etc.)
+- Navigation path from focus to target
+The expand_semantic() function at context.rs:640-679 traverses edges, but the LLM never sees this structure in the prompt. This is a gap for effective graph navigation.

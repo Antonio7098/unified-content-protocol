@@ -49,11 +49,11 @@ jobs:
         run: python scripts/check_version_sync.py --quiet --require-tag
 
       - name: Build distribution
-        working-directory: packages/ucp-python
+        working-directory: crates/ucp-python
         run: python -m build
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: packages/ucp-python/dist
+          packages-dir: crates/ucp-python/dist
           password: ${{ secrets.PYPI_API_TOKEN }}

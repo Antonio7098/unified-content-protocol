@@ -25,7 +25,7 @@ pub struct DeletedContent {
     /// The parent block ID where this content was attached
     pub parent_id: BlockId,
     /// Timestamp when the deletion occurred
-    pub deleted_at: std::time::SystemTime,
+    pub deleted_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl DeletedContent {
@@ -35,7 +35,7 @@ impl DeletedContent {
             blocks: HashMap::new(),
             structure: HashMap::new(),
             parent_id,
-            deleted_at: std::time::SystemTime::now(),
+            deleted_at: chrono::Utc::now(),
         }
     }
 
@@ -355,13 +355,10 @@ fn adjust_heading_level(block: &mut Block, base_level: usize, _depth: usize) {
 
 /// Regenerate block ID to avoid conflicts.
 fn regenerate_block_id(block: &Block) -> BlockId {
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use chrono::Utc;
 
     // Create a unique ID based on content and timestamp
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
+    let timestamp = Utc::now().timestamp_nanos_opt().unwrap_or(0) as u128;
 
     let content_hash = ucm_core::id::compute_content_hash(&block.content);
 

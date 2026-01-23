@@ -1,0 +1,29 @@
+[package]
+name = "ucp-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Python bindings for UCP (Unified Content Protocol)"
+
+[lib]
+name = "ucp_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+ucm-core = { path = "../ucm-core" }
+ucm-engine = { path = "../ucm-engine" }
+ucl-parser = { path = "../ucl-parser" }
+ucp-api = { path = "../ucp-api" }
+ucp-llm = { path = "../ucp-llm" }
+ucp-translator-markdown = { path = "../translators/markdown" }
+ucp-translator-html = { path = "../translators/html" }
+ucp-observe = { path = "../ucp-observe" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+
+[build-dependencies]
+pyo3-build-config = "0.22"

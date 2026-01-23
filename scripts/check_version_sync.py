@@ -14,8 +14,11 @@ import tomllib
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CARGO_TOML = REPO_ROOT / "Cargo.toml"
-PYPROJECT_TOML = REPO_ROOT / "packages" / "ucp-python" / "pyproject.toml"
-PACKAGE_JSON = REPO_ROOT / "packages" / "ucp-js" / "package.json"
+PYPROJECT_TOML = REPO_ROOT / "crates" / "ucp-python" / "pyproject.toml"
+# WASM package.json is generated in pkg/, but we can check the Cargo.toml metadata or the editor package
+# For now, let's point to ucm-editor as the representative JS package, or skip JS check if not applicable
+# ucm-editor moved out of repository - JS version check disabled
+PACKAGE_JSON = None
 README_PATH = REPO_ROOT / "README.md"
 DOCS_DIR = REPO_ROOT / "docs"
 DOC_INSTALL_PATH = DOCS_DIR / "getting-started" / "installation.md"
@@ -141,6 +144,8 @@ def load_python_version() -> str:
 
 
 def load_js_version() -> str:
+    if PACKAGE_JSON is None:
+        return "disabled"  # ucm-editor moved out of repository
     content = PACKAGE_JSON.read_text(encoding="utf-8")
     data = json.loads(content)
     version = data.get("version")

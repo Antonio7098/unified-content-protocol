@@ -24,34 +24,56 @@ EDIT <block_id> SET <path> <operator> <value> [WHERE <condition>]
 
 ### Examples
 
-```ucl
-// Set text content
-EDIT blk_abc123def456 SET content.text = "New content"
+=== "UCL"
+    ```ucl
+    // Set text content
+    EDIT blk_abc123def456 SET content.text = "New content"
 
-// Append to text
-EDIT blk_abc123def456 SET content.text += " additional text"
+    // Append to text
+    EDIT blk_abc123def456 SET content.text += " additional text"
 
-// Remove from text
-EDIT blk_abc123def456 SET content.text -= "remove this"
+    // Remove from text
+    EDIT blk_abc123def456 SET content.text -= "remove this"
 
-// Set label
-EDIT blk_abc123def456 SET metadata.label = "new-label"
+    // Set label
+    EDIT blk_abc123def456 SET metadata.label = "new-label"
 
-// Add tags
-EDIT blk_abc123def456 SET metadata.tags += ["tag1", "tag2"]
+    // Add tags
+    EDIT blk_abc123def456 SET metadata.tags += ["tag1", "tag2"]
 
-// Remove tag
-EDIT blk_abc123def456 SET metadata.tags -= ["old-tag"]
+    // Remove tag
+    EDIT blk_abc123def456 SET metadata.tags -= ["old-tag"]
 
-// Set summary
-EDIT blk_abc123def456 SET metadata.summary = "Brief description"
+    // Set summary
+    EDIT blk_abc123def456 SET metadata.summary = "Brief description"
 
-// Custom metadata
-EDIT blk_abc123def456 SET metadata.author = "Alice"
+    // Custom metadata
+    EDIT blk_abc123def456 SET metadata.author = "Alice"
 
-// Conditional edit
-EDIT blk_abc123def456 SET content.text = "Updated" WHERE status = "draft"
-```
+    // Conditional edit
+    EDIT blk_abc123def456 SET content.text = "Updated" WHERE status = "draft"
+    ```
+
+=== "Rust (via Client)"
+    ```rust
+    client.execute_ucl(&mut doc, r#"
+        EDIT blk_abc123def456 SET content.text = "New content"
+    "#)?;
+    ```
+
+=== "Python"
+    ```python
+    ucp_content.execute_ucl(doc, """
+        EDIT blk_abc123def456 SET content.text = "New content"
+    """)
+    ```
+
+=== "JavaScript"
+    ```javascript
+    executeUcl(doc, `
+        EDIT blk_abc123def456 SET content.text = "New content"
+    `);
+    ```
 
 ### Supported Paths
 
@@ -88,18 +110,36 @@ MOVE <block_id> AFTER <sibling_id>
 
 ### Examples
 
-```ucl
-// Move to new parent (appends to end)
-MOVE blk_child TO blk_newparent
+=== "UCL"
+    ```ucl
+    // Move to new parent (appends to end)
+    MOVE blk_child TO blk_newparent
 
-// Move to specific position
-MOVE blk_child TO blk_parent AT 0    // First position
-MOVE blk_child TO blk_parent AT 2    // Third position
+    // Move to specific position
+    MOVE blk_child TO blk_parent AT 0    // First position
+    MOVE blk_child TO blk_parent AT 2    // Third position
 
-// Move relative to sibling
-MOVE blk_child BEFORE blk_sibling
-MOVE blk_child AFTER blk_sibling
-```
+    // Move relative to sibling
+    MOVE blk_child BEFORE blk_sibling
+    MOVE blk_child AFTER blk_sibling
+    ```
+
+=== "Rust (via Client)"
+    ```rust
+    client.execute_ucl(&mut doc, r#"
+        MOVE blk_child TO blk_newparent
+    "#)?;
+    ```
+
+=== "Python"
+    ```python
+    ucp_content.execute_ucl(doc, "MOVE blk_child TO blk_newparent")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    executeUcl(doc, "MOVE blk_child TO blk_newparent");
+    ```
 
 ### Notes
 
@@ -138,32 +178,54 @@ APPEND <parent_id> <content_type> [AT <index>] [WITH <properties>] :: <content>
 
 ### Examples
 
-```ucl
-// Simple text
-APPEND blk_parent text :: "New paragraph"
+=== "UCL"
+    ```ucl
+    // Simple text
+    APPEND blk_parent text :: "New paragraph"
 
-// With label and tags
-APPEND blk_parent text WITH label="intro" tags=["important"] :: "Introduction"
+    // With label and tags
+    APPEND blk_parent text WITH label="intro" tags=["important"] :: "Introduction"
 
-// At specific position
-APPEND blk_parent text AT 0 :: "First child"
+    // At specific position
+    APPEND blk_parent text AT 0 :: "First child"
 
-// Code block
-APPEND blk_parent code :: "fn main() {
-    println!(\"Hello!\");
-}"
+    // Code block
+    APPEND blk_parent code :: "fn main() {
+        println!(\"Hello!\");
+    }"
 
-// With semantic role
-APPEND blk_parent text WITH role="heading2" :: "Section Title"
+    // With semantic role
+    APPEND blk_parent text WITH role="heading2" :: "Section Title"
 
-// JSON content
-APPEND blk_parent json :: {"key": "value", "count": 42}
+    // JSON content
+    APPEND blk_parent json :: {"key": "value", "count": 42}
 
-// Table (pipe-delimited)
-APPEND blk_parent table :: |Name|Age|
-                           |Alice|30|
-                           |Bob|25|
-```
+    // Table (pipe-delimited)
+    APPEND blk_parent table :: |Name|Age|
+                               |Alice|30|
+                               |Bob|25|
+    ```
+
+=== "Rust (via Client)"
+    ```rust
+    client.execute_ucl(&mut doc, r#"
+        APPEND blk_parent text :: "New paragraph"
+    "#)?;
+    ```
+
+=== "Python"
+    ```python
+    ucp_content.execute_ucl(doc, """
+        APPEND blk_parent text :: "New paragraph"
+    """)
+    ```
+
+=== "JavaScript"
+    ```javascript
+    executeUcl(doc, `
+        APPEND blk_parent text :: "New paragraph"
+    `);
+    ```
 
 ---
 
@@ -189,20 +251,36 @@ DELETE WHERE <condition>
 
 ### Examples
 
-```ucl
-// Delete single block (children become orphaned)
-DELETE blk_abc123def456
+=== "UCL"
+    ```ucl
+    // Delete single block (children become orphaned)
+    DELETE blk_abc123def456
 
-// Delete with all descendants
-DELETE blk_abc123def456 CASCADE
+    // Delete with all descendants
+    DELETE blk_abc123def456 CASCADE
 
-// Delete but keep children (move to grandparent)
-DELETE blk_abc123def456 PRESERVE_CHILDREN
+    // Delete but keep children (move to grandparent)
+    DELETE blk_abc123def456 PRESERVE_CHILDREN
 
-// Delete by condition
-DELETE WHERE tags CONTAINS "deprecated"
-DELETE WHERE metadata.status = "archived"
-```
+    // Delete by condition
+    DELETE WHERE tags CONTAINS "deprecated"
+    DELETE WHERE metadata.status = "archived"
+    ```
+
+=== "Rust (via Client)"
+    ```rust
+    client.execute_ucl(&mut doc, "DELETE blk_abc123def456 CASCADE")?;
+    ```
+
+=== "Python"
+    ```python
+    ucp_content.execute_ucl(doc, "DELETE blk_abc123def456 CASCADE")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    executeUcl(doc, "DELETE blk_abc123def456 CASCADE");
+    ```
 
 ### Notes
 
@@ -233,19 +311,35 @@ PRUNE WHERE <condition> [DRY_RUN]
 
 ### Examples
 
-```ucl
-// Remove all orphaned blocks
-PRUNE UNREACHABLE
+=== "UCL"
+    ```ucl
+    // Remove all orphaned blocks
+    PRUNE UNREACHABLE
 
-// Preview what would be pruned
-PRUNE UNREACHABLE DRY_RUN
+    // Preview what would be pruned
+    PRUNE UNREACHABLE DRY_RUN
 
-// Prune by tag
-PRUNE WHERE tags CONTAINS "temporary"
+    // Prune by tag
+    PRUNE WHERE tags CONTAINS "temporary"
 
-// Prune old blocks
-PRUNE WHERE metadata.created_at < "2024-01-01"
-```
+    // Prune old blocks
+    PRUNE WHERE metadata.created_at < "2024-01-01"
+    ```
+
+=== "Rust (via Client)"
+    ```rust
+    client.execute_ucl(&mut doc, "PRUNE UNREACHABLE")?;
+    ```
+
+=== "Python"
+    ```python
+    ucp_content.execute_ucl(doc, "PRUNE UNREACHABLE")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    executeUcl(doc, "PRUNE UNREACHABLE");
+    ```
 
 ---
 
@@ -270,19 +364,20 @@ FOLD <block_id> [DEPTH <n>] [MAX_TOKENS <n>] [PRESERVE_TAGS <tags>]
 
 ### Examples
 
-```ucl
-// Fold to depth 2
-FOLD blk_section DEPTH 2
+=== "UCL"
+    ```ucl
+    // Fold to depth 2
+    FOLD blk_section DEPTH 2
 
-// Fold by token limit
-FOLD blk_document MAX_TOKENS 4000
+    // Fold by token limit
+    FOLD blk_document MAX_TOKENS 4000
 
-// Preserve important content
-FOLD blk_section DEPTH 1 PRESERVE_TAGS ["important", "summary"]
+    // Preserve important content
+    FOLD blk_section DEPTH 1 PRESERVE_TAGS ["important", "summary"]
 
-// Combine options
-FOLD blk_chapter DEPTH 3 MAX_TOKENS 2000 PRESERVE_TAGS ["key-point"]
-```
+    // Combine options
+    FOLD blk_chapter DEPTH 3 MAX_TOKENS 2000 PRESERVE_TAGS ["key-point"]
+    ```
 
 ### Notes
 
@@ -328,25 +423,41 @@ LINK <source_id> <edge_type> <target_id> [WITH <properties>]
 
 ### Examples
 
-```ucl
-// Basic reference
-LINK blk_paragraph references blk_source
+=== "UCL"
+    ```ucl
+    // Basic reference
+    LINK blk_paragraph references blk_source
 
-// Evidence supports claim
-LINK blk_evidence supports blk_claim WITH confidence=0.95
+    // Evidence supports claim
+    LINK blk_evidence supports blk_claim WITH confidence=0.95
 
-// Derivation
-LINK blk_summary derived_from blk_original
+    // Derivation
+    LINK blk_summary derived_from blk_original
 
-// Contradiction
-LINK blk_counter contradicts blk_argument
+    // Contradiction
+    LINK blk_counter contradicts blk_argument
 
-// Custom relationship
-LINK blk_impl implements blk_interface
+    // Custom relationship
+    LINK blk_impl implements blk_interface
 
-// With description
-LINK blk_a references blk_b WITH description="See also"
-```
+    // With description
+    LINK blk_a references blk_b WITH description="See also"
+    ```
+
+=== "Rust (via Client)"
+    ```rust
+    client.execute_ucl(&mut doc, "LINK blk_a references blk_b")?;
+    ```
+
+=== "Python"
+    ```python
+    ucp_content.execute_ucl(doc, "LINK blk_a references blk_b")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    executeUcl(doc, "LINK blk_a references blk_b");
+    ```
 
 ---
 
@@ -362,10 +473,26 @@ UNLINK <source_id> <edge_type> <target_id>
 
 ### Examples
 
-```ucl
-UNLINK blk_paragraph references blk_source
-UNLINK blk_evidence supports blk_claim
-```
+=== "UCL"
+    ```ucl
+    UNLINK blk_paragraph references blk_source
+    UNLINK blk_evidence supports blk_claim
+    ```
+
+=== "Rust (via Client)"
+    ```rust
+    client.execute_ucl(&mut doc, "UNLINK blk_a references blk_b")?;
+    ```
+
+=== "Python"
+    ```python
+    ucp_content.execute_ucl(doc, "UNLINK blk_a references blk_b")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    executeUcl(doc, "UNLINK blk_a references blk_b");
+    ```
 
 ---
 
@@ -406,20 +533,36 @@ SNAPSHOT DIFF "<name1>" "<name2>"
 
 ### Examples
 
-```ucl
-// Create versioned snapshot
-SNAPSHOT CREATE "v1.0" WITH description="Initial release"
+=== "UCL"
+    ```ucl
+    // Create versioned snapshot
+    SNAPSHOT CREATE "v1.0" WITH description="Initial release"
 
-// Create checkpoint
-SNAPSHOT CREATE "before-refactor"
+    // Create checkpoint
+    SNAPSHOT CREATE "before-refactor"
 
-// Restore previous version
-SNAPSHOT RESTORE "v1.0"
+    // Restore previous version
+    SNAPSHOT RESTORE "v1.0"
 
-// Clean up old snapshots
-SNAPSHOT DELETE "draft-1"
-SNAPSHOT DELETE "draft-2"
-```
+    // Clean up old snapshots
+    SNAPSHOT DELETE "draft-1"
+    SNAPSHOT DELETE "draft-2"
+    ```
+
+=== "Rust (via Client)"
+    ```rust
+    client.execute_ucl(&mut doc, r#"SNAPSHOT CREATE "v1.0""#)?;
+    ```
+
+=== "Python"
+    ```python
+    ucp_content.execute_ucl(doc, 'SNAPSHOT CREATE "v1.0"')
+    ```
+
+=== "JavaScript"
+    ```javascript
+    executeUcl(doc, 'SNAPSHOT CREATE "v1.0"');
+    ```
 
 ---
 
@@ -450,25 +593,26 @@ ROLLBACK "<name>"
 
 ### Examples
 
-```ucl
-// Anonymous transaction
-BEGIN TRANSACTION
-APPEND blk_root text :: "Block 1"
-APPEND blk_root text :: "Block 2"
-COMMIT
+=== "UCL"
+    ```ucl
+    // Anonymous transaction
+    BEGIN TRANSACTION
+    APPEND blk_root text :: "Block 1"
+    APPEND blk_root text :: "Block 2"
+    COMMIT
 
-// Named transaction
-BEGIN TRANSACTION "import-chapter"
-APPEND blk_root text WITH role="heading1" :: "Chapter 3"
-APPEND blk_chapter3 text :: "Content..."
-COMMIT "import-chapter"
+    // Named transaction
+    BEGIN TRANSACTION "import-chapter"
+    APPEND blk_root text WITH role="heading1" :: "Chapter 3"
+    APPEND blk_chapter3 text :: "Content..."
+    COMMIT "import-chapter"
 
-// Rollback on error
-BEGIN TRANSACTION "risky-operation"
-DELETE blk_important CASCADE
-// Oops, wrong block!
-ROLLBACK "risky-operation"
-```
+    // Rollback on error
+    BEGIN TRANSACTION "risky-operation"
+    DELETE blk_important CASCADE
+    // Oops, wrong block!
+    ROLLBACK "risky-operation"
+    ```
 
 ---
 
@@ -488,21 +632,22 @@ ATOMIC {
 
 ### Examples
 
-```ucl
-// Atomic block creation with linking
-ATOMIC {
-    APPEND blk_root text WITH label="claim" :: "Main argument"
-    APPEND blk_root text WITH label="evidence" :: "Supporting evidence"
-    LINK blk_evidence supports blk_claim
-}
+=== "UCL"
+    ```ucl
+    // Atomic block creation with linking
+    ATOMIC {
+        APPEND blk_root text WITH label="claim" :: "Main argument"
+        APPEND blk_root text WITH label="evidence" :: "Supporting evidence"
+        LINK blk_evidence supports blk_claim
+    }
 
-// Atomic restructure
-ATOMIC {
-    MOVE blk_section1 TO blk_chapter2
-    MOVE blk_section2 TO blk_chapter2
-    DELETE blk_chapter1 CASCADE
-}
-```
+    // Atomic restructure
+    ATOMIC {
+        MOVE blk_section1 TO blk_chapter2
+        MOVE blk_section2 TO blk_chapter2
+        DELETE blk_chapter1 CASCADE
+    }
+    ```
 
 ### Notes
 

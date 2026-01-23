@@ -1,131 +1,165 @@
 # Transactions
 
-Transactions group operations for atomic execution. Either all operations succeed, or none are applied.
+Transactions allow grouping multiple operations into a single atomic unit. If any operation fails, the entire transaction is rolled back.
 
 ## Transaction Structure
 
-```rust
-pub struct Transaction {
-    pub id: TransactionId,
-    pub name: Option<String>,
-    pub operations: Vec<Operation>,
-    pub savepoints: Vec<Savepoint>,
-    pub state: TransactionState,
-    pub started_at: Instant,
-    pub created_at: DateTime<Utc>,
-    pub timeout: Duration,
-}
+=== "Rust"
+    ```rust
+    pub struct Transaction {
+        /// Unique transaction ID
+        pub id: TransactionId,
+        
+        /// Operations in the transaction
+        pub operations: Vec<Operation>,
+        
+        /// Transaction state (Pending, Committed, RolledBack)
+        pub state: TransactionState,
+        
+        /// Creation timestamp
+        pub created_at: DateTime<Utc>,
+    }
+    ```
 
-pub enum TransactionState {
-    Active,
-    Committed,
-    RolledBack,
-    TimedOut,
-}
-```
+=== "Python"
+    *Transactions are managed internally by the engine but not directly exposed as objects in the high-level Python API. Use atomic batch operations via UCL.*
+
+=== "JavaScript"
+    *Transactions are managed internally by the engine but not directly exposed as objects in the high-level JavaScript API. Use atomic batch operations via UCL.*
 
 ## Basic Usage
 
-### Begin, Add, Commit
+=== "Rust"
+    ```rust
+    use ucm_engine::{Engine, Operation, EditOperator};
+    use ucm_core::{Document, Content};
 
-```rust
-use ucm_engine::{Engine, Operation};
-use ucm_core::{Content, Document};
+    let mut engine = Engine::new();
+    let mut doc = Document::create();
+    let root = doc.root.clone();
 
-let mut engine = Engine::new();
-let mut doc = Document::create();
-let root = doc.root.clone();
+    // 1. Begin transaction
+    let txn_id = engine.begin_transaction();
 
-// Begin transaction
-let txn_id = engine.begin_transaction();
+    // 2. Add operations
+    engine.add_to_transaction(&txn_id, Operation::Append {
+        parent_id: root.clone(),
+        content: Content::text("First block"),
+        label: None,
+        tags: vec![],
+        semantic_role: None,
+        index: None,
+    }).unwrap();
 
-// Add operations
-engine.add_to_transaction(&txn_id, Operation::Append {
-    parent_id: root.clone(),
-    content: Content::text("First block"),
-    label: None,
-    tags: vec![],
-    semantic_role: None,
-    index: None,
-}).unwrap();
+    engine.add_to_transaction(&txn_id, Operation::Append {
+        parent_id: root.clone(),
+        content: Content::text("Second block"),
+        label: None,
+        tags: vec![],
+        semantic_role: None,
+        index: None,
+    }).unwrap();
 
-engine.add_to_transaction(&txn_id, Operation::Append {
-    parent_id: root.clone(),
-    content: Content::text("Second block"),
-    label: None,
-    tags: vec![],
-    semantic_role: None,
-    index: None,
-}).unwrap();
+    // 3. Commit
+    let results = engine.commit_transaction(&txn_id, &mut doc).unwrap();
 
-// Commit - executes all operations
-let results = engine.commit_transaction(&txn_id, &mut doc).unwrap();
+    println!("Executed {} operations", results.len());
+    ```
 
-assert_eq!(results.len(), 2);
-assert!(results.iter().all(|r| r.success));
-```
+## Atomicity
 
-### Named Transactions
+If an operation fails during commit, previous operations in the transaction are rolled back:
 
-```rust
-let txn_id = engine.begin_named_transaction("add-chapter-1");
+=== "Rust"
+    ```rust
+    let txn_id = engine.begin_transaction();
 
-// Transaction ID is the name
-assert_eq!(txn_id.0, "add-chapter-1");
-```
+    // Valid operation
+    engine.add_to_transaction(&txn_id, Operation::Append {
+        parent_id: root.clone(),
+        content: Content::text("Valid"),
+        label: None,
+        tags: vec![],
+        semantic_role: None,
+        index: None,
+    }).unwrap();
 
-### Rollback
+    // Invalid operation (reference to non-existent parent)
+    engine.add_to_transaction(&txn_id, Operation::Append {
+        parent_id: "blk_invalid".parse().unwrap(),
+        content: Content::text("Invalid"),
+        label: None,
+        tags: vec![],
+        semantic_role: None,
+        index: None,
+    }).unwrap();
 
-```rust
-let txn_id = engine.begin_transaction();
+    // Commit fails
+    let result = engine.commit_transaction(&txn_id, &mut doc);
+    assert!(result.is_err());
 
-engine.add_to_transaction(&txn_id, Operation::Append { ... }).unwrap();
-engine.add_to_transaction(&txn_id, Operation::Append { ... }).unwrap();
+    // Document is unchanged (first operation was rolled back)
+    assert_eq!(doc.block_count(), 1); // Only root exists
+    ```
 
-// Decide not to commit
-engine.rollback_transaction(&txn_id).unwrap();
+## Explicit Rollback
 
-// Document is unchanged
-```
+You can manually rollback a pending transaction:
+
+=== "Rust"
+    ```rust
+    let txn_id = engine.begin_transaction();
+
+    engine.add_to_transaction(&txn_id, Operation::Append {
+        // ...
+        # parent_id: root.clone(),
+        # content: Content::text("Draft"),
+        # label: None,
+        # tags: vec![],
+        # semantic_role: None,
+        # index: None,
+    }).unwrap();
+
+    // Change mind
+    engine.rollback_transaction(&txn_id).unwrap();
+
+    // Transaction is now marked as RolledBack and cannot be committed
+    let result = engine.commit_transaction(&txn_id, &mut doc);
+    assert!(result.is_err());
+    ```
 
 ## Transaction Manager
 
-The `TransactionManager` handles transaction lifecycle:
+The engine uses a `TransactionManager` to track transaction lifecycle:
 
-```rust
-use ucm_engine::transaction::{TransactionManager, TransactionId};
-use std::time::Duration;
+=== "Rust"
+    ```rust
+    use ucm_engine::transaction::{TransactionManager, TransactionState};
 
-// Create with default timeout (30 seconds)
-let mut mgr = TransactionManager::new();
+    let manager = TransactionManager::new();
+    let txn_id = manager.begin();
 
-// Create with custom timeout
-let mut mgr = TransactionManager::with_timeout(Duration::from_secs(60));
+    assert_eq!(manager.get_state(&txn_id), Some(TransactionState::Pending));
+    ```
 
-// Begin transaction
-let txn_id = mgr.begin();
+## Best Practices
 
-// Get transaction
-if let Some(txn) = mgr.get(&txn_id) {
-    println!("Operations: {}", txn.operation_count());
-    println!("Elapsed: {:?}", txn.elapsed());
-}
+### 1. Keep Transactions Short
 
-// Check active count
-println!("Active transactions: {}", mgr.active_count());
+Long-running transactions consume memory and may conflict with other operations.
 
-// Cleanup completed/timed out transactions
-mgr.cleanup();
-```
+### 2. Group Logically Related Changes
 
-## Timeouts
+Use transactions for changes that must happen together, like:
+- Moving a block and updating references
+- Creating a section and its initial children
+- Renaming a label and updating links to it
 
-Transactions have a timeout to prevent resource leaks:
+### 3. Handle Commit Failures
 
-```rust
-use std::time::Duration;
-use ucm_engine::transaction::TransactionManager;
+Always check the result of `commit_transaction`. If it fails, the document state is preserved (rolled back), but you may need to retry or report the error.
 
+## See Also
 let mut mgr = TransactionManager::with_timeout(Duration::from_secs(5));
 
 let txn_id = mgr.begin();

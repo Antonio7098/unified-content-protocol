@@ -12,41 +12,71 @@ UCL is designed for:
 
 ## Installation
 
-```toml
-[dependencies]
-ucl-parser = "0.1.5"
-```
+=== "Rust"
+    ```toml
+    [dependencies]
+    ucl-parser = "0.1.7"
+    ```
+
+=== "Python"
+    *UCL parsing is integrated into the `ucp-content` package.*
+
+=== "JavaScript"
+    *UCL parsing is integrated into the `ucp-content` package.*
 
 ## Quick Example
 
-```rust
-use ucl_parser::{parse, parse_commands};
+=== "Rust"
+    ```rust
+    use ucl_parser::{parse, parse_commands};
 
-// Parse a full UCL document
-let ucl = r#"
-STRUCTURE
-blk_root: [blk_intro, blk_body]
+    // Parse a full UCL document
+    let ucl = r#"
+    STRUCTURE
+    blk_root: [blk_intro, blk_body]
 
-BLOCKS
-text #blk_intro label="Introduction" :: "Welcome to UCP!"
+    BLOCKS
+    text #blk_intro label="Introduction" :: "Welcome to UCP!"
 
-COMMANDS
-EDIT blk_intro SET content.text = "Updated introduction"
-"#;
+    COMMANDS
+    EDIT blk_intro SET content.text = "Updated introduction"
+    "#;
 
-let doc = parse(ucl).unwrap();
-println!("Structure entries: {}", doc.structure.len());
-println!("Block definitions: {}", doc.blocks.len());
-println!("Commands: {}", doc.commands.len());
+    let doc = parse(ucl).unwrap();
+    println!("Structure entries: {}", doc.structure.len());
+    println!("Block definitions: {}", doc.blocks.len());
+    println!("Commands: {}", doc.commands.len());
 
-// Parse commands only
-let commands = parse_commands(r#"
-    EDIT blk_abc SET content.text = "Hello"
-    APPEND blk_root text :: "New block"
-"#).unwrap();
+    // Parse commands only
+    let commands = parse_commands(r#"
+        EDIT blk_abc SET content.text = "Hello"
+        APPEND blk_root text :: "New block"
+    "#).unwrap();
 
-println!("Parsed {} commands", commands.len());
-```
+    println!("Parsed {} commands", commands.len());
+    ```
+
+=== "Python"
+    ```python
+    from ucp_content import execute_ucl
+    
+    # In Python, UCL is typically used directly via execution functions
+    execute_ucl(doc, """
+        EDIT blk_intro SET content.text = "Updated introduction"
+        APPEND blk_root text :: "New block"
+    """)
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { executeUcl } from 'ucp-content';
+    
+    // In JavaScript, UCL is typically used directly via execution functions
+    executeUcl(doc, `
+        EDIT blk_intro SET content.text = "Updated introduction"
+        APPEND blk_root text :: "New block"
+    `);
+    ```
 
 ## Module Overview
 
@@ -60,13 +90,14 @@ println!("Parsed {} commands", commands.len());
 
 ### Functions
 
-```rust
-/// Parse a full UCL document
-pub fn parse(input: &str) -> ParseResult<UclDocument>;
+=== "Rust"
+    ```rust
+    /// Parse a full UCL document
+    pub fn parse(input: &str) -> ParseResult<UclDocument>;
 
-/// Parse UCL commands only (without STRUCTURE/BLOCKS sections)
-pub fn parse_commands(input: &str) -> ParseResult<Vec<Command>>;
-```
+    /// Parse UCL commands only (without STRUCTURE/BLOCKS sections)
+    pub fn parse_commands(input: &str) -> ParseResult<Vec<Command>>;
+    ```
 
 ### Re-exports
 
@@ -140,25 +171,27 @@ DELETE blk_old CASCADE
 
 ## Error Handling
 
-```rust
-use ucl_parser::{parse_commands, ParseError};
+=== "Rust"
+    ```rust
+    use ucl_parser::{parse_commands, ParseError};
 
-let result = parse_commands("INVALID SYNTAX");
+    let result = parse_commands("INVALID SYNTAX");
 
-match result {
-    Ok(commands) => println!("Parsed {} commands", commands.len()),
-    Err(ParseError::UnexpectedToken { expected, found, line, column }) => {
-        eprintln!("Error at {}:{}: expected {}, found {}", line, column, expected, found);
+    match result {
+        Ok(commands) => println!("Parsed {} commands", commands.len()),
+        Err(ParseError::UnexpectedToken { expected, found, line, column }) => {
+            eprintln!("Error at {}:{}: expected {}, found {}", line, column, expected, found);
+        }
+        Err(ParseError::UnexpectedEof) => {
+            eprintln!("Unexpected end of input");
+        }
+        Err(e) => eprintln!("Parse error: {}", e),
     }
-    Err(ParseError::UnexpectedEof) => {
-        eprintln!("Unexpected end of input");
-    }
-    Err(e) => eprintln!("Parse error: {}", e),
-}
-```
+    ```
 
 ## See Also
 
 - [Syntax Reference](./syntax.md) - Complete syntax documentation
 - [Commands Reference](./commands.md) - Detailed command documentation
 - [Expressions](./expressions.md) - Path and condition expressions
+

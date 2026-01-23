@@ -174,6 +174,7 @@ impl TraversalEngine {
             .min(self.config.max_depth);
         let filter = filter.unwrap_or_default();
 
+        #[cfg(not(target_arch = "wasm32"))]
         let start_time = std::time::Instant::now();
 
         let result = match direction {
@@ -193,7 +194,11 @@ impl TraversalEngine {
         result.metadata.start_id = Some(start);
         result.metadata.direction = Some(direction);
         result.metadata.max_depth = Some(max_depth);
-        result.metadata.execution_time_ms = Some(start_time.elapsed().as_millis() as u64);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            result.metadata.execution_time_ms = Some(start_time.elapsed().as_millis() as u64);
+        }
 
         Ok(result)
     }
@@ -485,33 +490,33 @@ impl TraversalEngine {
             visited.insert(node_id);
 
             if let Some(block) = doc.get_block(&node_id) {
-                if !self.matches_filter(block, filter) {
-                    continue;
+                if self.matches_filter(block, filter) {
+                    let node = self.create_traversal_node(doc, &node_id, depth, parent_id, output);
+
+                    if let Some(role) = &node.semantic_role {
+                        *nodes_by_role.entry(role.clone()).or_insert(0) += 1;
+                    }
+
+                    nodes.push(node);
+
+                    // Collect edges
+                    for edge in &block.edges {
+                        if filter.edge_types.is_empty()
+                            || filter.edge_types.contains(&edge.edge_type)
+                        {
+                            edges.push(TraversalEdge {
+                                source: node_id,
+                                target: edge.target,
+                                edge_type: edge.edge_type.clone(),
+                            });
+                        }
+                    }
                 }
-
-                let node = self.create_traversal_node(doc, &node_id, depth, parent_id, output);
-
-                if let Some(role) = &node.semantic_role {
-                    *nodes_by_role.entry(role.clone()).or_insert(0) += 1;
-                }
-
-                nodes.push(node);
 
                 // Add children to queue
                 for child in doc.children(&node_id) {
                     if !visited.contains(child) {
                         queue.push_back((*child, Some(node_id), depth + 1));
-                    }
-                }
-
-                // Collect edges
-                for edge in &block.edges {
-                    if filter.edge_types.is_empty() || filter.edge_types.contains(&edge.edge_type) {
-                        edges.push(TraversalEdge {
-                            source: node_id,
-                            target: edge.target,
-                            edge_type: edge.edge_type.clone(),
-                        });
                     }
                 }
             }
@@ -626,26 +631,24 @@ impl TraversalEngine {
         visited.insert(node_id);
 
         if let Some(block) = doc.get_block(&node_id) {
-            if !self.matches_filter(block, filter) {
-                return Ok(());
-            }
+            if self.matches_filter(block, filter) {
+                let node = self.create_traversal_node(doc, &node_id, depth, parent_id, output);
 
-            let node = self.create_traversal_node(doc, &node_id, depth, parent_id, output);
+                if let Some(role) = &node.semantic_role {
+                    *nodes_by_role.entry(role.clone()).or_insert(0) += 1;
+                }
 
-            if let Some(role) = &node.semantic_role {
-                *nodes_by_role.entry(role.clone()).or_insert(0) += 1;
-            }
+                nodes.push(node);
 
-            nodes.push(node);
-
-            // Collect edges
-            for edge in &block.edges {
-                if filter.edge_types.is_empty() || filter.edge_types.contains(&edge.edge_type) {
-                    edges.push(TraversalEdge {
-                        source: node_id,
-                        target: edge.target,
-                        edge_type: edge.edge_type.clone(),
-                    });
+                // Collect edges
+                for edge in &block.edges {
+                    if filter.edge_types.is_empty() || filter.edge_types.contains(&edge.edge_type) {
+                        edges.push(TraversalEdge {
+                            source: node_id,
+                            target: edge.target,
+                            edge_type: edge.edge_type.clone(),
+                        });
+                    }
                 }
             }
 

@@ -12,44 +12,93 @@ The **ucp-translator-html** crate converts HTML documents into the Unified Conte
 
 ## Installation
 
-```toml
-[dependencies]
-ucp-translator-html = "0.1.3"
-```
+=== "Rust"
+    ```toml
+    [dependencies]
+    ucp-translator-html = "0.1.3"
+    ```
+
+=== "Python"
+    ```bash
+    pip install ucp-content
+    ```
+
+=== "JavaScript"
+    ```bash
+    npm install ucp-content
+    ```
 
 ## Quick Start
 
-```rust
-use ucp_translator_html::HtmlParser;
+=== "Rust"
+    ```rust
+    use ucp_translator_html::HtmlParser;
 
-let html = r#"
-<!doctype html>
-<html>
-  <body>
-    <h1>Intro</h1>
-    <p>Hello <strong>HTML</strong>!</p>
-  </body>
-</html>
-"#;
+    let html = r#"
+    <!doctype html>
+    <html>
+      <body>
+        <h1>Intro</h1>
+        <p>Hello <strong>HTML</strong>!</p>
+      </body>
+    </html>
+    "#;
 
-let parser = HtmlParser::default();
-let doc = parser.parse(html)?;
-println!("Parsed {} blocks", doc.block_count());
-```
+    let parser = HtmlParser::default();
+    let doc = parser.parse(html)?;
+    println!("Parsed {} blocks", doc.block_count());
+    ```
 
-## Parser Configuration
+=== "Python"
+    ```python
+    import ucp
 
-```rust
-use ucp_translator_html::{HtmlParser, ParseConfig};
+    html = '''
+    <!doctype html>
+    <html>
+      <body>
+        <h1>Intro</h1>
+        <p>Hello <strong>HTML</strong>!</p>
+      </body>
+    </html>
+    '''
 
-let parser = HtmlParser::new(ParseConfig {
-    preserve_whitespace: false,
-    max_depth: Some(12),
-    allowed_nodes: None,
-    denied_nodes: Some(vec!["script", "style"]),
-    capture_attributes: true,
-});
-```
+    doc = ucp.parse_html(html)
+    print(f"Parsed {doc.block_count} blocks")
+    ```
+
+=== "JavaScript"
+    ```javascript
+    import { parseHtml } from 'ucp-content';
+
+    const html = `
+    <!doctype html>
+    <html>
+      <body>
+        <h1>Intro</h1>
+        <p>Hello <strong>HTML</strong>!</p>
+      </body>
+    </html>
+    `;
+
+    const doc = parseHtml(html);
+    console.log(`Parsed ${doc.blockCount()} blocks`);
+    ```
+
+## Parser Configuration (Rust Only)
+
+=== "Rust"
+    ```rust
+    use ucp_translator_html::{HtmlParser, ParseConfig};
+
+    let parser = HtmlParser::new(ParseConfig {
+        preserve_whitespace: false,
+        max_depth: Some(12),
+        allowed_nodes: None,
+        denied_nodes: Some(vec!["script", "style"]),
+        capture_attributes: true,
+    });
+    ```
 
 ### Key Options
 
@@ -77,12 +126,13 @@ let parser = HtmlParser::new(ParseConfig {
 
 ## Error Handling
 
-```rust
-match parser.parse(input) {
-    Ok(doc) => println!("blocks: {}", doc.block_count()),
-    Err(e) => eprintln!("HTML parse error: {e}")
-}
-```
+=== "Rust"
+    ```rust
+    match parser.parse(input) {
+        Ok(doc) => println!("blocks: {}", doc.block_count()),
+        Err(e) => eprintln!("HTML parse error: {e}")
+    }
+    ```
 
 All errors use the crate-specific `HtmlError` enum, which includes:
 
