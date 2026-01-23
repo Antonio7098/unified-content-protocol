@@ -185,7 +185,7 @@ If you're using multiple UCP crates, ensure they're all from the same version:
 ```toml
 [dependencies]
 ucm-core = "0.1.7"
-sucm-engine = "0.1.7"  # Must match ucm-core version
+ucm-engine = "0.1.7"
 ```
 
 ## Next Steps
