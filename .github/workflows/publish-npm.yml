@@ -30,6 +30,16 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build WASM package
+        working-directory: crates/ucp-wasm
+        run: wasm-pack build --release --target nodejs --out-dir pkg
+
       - name: Install dependencies
         working-directory: crates/ucp-wasm/pkg
         run: npm ci
@@ -62,6 +72,16 @@ jobs:
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build WASM package
+        working-directory: crates/ucp-wasm
+        run: wasm-pack build --release --target nodejs --out-dir pkg
 
       - name: Install dependencies
         working-directory: crates/ucp-wasm/pkg
