@@ -52,6 +52,9 @@ jobs:
         working-directory: crates/ucp-python
         run: maturin build --compatibility manylinux_2_34_x86_64
 
+      - name: Copy wheel to dist directory
+        run: cp target/wheels/*.whl crates/ucp-python/dist/
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
