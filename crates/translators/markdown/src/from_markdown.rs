@@ -4,6 +4,7 @@ use crate::{Result, TranslatorError};
 use ucm_core::{Block, Content, Document};
 
 /// Markdown parser that converts to UCM
+#[derive(Debug, Clone)]
 pub struct MarkdownParser {
     preserve_raw: bool,
 }

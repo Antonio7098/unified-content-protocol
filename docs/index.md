@@ -64,6 +64,14 @@ Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major a
 
 - [Overview & Context Management](./ucp-llm/README.md)
 
+## Agent Graph Traversal (ucp-agent)
+
+- [Overview](./ucp-agent/index.md)
+- [API Reference](./ucp-agent/api.md)
+- [UCL Commands](./ucp-agent/ucl-commands.md)
+- [Usage Examples](./ucp-agent/examples.md)
+- [Architecture](./ucp-agent/architecture.md)
+
 ## Observability (ucp-observe)
 
 - [Tracing, Audit, Metrics](./ucp-observe/README.md)

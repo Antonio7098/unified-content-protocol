@@ -98,6 +98,110 @@ pub enum TokenKind {
     #[token("BASE_LEVEL")]
     BaseLevel,
 
+    // Agent traversal commands
+    #[token("GOTO")]
+    Goto,
+    #[token("BACK")]
+    Back,
+    #[token("EXPAND")]
+    Expand,
+    #[token("FOLLOW")]
+    Follow,
+    #[token("PATH")]
+    Path,
+    #[token("SEARCH")]
+    Search,
+    #[token("FIND")]
+    Find,
+    #[token("CTX")]
+    Ctx,
+
+    // Traversal directions
+    #[token("DOWN")]
+    Down,
+    #[token("UP")]
+    Up,
+    #[token("SEMANTIC")]
+    Semantic,
+
+    // Traversal options
+    #[token("MODE")]
+    Mode,
+    #[token("LIMIT")]
+    Limit,
+    #[token("MIN_SIMILARITY")]
+    MinSimilarity,
+    #[token("ROLES")]
+    Roles,
+    #[token("TAGS")]
+    Tags,
+    #[token("ROLE")]
+    Role,
+    #[token("TAG")]
+    Tag,
+    #[token("LABEL")]
+    Label,
+    #[token("PATTERN")]
+    Pattern,
+    #[token("MAX")]
+    Max,
+    #[token("NEIGHBORHOOD")]
+    Neighborhood,
+
+    // Context commands
+    #[token("ADD")]
+    Add,
+    #[token("REMOVE")]
+    Remove,
+    #[token("CLEAR")]
+    Clear,
+    #[token("COMPRESS")]
+    Compress,
+    #[token("RENDER")]
+    Render,
+    #[token("STATS")]
+    Stats,
+    #[token("FOCUS")]
+    Focus,
+    #[token("RESULTS")]
+    Results,
+    #[token("CHILDREN")]
+    Children,
+    #[token("AUTO")]
+    Auto,
+    #[token("TOKENS")]
+    Tokens,
+    #[token("MAX_AGE")]
+    MaxAge,
+    #[token("RELEVANCE")]
+    Relevance,
+    #[token("REASON")]
+    Reason,
+    #[token("METHOD")]
+    Method,
+    #[token("FORMAT")]
+    Format,
+    #[token("TRUNCATE")]
+    Truncate,
+    #[token("SUMMARIZE")]
+    Summarize,
+    #[token("STRUCTURE_ONLY")]
+    StructureOnly,
+    #[token("SHORT_IDS")]
+    ShortIds,
+    #[token("MARKDOWN")]
+    Markdown,
+    #[token("FULL")]
+    Full,
+    #[token("PREVIEW")]
+    Preview,
+    #[token("METADATA")]
+    MetadataToken,
+    #[token("IDS")]
+    Ids,
+    #[token("BOTH")]
+    Both,
+
     // Operators
     #[token("=")]
     Eq,

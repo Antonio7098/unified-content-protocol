@@ -149,6 +149,7 @@ impl<'a> Parser<'a> {
 
     fn parse_command(&mut self) -> ParseResult<Command> {
         match self.peek_kind() {
+            // Document modification commands
             Some(TokenKind::Edit) => self.parse_edit(),
             Some(TokenKind::Move) => self.parse_move(),
             Some(TokenKind::Append) => self.parse_append(),
@@ -163,6 +164,20 @@ impl<'a> Parser<'a> {
             Some(TokenKind::Rollback) => self.parse_rollback(),
             Some(TokenKind::Atomic) => self.parse_atomic(),
             Some(TokenKind::WriteSection) => self.parse_write_section(),
+
+            // Agent traversal commands
+            Some(TokenKind::Goto) => self.parse_goto(),
+            Some(TokenKind::Back) => self.parse_back(),
+            Some(TokenKind::Expand) => self.parse_expand(),
+            Some(TokenKind::Follow) => self.parse_follow(),
+            Some(TokenKind::Path) => self.parse_path_find(),
+            Some(TokenKind::Search) => self.parse_search(),
+            Some(TokenKind::Find) => self.parse_find(),
+            Some(TokenKind::View) => self.parse_view(),
+
+            // Context commands
+            Some(TokenKind::Ctx) => self.parse_ctx(),
+
             _ => Err(self.error("command")),
         }
     }
@@ -470,6 +485,595 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::RBrace)?;
         Ok(Command::Atomic(cmds))
+    }
+
+    // ========================================================================
+    // Agent Traversal Command Parsers
+    // ========================================================================
+
+    /// Parse GOTO blk_xxx
+    fn parse_goto(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume GOTO
+        let block_id = self.expect_block_id()?;
+        Ok(Command::Goto(GotoCommand { block_id }))
+    }
+
+    /// Parse BACK [n]
+    fn parse_back(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume BACK
+        let steps = if let Some(TokenKind::Integer(n)) = self.peek_kind() {
+            self.advance();
+            n as usize
+        } else {
+            1
+        };
+        Ok(Command::Back(BackCommand { steps }))
+    }
+
+    /// Parse EXPAND blk_xxx DOWN|UP|BOTH|SEMANTIC [depth=N] [mode=MODE] [roles=...] [tags=...]
+    fn parse_expand(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume EXPAND
+        let block_id = self.expect_block_id()?;
+
+        // Parse direction
+        let direction = match self.peek_kind() {
+            Some(TokenKind::Down) => {
+                self.advance();
+                ExpandDirection::Down
+            }
+            Some(TokenKind::Up) => {
+                self.advance();
+                ExpandDirection::Up
+            }
+            Some(TokenKind::Both) => {
+                self.advance();
+                ExpandDirection::Both
+            }
+            Some(TokenKind::Semantic) => {
+                self.advance();
+                ExpandDirection::Semantic
+            }
+            _ => ExpandDirection::Down, // Default
+        };
+
+        // Parse options
+        let mut depth = 1usize;
+        let mut mode = None;
+        let mut filter = TraversalFilterCriteria::default();
+
+        while !self.is_at_end() && !self.is_cmd_start() {
+            match self.peek_kind() {
+                Some(TokenKind::Depth) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    depth = self.expect_int()? as usize;
+                }
+                Some(TokenKind::Mode) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    mode = Some(self.parse_view_mode()?);
+                }
+                Some(TokenKind::Roles) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    filter.include_roles = self.parse_comma_list()?;
+                }
+                Some(TokenKind::Tags) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    filter.include_tags = self.parse_comma_list()?;
+                }
+                _ => break,
+            }
+        }
+
+        Ok(Command::Expand(ExpandCommand {
+            block_id,
+            direction,
+            depth,
+            mode,
+            filter: if filter.include_roles.is_empty()
+                && filter.include_tags.is_empty()
+                && filter.exclude_roles.is_empty()
+                && filter.exclude_tags.is_empty()
+            {
+                None
+            } else {
+                Some(filter)
+            },
+        }))
+    }
+
+    /// Parse FOLLOW blk_xxx edge_type[,edge_type...] [blk_yyy]
+    fn parse_follow(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume FOLLOW
+        let source_id = self.expect_block_id()?;
+
+        // Parse edge types (comma-separated identifiers)
+        let edge_types = self.parse_comma_list()?;
+
+        // Optional target block
+        let target_id = if matches!(self.peek_kind(), Some(TokenKind::BlockId)) {
+            Some(self.expect_block_id()?)
+        } else {
+            None
+        };
+
+        Ok(Command::Follow(FollowCommand {
+            source_id,
+            edge_types,
+            target_id,
+        }))
+    }
+
+    /// Parse PATH blk_xxx TO blk_yyy [max=N]
+    fn parse_path_find(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume PATH
+        let from_id = self.expect_block_id()?;
+        self.expect(TokenKind::To)?;
+        let to_id = self.expect_block_id()?;
+
+        let max_length = if self.check(TokenKind::Max) {
+            self.advance();
+            self.expect(TokenKind::Eq)?;
+            Some(self.expect_int()? as usize)
+        } else {
+            None
+        };
+
+        Ok(Command::Path(PathFindCommand {
+            from_id,
+            to_id,
+            max_length,
+        }))
+    }
+
+    /// Parse SEARCH "query" [limit=N] [min_similarity=F] [roles=...]
+    fn parse_search(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume SEARCH
+        let query = self.expect_str()?;
+
+        let mut limit = None;
+        let mut min_similarity = None;
+        let mut filter = TraversalFilterCriteria::default();
+
+        while !self.is_at_end() && !self.is_cmd_start() {
+            match self.peek_kind() {
+                Some(TokenKind::Limit) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    limit = Some(self.expect_int()? as usize);
+                }
+                Some(TokenKind::MinSimilarity) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    min_similarity = Some(self.expect_float()?);
+                }
+                Some(TokenKind::Roles) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    filter.include_roles = self.parse_comma_list()?;
+                }
+                Some(TokenKind::Tags) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    filter.include_tags = self.parse_comma_list()?;
+                }
+                _ => break,
+            }
+        }
+
+        Ok(Command::Search(SearchCommand {
+            query,
+            limit,
+            min_similarity,
+            filter: if filter.include_roles.is_empty() && filter.include_tags.is_empty() {
+                None
+            } else {
+                Some(filter)
+            },
+        }))
+    }
+
+    /// Parse FIND [role=...] [tag=...] [label=...] [pattern=...]
+    fn parse_find(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume FIND
+        let mut cmd = FindCommand::default();
+
+        while !self.is_at_end() && !self.is_cmd_start() {
+            match self.peek_kind() {
+                Some(TokenKind::Role) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    cmd.role = Some(self.expect_ident_or_str()?);
+                }
+                Some(TokenKind::Tag) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    cmd.tag = Some(self.expect_str()?);
+                }
+                Some(TokenKind::Label) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    cmd.label = Some(self.expect_str()?);
+                }
+                Some(TokenKind::Pattern) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    cmd.pattern = Some(self.expect_str()?);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(Command::Find(cmd))
+    }
+
+    /// Parse VIEW blk_xxx|NEIGHBORHOOD [mode=...] [depth=N]
+    fn parse_view(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume VIEW
+
+        let target = if self.check(TokenKind::Neighborhood) {
+            self.advance();
+            ViewTarget::Neighborhood
+        } else if matches!(self.peek_kind(), Some(TokenKind::BlockId)) {
+            ViewTarget::Block(self.expect_block_id()?)
+        } else {
+            ViewTarget::Neighborhood
+        };
+
+        let mut mode = ViewMode::Full;
+        let mut depth = None;
+
+        while !self.is_at_end() && !self.is_cmd_start() {
+            match self.peek_kind() {
+                Some(TokenKind::Mode) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    mode = self.parse_view_mode()?;
+                }
+                Some(TokenKind::Depth) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    depth = Some(self.expect_int()? as usize);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(Command::View(ViewCommand {
+            target,
+            mode,
+            depth,
+        }))
+    }
+
+    // ========================================================================
+    // Context Command Parsers
+    // ========================================================================
+
+    /// Parse CTX ADD|REMOVE|CLEAR|EXPAND|COMPRESS|PRUNE|RENDER|STATS|FOCUS ...
+    fn parse_ctx(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume CTX
+
+        match self.peek_kind() {
+            Some(TokenKind::Add) => self.parse_ctx_add(),
+            Some(TokenKind::Remove) => self.parse_ctx_remove(),
+            Some(TokenKind::Clear) => {
+                self.advance();
+                Ok(Command::Context(ContextCommand::Clear))
+            }
+            Some(TokenKind::Expand) => self.parse_ctx_expand(),
+            Some(TokenKind::Compress) => self.parse_ctx_compress(),
+            Some(TokenKind::Prune) => self.parse_ctx_prune(),
+            Some(TokenKind::Render) => self.parse_ctx_render(),
+            Some(TokenKind::Stats) => {
+                self.advance();
+                Ok(Command::Context(ContextCommand::Stats))
+            }
+            Some(TokenKind::Focus) => self.parse_ctx_focus(),
+            _ => Err(self.error("CTX subcommand (ADD/REMOVE/CLEAR/EXPAND/COMPRESS/PRUNE/RENDER/STATS/FOCUS)")),
+        }
+    }
+
+    /// Parse CTX ADD blk_xxx|RESULTS|CHILDREN blk_xxx|PATH blk_xxx TO blk_yyy [reason=...] [relevance=F]
+    fn parse_ctx_add(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume ADD
+
+        let target = if self.check(TokenKind::Results) {
+            self.advance();
+            ContextAddTarget::Results
+        } else if self.check(TokenKind::Children) {
+            self.advance();
+            let parent_id = self.expect_block_id()?;
+            ContextAddTarget::Children { parent_id }
+        } else if self.check(TokenKind::Path) {
+            self.advance();
+            let from_id = self.expect_block_id()?;
+            self.expect(TokenKind::To)?;
+            let to_id = self.expect_block_id()?;
+            ContextAddTarget::Path { from_id, to_id }
+        } else {
+            let block_id = self.expect_block_id()?;
+            ContextAddTarget::Block(block_id)
+        };
+
+        let mut reason = None;
+        let mut relevance = None;
+
+        while !self.is_at_end() && !self.is_cmd_start() {
+            match self.peek_kind() {
+                Some(TokenKind::Reason) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    reason = Some(self.expect_str()?);
+                }
+                Some(TokenKind::Relevance) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    relevance = Some(self.expect_float()?);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(Command::Context(ContextCommand::Add(ContextAddCommand {
+            target,
+            reason,
+            relevance,
+        })))
+    }
+
+    /// Parse CTX REMOVE blk_xxx
+    fn parse_ctx_remove(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume REMOVE
+        let block_id = self.expect_block_id()?;
+        Ok(Command::Context(ContextCommand::Remove { block_id }))
+    }
+
+    /// Parse CTX EXPAND DOWN|UP|SEMANTIC|AUTO [depth=N] [tokens=N]
+    fn parse_ctx_expand(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume EXPAND
+
+        let direction = match self.peek_kind() {
+            Some(TokenKind::Down) => {
+                self.advance();
+                ExpandDirection::Down
+            }
+            Some(TokenKind::Up) => {
+                self.advance();
+                ExpandDirection::Up
+            }
+            Some(TokenKind::Semantic) => {
+                self.advance();
+                ExpandDirection::Semantic
+            }
+            Some(TokenKind::Both) => {
+                self.advance();
+                ExpandDirection::Both
+            }
+            _ => ExpandDirection::Down,
+        };
+
+        let mut depth = None;
+        let mut token_budget = None;
+
+        while !self.is_at_end() && !self.is_cmd_start() {
+            match self.peek_kind() {
+                Some(TokenKind::Depth) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    depth = Some(self.expect_int()? as usize);
+                }
+                Some(TokenKind::Tokens) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    token_budget = Some(self.expect_int()? as usize);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(Command::Context(ContextCommand::Expand(
+            ContextExpandCommand {
+                direction,
+                depth,
+                token_budget,
+            },
+        )))
+    }
+
+    /// Parse CTX COMPRESS method=TRUNCATE|SUMMARIZE|STRUCTURE_ONLY
+    fn parse_ctx_compress(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume COMPRESS
+
+        let method = if self.check(TokenKind::Method) {
+            self.advance();
+            self.expect(TokenKind::Eq)?;
+            self.parse_compression_method()?
+        } else {
+            CompressionMethod::Truncate
+        };
+
+        Ok(Command::Context(ContextCommand::Compress { method }))
+    }
+
+    /// Parse CTX PRUNE [min_relevance=F] [max_age=N]
+    fn parse_ctx_prune(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume PRUNE
+
+        let mut min_relevance = None;
+        let mut max_age_secs = None;
+
+        while !self.is_at_end() && !self.is_cmd_start() {
+            match self.peek_kind() {
+                Some(TokenKind::MinSimilarity) | Some(TokenKind::Relevance) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    min_relevance = Some(self.expect_float()?);
+                }
+                Some(TokenKind::MaxAge) => {
+                    self.advance();
+                    self.expect(TokenKind::Eq)?;
+                    max_age_secs = Some(self.expect_int()? as u64);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(Command::Context(ContextCommand::Prune(ContextPruneCommand {
+            min_relevance,
+            max_age_secs,
+        })))
+    }
+
+    /// Parse CTX RENDER [format=DEFAULT|SHORT_IDS|MARKDOWN]
+    fn parse_ctx_render(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume RENDER
+
+        let format = if self.check(TokenKind::Format) {
+            self.advance();
+            self.expect(TokenKind::Eq)?;
+            Some(self.parse_render_format()?)
+        } else {
+            None
+        };
+
+        Ok(Command::Context(ContextCommand::Render { format }))
+    }
+
+    /// Parse CTX FOCUS blk_xxx|CLEAR
+    fn parse_ctx_focus(&mut self) -> ParseResult<Command> {
+        self.advance(); // consume FOCUS
+
+        let block_id = if self.check(TokenKind::Clear) {
+            self.advance();
+            None
+        } else if matches!(self.peek_kind(), Some(TokenKind::BlockId)) {
+            Some(self.expect_block_id()?)
+        } else {
+            None
+        };
+
+        Ok(Command::Context(ContextCommand::Focus { block_id }))
+    }
+
+    // ========================================================================
+    // Helper Parsers
+    // ========================================================================
+
+    fn parse_view_mode(&mut self) -> ParseResult<ViewMode> {
+        match self.peek_kind() {
+            Some(TokenKind::Full) => {
+                self.advance();
+                Ok(ViewMode::Full)
+            }
+            Some(TokenKind::Preview) => {
+                self.advance();
+                Ok(ViewMode::Preview { length: 100 })
+            }
+            Some(TokenKind::MetadataToken) => {
+                self.advance();
+                Ok(ViewMode::Metadata)
+            }
+            Some(TokenKind::Ids) => {
+                self.advance();
+                Ok(ViewMode::IdsOnly)
+            }
+            Some(TokenKind::Identifier) => {
+                let span = self.tokens[self.pos].span.clone();
+                let s = self.source[span].to_string();
+                self.advance();
+                ViewMode::parse(&s).ok_or_else(|| self.error("view mode"))
+            }
+            _ => Err(self.error("view mode (FULL/PREVIEW/METADATA/IDS)")),
+        }
+    }
+
+    fn parse_compression_method(&mut self) -> ParseResult<CompressionMethod> {
+        match self.peek_kind() {
+            Some(TokenKind::Truncate) => {
+                self.advance();
+                Ok(CompressionMethod::Truncate)
+            }
+            Some(TokenKind::Summarize) => {
+                self.advance();
+                Ok(CompressionMethod::Summarize)
+            }
+            Some(TokenKind::StructureOnly) => {
+                self.advance();
+                Ok(CompressionMethod::StructureOnly)
+            }
+            Some(TokenKind::Identifier) => {
+                let span = self.tokens[self.pos].span.clone();
+                let s = self.source[span].to_string();
+                self.advance();
+                CompressionMethod::parse(&s).ok_or_else(|| self.error("compression method"))
+            }
+            _ => Err(self.error("compression method (TRUNCATE/SUMMARIZE/STRUCTURE_ONLY)")),
+        }
+    }
+
+    fn parse_render_format(&mut self) -> ParseResult<RenderFormat> {
+        match self.peek_kind() {
+            Some(TokenKind::ShortIds) => {
+                self.advance();
+                Ok(RenderFormat::ShortIds)
+            }
+            Some(TokenKind::Markdown) => {
+                self.advance();
+                Ok(RenderFormat::Markdown)
+            }
+            Some(TokenKind::Identifier) => {
+                let span = self.tokens[self.pos].span.clone();
+                let s = self.source[span].to_string();
+                self.advance();
+                RenderFormat::parse(&s).ok_or_else(|| self.error("render format"))
+            }
+            _ => Ok(RenderFormat::Default),
+        }
+    }
+
+    /// Parse comma-separated list of identifiers
+    fn parse_comma_list(&mut self) -> ParseResult<Vec<String>> {
+        let mut items = Vec::new();
+        items.push(self.expect_ident_or_str()?);
+
+        while self.check(TokenKind::Comma) {
+            self.advance();
+            items.push(self.expect_ident_or_str()?);
+        }
+
+        Ok(items)
+    }
+
+    fn expect_ident_or_str(&mut self) -> ParseResult<String> {
+        match self.peek_kind() {
+            Some(TokenKind::DoubleString(s)) | Some(TokenKind::SingleString(s)) => {
+                self.advance();
+                Ok(s)
+            }
+            Some(TokenKind::Identifier) => {
+                let span = self.tokens[self.pos].span.clone();
+                self.advance();
+                Ok(self.source[span].to_string())
+            }
+            _ => self.expect_ident_or_keyword(),
+        }
+    }
+
+    fn expect_float(&mut self) -> ParseResult<f32> {
+        match self.peek_kind() {
+            Some(TokenKind::Float(n)) => {
+                self.advance();
+                Ok(n as f32)
+            }
+            Some(TokenKind::Integer(n)) => {
+                self.advance();
+                Ok(n as f32)
+            }
+            _ => Err(self.error("float")),
+        }
     }
 
     fn parse_path(&mut self) -> ParseResult<Path> {
@@ -914,6 +1518,7 @@ impl<'a> Parser<'a> {
     fn is_cmd_start(&self) -> bool {
         matches!(
             self.peek_kind(),
+            // Document modification commands
             Some(TokenKind::Edit)
                 | Some(TokenKind::Move)
                 | Some(TokenKind::Append)
@@ -927,6 +1532,18 @@ impl<'a> Parser<'a> {
                 | Some(TokenKind::Commit)
                 | Some(TokenKind::Rollback)
                 | Some(TokenKind::Atomic)
+                | Some(TokenKind::WriteSection)
+                // Agent traversal commands
+                | Some(TokenKind::Goto)
+                | Some(TokenKind::Back)
+                | Some(TokenKind::Expand)
+                | Some(TokenKind::Follow)
+                | Some(TokenKind::Path)
+                | Some(TokenKind::Search)
+                | Some(TokenKind::Find)
+                | Some(TokenKind::View)
+                // Context commands
+                | Some(TokenKind::Ctx)
         )
     }
     fn error(&self, exp: &str) -> ParseError {
@@ -959,5 +1576,301 @@ mod tests {
         let r = Parser::new(r#"EDIT blk_abc123def456 SET content.text = "hello""#)
             .parse_commands_only();
         assert!(r.is_ok(), "Parse error: {:?}", r.err());
+    }
+
+    // ========================================================================
+    // Agent Traversal Command Tests
+    // ========================================================================
+
+    #[test]
+    fn test_parse_goto() {
+        let r = Parser::new("GOTO blk_abc123def456").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        match &cmds[0] {
+            Command::Goto(cmd) => assert_eq!(cmd.block_id, "blk_abc123def456"),
+            _ => panic!("Expected Goto command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_back() {
+        // Default steps
+        let r = Parser::new("BACK").parse_commands_only();
+        assert!(r.is_ok());
+        match &r.unwrap()[0] {
+            Command::Back(cmd) => assert_eq!(cmd.steps, 1),
+            _ => panic!("Expected Back command"),
+        }
+
+        // Custom steps
+        let r = Parser::new("BACK 3").parse_commands_only();
+        assert!(r.is_ok());
+        match &r.unwrap()[0] {
+            Command::Back(cmd) => assert_eq!(cmd.steps, 3),
+            _ => panic!("Expected Back command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_expand() {
+        let r = Parser::new("EXPAND blk_abc123def456 DOWN DEPTH=3 MODE=PREVIEW").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Expand(cmd) => {
+                assert_eq!(cmd.block_id, "blk_abc123def456");
+                assert_eq!(cmd.direction, ExpandDirection::Down);
+                assert_eq!(cmd.depth, 3);
+                assert!(matches!(cmd.mode, Some(ViewMode::Preview { .. })));
+            }
+            _ => panic!("Expected Expand command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_expand_semantic() {
+        let r = Parser::new("EXPAND blk_abc123def456 SEMANTIC").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Expand(cmd) => {
+                assert_eq!(cmd.direction, ExpandDirection::Semantic);
+            }
+            _ => panic!("Expected Expand command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_follow() {
+        let r = Parser::new("FOLLOW blk_abc123def456 references").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Follow(cmd) => {
+                assert_eq!(cmd.source_id, "blk_abc123def456");
+                assert_eq!(cmd.edge_types, vec!["references"]);
+                assert!(cmd.target_id.is_none());
+            }
+            _ => panic!("Expected Follow command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_path_find() {
+        let r = Parser::new("PATH blk_abc123def456 TO blk_111222333444").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Path(cmd) => {
+                assert_eq!(cmd.from_id, "blk_abc123def456");
+                assert_eq!(cmd.to_id, "blk_111222333444");
+                assert!(cmd.max_length.is_none());
+            }
+            _ => panic!("Expected Path command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_search() {
+        let r = Parser::new(r#"SEARCH "authentication flow" LIMIT=10"#).parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Search(cmd) => {
+                assert_eq!(cmd.query, "authentication flow");
+                assert_eq!(cmd.limit, Some(10));
+            }
+            _ => panic!("Expected Search command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_find() {
+        let r = Parser::new(r#"FIND ROLE=heading1 TAG="important""#).parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Find(cmd) => {
+                assert_eq!(cmd.role, Some("heading1".to_string()));
+                assert_eq!(cmd.tag, Some("important".to_string()));
+            }
+            _ => panic!("Expected Find command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_view_block() {
+        let r = Parser::new("VIEW blk_abc123def456 MODE=METADATA").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::View(cmd) => {
+                assert!(matches!(cmd.target, ViewTarget::Block(ref id) if id == "blk_abc123def456"));
+                assert!(matches!(cmd.mode, ViewMode::Metadata));
+            }
+            _ => panic!("Expected View command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_view_neighborhood() {
+        let r = Parser::new("VIEW NEIGHBORHOOD DEPTH=2").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::View(cmd) => {
+                assert!(matches!(cmd.target, ViewTarget::Neighborhood));
+                assert_eq!(cmd.depth, Some(2));
+            }
+            _ => panic!("Expected View command"),
+        }
+    }
+
+    // ========================================================================
+    // Context Command Tests
+    // ========================================================================
+
+    #[test]
+    fn test_parse_ctx_add_block() {
+        let r = Parser::new(r#"CTX ADD blk_abc123def456 REASON="semantic_relevance""#).parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Add(cmd)) => {
+                assert!(matches!(cmd.target, ContextAddTarget::Block(ref id) if id == "blk_abc123def456"));
+                assert_eq!(cmd.reason, Some("semantic_relevance".to_string()));
+            }
+            _ => panic!("Expected CTX ADD command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_add_results() {
+        let r = Parser::new("CTX ADD RESULTS").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Add(cmd)) => {
+                assert!(matches!(cmd.target, ContextAddTarget::Results));
+            }
+            _ => panic!("Expected CTX ADD RESULTS command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_add_children() {
+        let r = Parser::new("CTX ADD CHILDREN blk_abc123def456").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Add(cmd)) => {
+                assert!(matches!(cmd.target, ContextAddTarget::Children { ref parent_id } if parent_id == "blk_abc123def456"));
+            }
+            _ => panic!("Expected CTX ADD CHILDREN command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_remove() {
+        let r = Parser::new("CTX REMOVE blk_abc123def456").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Remove { block_id }) => {
+                assert_eq!(block_id, "blk_abc123def456");
+            }
+            _ => panic!("Expected CTX REMOVE command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_clear() {
+        let r = Parser::new("CTX CLEAR").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        assert!(matches!(r.unwrap()[0], Command::Context(ContextCommand::Clear)));
+    }
+
+    #[test]
+    fn test_parse_ctx_expand() {
+        let r = Parser::new("CTX EXPAND SEMANTIC DEPTH=2").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Expand(cmd)) => {
+                assert_eq!(cmd.direction, ExpandDirection::Semantic);
+                assert_eq!(cmd.depth, Some(2));
+            }
+            _ => panic!("Expected CTX EXPAND command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_compress() {
+        let r = Parser::new("CTX COMPRESS METHOD=TRUNCATE").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Compress { method }) => {
+                assert_eq!(*method, CompressionMethod::Truncate);
+            }
+            _ => panic!("Expected CTX COMPRESS command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_prune() {
+        let r = Parser::new("CTX PRUNE RELEVANCE=0.3 MAX_AGE=300").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Prune(cmd)) => {
+                assert_eq!(cmd.min_relevance, Some(0.3));
+                assert_eq!(cmd.max_age_secs, Some(300));
+            }
+            _ => panic!("Expected CTX PRUNE command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_render() {
+        let r = Parser::new("CTX RENDER FORMAT=SHORT_IDS").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Render { format }) => {
+                assert_eq!(*format, Some(RenderFormat::ShortIds));
+            }
+            _ => panic!("Expected CTX RENDER command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_stats() {
+        let r = Parser::new("CTX STATS").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        assert!(matches!(r.unwrap()[0], Command::Context(ContextCommand::Stats)));
+    }
+
+    #[test]
+    fn test_parse_ctx_focus() {
+        let r = Parser::new("CTX FOCUS blk_abc123def456").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Focus { block_id }) => {
+                assert_eq!(*block_id, Some("blk_abc123def456".to_string()));
+            }
+            _ => panic!("Expected CTX FOCUS command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ctx_focus_clear() {
+        let r = Parser::new("CTX FOCUS CLEAR").parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        match &r.unwrap()[0] {
+            Command::Context(ContextCommand::Focus { block_id }) => {
+                assert!(block_id.is_none());
+            }
+            _ => panic!("Expected CTX FOCUS CLEAR command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_multiple_commands() {
+        let input = r#"
+            GOTO blk_abc123def456
+            EXPAND blk_abc123def456 DOWN DEPTH=2
+            CTX ADD RESULTS
+            CTX RENDER FORMAT=SHORT_IDS
+        "#;
+        let r = Parser::new(input).parse_commands_only();
+        assert!(r.is_ok(), "Parse error: {:?}", r.err());
+        assert_eq!(r.unwrap().len(), 4);
     }
 }

@@ -7,6 +7,7 @@ members = [
     "crates/ucp-api",
     "crates/ucp-observe",
     "crates/ucp-llm",
+    "crates/ucp-agent",
     "crates/translators/markdown",
     "crates/translators/html",
     "crates/ucp-python",
@@ -68,6 +69,7 @@ ucm-engine = { path = "crates/ucm-engine" }
 ucl-parser = { path = "crates/ucl-parser" }
 ucp-observe = { path = "crates/ucp-observe" }
 ucp-llm = { path = "crates/ucp-llm" }
+ucp-agent = { path = "crates/ucp-agent" }
 ucp-translator-markdown = { path = "crates/translators/markdown" }
 ucp-translator-html = { path = "crates/translators/html" }
 

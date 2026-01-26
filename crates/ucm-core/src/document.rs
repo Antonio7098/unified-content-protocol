@@ -273,6 +273,11 @@ impl Document {
         None
     }
 
+    /// Get the parent block (convenience method)
+    pub fn parent_of(&self, child: &BlockId) -> Option<&Block> {
+        self.parent(child).and_then(|id| self.blocks.get(id))
+    }
+
     /// Add a block to the document
     pub fn add_block(&mut self, block: Block, parent: &BlockId) -> Result<BlockId> {
         if !self.blocks.contains_key(parent) {
@@ -325,6 +330,17 @@ impl Document {
 
         self.touch();
         Ok(id)
+    }
+
+    /// Add an edge between two blocks (wrapper for edge_index)
+    pub fn add_edge(
+        &mut self,
+        source: &BlockId,
+        edge_type: crate::edge::EdgeType,
+        target: BlockId,
+    ) {
+        let edge = crate::edge::Edge::new(edge_type, target);
+        self.edge_index.add_edge(source, &edge);
     }
 
     /// Remove a block from the structure (makes it orphaned)
@@ -429,6 +445,66 @@ impl Document {
         let children = self.structure.entry(*new_parent).or_default();
         let insert_idx = index.min(children.len());
         children.insert(insert_idx, *id);
+
+        self.touch();
+        Ok(())
+    }
+
+    /// Move a block before another block (sibling ordering)
+    pub fn move_block_before(&mut self, id: &BlockId, before: &BlockId) -> Result<()> {
+        if !self.blocks.contains_key(id) {
+            return Err(Error::BlockNotFound(id.to_string()));
+        }
+        if !self.blocks.contains_key(before) {
+            return Err(Error::BlockNotFound(before.to_string()));
+        }
+
+        let parent = *self
+            .parent(before)
+            .ok_or_else(|| Error::BlockNotFound(format!("parent of {}", before)))?;
+
+        if self.is_ancestor(id, &parent) {
+            return Err(Error::CycleDetected(id.to_string()));
+        }
+
+        self.remove_from_structure(id);
+        let children = self.structure.entry(parent).or_default();
+
+        if let Some(pos) = children.iter().position(|child| child == before) {
+            children.insert(pos, *id);
+        } else {
+            children.push(*id);
+        }
+
+        self.touch();
+        Ok(())
+    }
+
+    /// Move a block after another block (sibling ordering)
+    pub fn move_block_after(&mut self, id: &BlockId, after: &BlockId) -> Result<()> {
+        if !self.blocks.contains_key(id) {
+            return Err(Error::BlockNotFound(id.to_string()));
+        }
+        if !self.blocks.contains_key(after) {
+            return Err(Error::BlockNotFound(after.to_string()));
+        }
+
+        let parent = *self
+            .parent(after)
+            .ok_or_else(|| Error::BlockNotFound(format!("parent of {}", after)))?;
+
+        if self.is_ancestor(id, &parent) {
+            return Err(Error::CycleDetected(id.to_string()));
+        }
+
+        self.remove_from_structure(id);
+        let children = self.structure.entry(parent).or_default();
+
+        if let Some(pos) = children.iter().position(|child| child == after) {
+            children.insert(pos + 1, *id);
+        } else {
+            children.push(*id);
+        }
 
         self.touch();
         Ok(())

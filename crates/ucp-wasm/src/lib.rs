@@ -4,6 +4,7 @@
 
 use wasm_bindgen::prelude::*;
 
+mod agent;
 mod document;
 mod engine;
 mod errors;
@@ -13,6 +14,7 @@ mod section;
 mod snapshot;
 mod types;
 
+pub use agent::*;
 pub use document::*;
 pub use engine::*;
 pub use errors::*;

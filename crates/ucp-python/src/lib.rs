@@ -7,6 +7,7 @@
 
 use pyo3::prelude::*;
 
+mod agent;
 mod block;
 mod content;
 mod document;
@@ -19,6 +20,11 @@ mod section;
 mod snapshot;
 mod types;
 
+use agent::{
+    PyAgentCapabilities, PyAgentSessionId, PyAgentTraversal, PyBlockView, PyConnection,
+    PyExpansionResult, PyFindResult, PyNavigationResult, PyNeighborhoodView, PySearchResult,
+    PySessionConfig, PyViewMode,
+};
 use block::PyBlock;
 use content::PyContent;
 use document::PyDocument;
@@ -200,6 +206,20 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTraversalDirection>()?;
     m.add_class::<PyTraversalResult>()?;
     m.add_class::<PyTraversalNode>()?;
+
+    // Agent traversal classes
+    m.add_class::<PyAgentTraversal>()?;
+    m.add_class::<PyAgentSessionId>()?;
+    m.add_class::<PySessionConfig>()?;
+    m.add_class::<PyAgentCapabilities>()?;
+    m.add_class::<PyViewMode>()?;
+    m.add_class::<PyNavigationResult>()?;
+    m.add_class::<PyExpansionResult>()?;
+    m.add_class::<PyBlockView>()?;
+    m.add_class::<PySearchResult>()?;
+    m.add_class::<PyFindResult>()?;
+    m.add_class::<PyNeighborhoodView>()?;
+    m.add_class::<PyConnection>()?;
 
     // Register functions
     m.add_function(wrap_pyfunction!(parse_markdown, m)?)?;
