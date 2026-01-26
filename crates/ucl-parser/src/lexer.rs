@@ -6,200 +6,200 @@ use logos::Logos;
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(skip r"[ \t]+")]
 pub enum TokenKind {
-    // Section headers
-    #[token("STRUCTURE")]
+    // Section headers (case-insensitive)
+    #[regex("(?i)STRUCTURE")]
     Structure,
-    #[token("BLOCKS")]
+    #[regex("(?i)BLOCKS")]
     Blocks,
-    #[token("COMMANDS")]
+    #[regex("(?i)COMMANDS")]
     Commands,
 
-    // Commands
-    #[token("EDIT")]
+    // Commands (case-insensitive)
+    #[regex("(?i)EDIT")]
     Edit,
-    #[token("SET")]
+    #[regex("(?i)SET")]
     Set,
-    #[token("MOVE")]
+    #[regex("(?i)MOVE")]
     Move,
-    #[token("TO")]
+    #[regex("(?i)TO")]
     To,
-    #[token("AT")]
+    #[regex("(?i)AT")]
     At,
-    #[token("BEFORE")]
+    #[regex("(?i)BEFORE")]
     Before,
-    #[token("AFTER")]
+    #[regex("(?i)AFTER")]
     After,
-    #[token("SWAP")]
+    #[regex("(?i)SWAP")]
     Swap,
-    #[token("APPEND")]
+    #[regex("(?i)APPEND")]
     Append,
-    #[token("WITH")]
+    #[regex("(?i)WITH")]
     With,
-    #[token("DELETE")]
+    #[regex("(?i)DELETE")]
     Delete,
-    #[token("CASCADE")]
+    #[regex("(?i)CASCADE")]
     Cascade,
-    #[token("PRESERVE_CHILDREN")]
+    #[regex("(?i)PRESERVE_CHILDREN")]
     PreserveChildren,
-    #[token("PRUNE")]
+    #[regex("(?i)PRUNE")]
     Prune,
-    #[token("UNREACHABLE")]
+    #[regex("(?i)UNREACHABLE")]
     Unreachable,
-    #[token("WHERE")]
+    #[regex("(?i)WHERE")]
     Where,
-    #[token("DRY_RUN")]
+    #[regex("(?i)DRY_RUN")]
     DryRun,
-    #[token("FOLD")]
+    #[regex("(?i)FOLD")]
     Fold,
-    #[token("DEPTH")]
+    #[regex("(?i)DEPTH")]
     Depth,
-    #[token("MAX_TOKENS")]
+    #[regex("(?i)MAX_TOKENS")]
     MaxTokens,
-    #[token("PRESERVE_TAGS")]
+    #[regex("(?i)PRESERVE_TAGS")]
     PreserveTags,
-    #[token("LINK")]
+    #[regex("(?i)LINK")]
     Link,
-    #[token("UNLINK")]
+    #[regex("(?i)UNLINK")]
     Unlink,
-    #[token("SNAPSHOT")]
+    #[regex("(?i)SNAPSHOT")]
     Snapshot,
-    #[token("CREATE")]
+    #[regex("(?i)CREATE")]
     Create,
-    #[token("RESTORE")]
+    #[regex("(?i)RESTORE")]
     Restore,
-    #[token("LIST")]
+    #[regex("(?i)LIST")]
     List,
-    #[token("DIFF")]
+    #[regex("(?i)DIFF")]
     Diff,
-    #[token("BEGIN")]
+    #[regex("(?i)BEGIN")]
     Begin,
-    #[token("TRANSACTION")]
+    #[regex("(?i)TRANSACTION")]
     Transaction,
-    #[token("COMMIT")]
+    #[regex("(?i)COMMIT")]
     Commit,
-    #[token("ROLLBACK")]
+    #[regex("(?i)ROLLBACK")]
     Rollback,
-    #[token("ATOMIC")]
+    #[regex("(?i)ATOMIC")]
     Atomic,
-    #[token("VIEW")]
+    #[regex("(?i)VIEW")]
     View,
-    #[token("FOLDED")]
+    #[regex("(?i)FOLDED")]
     Folded,
-    #[token("FROM")]
+    #[regex("(?i)FROM")]
     From,
-    #[token("TEMPLATE")]
+    #[regex("(?i)TEMPLATE")]
     Template,
-    #[token("FIRST")]
+    #[regex("(?i)FIRST")]
     First,
-    #[token("LAST")]
+    #[regex("(?i)LAST")]
     Last,
-    #[token("WRITE_SECTION")]
+    #[regex("(?i)WRITE_SECTION")]
     WriteSection,
-    #[token("BASE_LEVEL")]
+    #[regex("(?i)BASE_LEVEL")]
     BaseLevel,
 
-    // Agent traversal commands
-    #[token("GOTO")]
+    // Agent traversal commands (case-insensitive)
+    #[regex("(?i)GOTO")]
     Goto,
-    #[token("BACK")]
+    #[regex("(?i)BACK")]
     Back,
-    #[token("EXPAND")]
+    #[regex("(?i)EXPAND")]
     Expand,
-    #[token("FOLLOW")]
+    #[regex("(?i)FOLLOW")]
     Follow,
-    #[token("PATH")]
+    #[regex("(?i)PATH")]
     Path,
-    #[token("SEARCH")]
+    #[regex("(?i)SEARCH")]
     Search,
-    #[token("FIND")]
+    #[regex("(?i)FIND")]
     Find,
-    #[token("CTX")]
+    #[regex("(?i)CTX")]
     Ctx,
 
-    // Traversal directions
-    #[token("DOWN")]
+    // Traversal directions (case-insensitive)
+    #[regex("(?i)DOWN")]
     Down,
-    #[token("UP")]
+    #[regex("(?i)UP")]
     Up,
-    #[token("SEMANTIC")]
+    #[regex("(?i)SEMANTIC")]
     Semantic,
 
-    // Traversal options
-    #[token("MODE")]
+    // Traversal options (case-insensitive)
+    #[regex("(?i)MODE")]
     Mode,
-    #[token("LIMIT")]
+    #[regex("(?i)LIMIT")]
     Limit,
-    #[token("MIN_SIMILARITY")]
+    #[regex("(?i)MIN_SIMILARITY")]
     MinSimilarity,
-    #[token("ROLES")]
+    #[regex("(?i)ROLES")]
     Roles,
-    #[token("TAGS")]
+    #[regex("(?i)TAGS")]
     Tags,
-    #[token("ROLE")]
+    #[regex("(?i)ROLE")]
     Role,
-    #[token("TAG")]
+    #[regex("(?i)TAG")]
     Tag,
-    #[token("LABEL")]
+    #[regex("(?i)LABEL")]
     Label,
-    #[token("PATTERN")]
+    #[regex("(?i)PATTERN")]
     Pattern,
-    #[token("MAX")]
+    #[regex("(?i)MAX")]
     Max,
-    #[token("NEIGHBORHOOD")]
+    #[regex("(?i)NEIGHBORHOOD")]
     Neighborhood,
 
-    // Context commands
-    #[token("ADD")]
+    // Context commands (case-insensitive)
+    #[regex("(?i)ADD")]
     Add,
-    #[token("REMOVE")]
+    #[regex("(?i)REMOVE")]
     Remove,
-    #[token("CLEAR")]
+    #[regex("(?i)CLEAR")]
     Clear,
-    #[token("COMPRESS")]
+    #[regex("(?i)COMPRESS")]
     Compress,
-    #[token("RENDER")]
+    #[regex("(?i)RENDER")]
     Render,
-    #[token("STATS")]
+    #[regex("(?i)STATS")]
     Stats,
-    #[token("FOCUS")]
+    #[regex("(?i)FOCUS")]
     Focus,
-    #[token("RESULTS")]
+    #[regex("(?i)RESULTS")]
     Results,
-    #[token("CHILDREN")]
+    #[regex("(?i)CHILDREN")]
     Children,
-    #[token("AUTO")]
+    #[regex("(?i)AUTO")]
     Auto,
-    #[token("TOKENS")]
+    #[regex("(?i)TOKENS")]
     Tokens,
-    #[token("MAX_AGE")]
+    #[regex("(?i)MAX_AGE")]
     MaxAge,
-    #[token("RELEVANCE")]
+    #[regex("(?i)RELEVANCE")]
     Relevance,
-    #[token("REASON")]
+    #[regex("(?i)REASON")]
     Reason,
-    #[token("METHOD")]
+    #[regex("(?i)METHOD")]
     Method,
-    #[token("FORMAT")]
+    #[regex("(?i)FORMAT")]
     Format,
-    #[token("TRUNCATE")]
+    #[regex("(?i)TRUNCATE")]
     Truncate,
-    #[token("SUMMARIZE")]
+    #[regex("(?i)SUMMARIZE")]
     Summarize,
-    #[token("STRUCTURE_ONLY")]
+    #[regex("(?i)STRUCTURE_ONLY")]
     StructureOnly,
-    #[token("SHORT_IDS")]
+    #[regex("(?i)SHORT_IDS")]
     ShortIds,
-    #[token("MARKDOWN")]
+    #[regex("(?i)MARKDOWN")]
     Markdown,
-    #[token("FULL")]
+    #[regex("(?i)FULL")]
     Full,
-    #[token("PREVIEW")]
+    #[regex("(?i)PREVIEW")]
     Preview,
-    #[token("METADATA")]
+    #[regex("(?i)METADATA")]
     MetadataToken,
-    #[token("IDS")]
+    #[regex("(?i)IDS")]
     Ids,
-    #[token("BOTH")]
+    #[regex("(?i)BOTH")]
     Both,
 
     // Operators
@@ -224,30 +224,30 @@ pub enum TokenKind {
     #[token("--")]
     MinusMinus,
 
-    // Logic
-    #[token("AND")]
+    // Logic (case-insensitive)
+    #[regex("(?i)AND")]
     And,
-    #[token("OR")]
+    #[regex("(?i)OR")]
     Or,
-    #[token("NOT")]
+    #[regex("(?i)NOT")]
     Not,
-    #[token("CONTAINS")]
+    #[regex("(?i)CONTAINS")]
     Contains,
-    #[token("STARTS_WITH")]
+    #[regex("(?i)STARTS_WITH")]
     StartsWith,
-    #[token("ENDS_WITH")]
+    #[regex("(?i)ENDS_WITH")]
     EndsWith,
-    #[token("MATCHES")]
+    #[regex("(?i)MATCHES")]
     Matches,
-    #[token("EXISTS")]
+    #[regex("(?i)EXISTS")]
     Exists,
-    #[token("IS_NULL")]
+    #[regex("(?i)IS_NULL")]
     IsNull,
-    #[token("IS_NOT_NULL")]
+    #[regex("(?i)IS_NOT_NULL")]
     IsNotNull,
-    #[token("IS_EMPTY")]
+    #[regex("(?i)IS_EMPTY")]
     IsEmpty,
-    #[token("LENGTH")]
+    #[regex("(?i)LENGTH")]
     Length,
 
     // Punctuation

@@ -4,6 +4,17 @@
 
 The Agent Traversal System extends UCL with new commands for graph navigation and context management. Commands are case-insensitive but typically written in uppercase.
 
+### Troubleshooting note (Jan 2026)
+
+> Earlier automated reports claiming "fixes not deployed" were traced back to the test harness issuing invalid UCL, not a runtime regression. Double-check the following syntax rules before filing a bug:
+>
+> 1. `EXPAND blk_target DOWN …` — the block ID must come first, followed by the direction keyword. `EXPAND DOWN blk_target` will be rejected by the parser.
+> 2. `PATH blk_start TO blk_end` — always include the `TO` keyword between the two block IDs.
+> 3. `FIND PATTERN=".*"` — every filter (`ROLE`, `TAG`, `LABEL`, `PATTERN`) uses `=` between the key and value.
+> 4. `CTX ADD blk_id RELEVANCE=0.8` — contextual metadata such as `RELEVANCE` and `REASON` also require `=`.
+
+These constraints already existed in the engine; the improved errors below simply call them out explicitly.
+
 ## Traversal Commands
 
 ### GOTO

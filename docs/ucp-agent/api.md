@@ -96,6 +96,14 @@ Creates a new agent session with the given configuration.
 
 Closes a session and releases its resources.
 
+### Python API reminders (Jan 2026)
+
+> Several "fixes not deployed" alerts actually came from automation calling the bindings incorrectly. Double-check the following before opening an issue:
+>
+> 1. `expand(session_id, block_id, direction="down", ...)` — the `block_id` argument is mandatory and must be positional; there is no overload that infers it from the session.
+> 2. `context_add(session_id, block_id, relevance=0.8)` — the keyword parameter is `relevance`, not `relevance_score`.
+> 3. `SessionConfig(name="...")` — the constructor only accepts `name` and `start_block`. Use the builder helpers (`with_view_mode`, `with_capabilities`, etc.) for any other option.
+
 #### Update Document
 
 === "Rust"

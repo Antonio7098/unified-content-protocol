@@ -570,7 +570,10 @@ impl<'a> UclExecutor<'a> {
 
 /// Parse a block ID string.
 fn parse_block_id(s: &str) -> Result<BlockId> {
-    s.parse().map_err(|_| AgentError::BlockNotFound(BlockId::root()))
+    s.parse().map_err(|_| AgentError::ParseError(format!(
+        "Invalid block ID format: '{}'. Block IDs must start with 'blk_' followed by hexadecimal characters (e.g., 'blk_abc123def456').",
+        s
+    )))
 }
 
 /// Execute UCL commands from a string.

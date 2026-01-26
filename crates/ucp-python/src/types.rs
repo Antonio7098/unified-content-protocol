@@ -29,7 +29,10 @@ impl PyBlockId {
     fn new(s: &str) -> PyResult<Self> {
         s.parse::<BlockId>()
             .map(PyBlockId)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+            .map_err(|_| pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid block ID: '{}'. Block IDs must be in format 'blk_' followed by 24 hexadecimal characters (e.g., 'blk_0102030405060708090a0b0c').",
+                s
+            )))
     }
 
     /// Create the root block ID.

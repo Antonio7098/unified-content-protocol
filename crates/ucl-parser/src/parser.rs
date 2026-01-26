@@ -513,6 +513,14 @@ impl<'a> Parser<'a> {
     /// Parse EXPAND blk_xxx DOWN|UP|BOTH|SEMANTIC [depth=N] [mode=MODE] [roles=...] [tags=...]
     fn parse_expand(&mut self) -> ParseResult<Command> {
         self.advance(); // consume EXPAND
+        if matches!(
+            self.peek_kind(),
+            Some(TokenKind::Down | TokenKind::Up | TokenKind::Both | TokenKind::Semantic)
+        ) {
+            return Err(self.error_with_hint(
+                "EXPAND syntax: provide the block ID before the direction (e.g., EXPAND blk_root DOWN)",
+            ));
+        }
         let block_id = self.expect_block_id()?;
 
         // Parse direction
@@ -610,7 +618,15 @@ impl<'a> Parser<'a> {
     fn parse_path_find(&mut self) -> ParseResult<Command> {
         self.advance(); // consume PATH
         let from_id = self.expect_block_id()?;
-        self.expect(TokenKind::To)?;
+        if self.check(TokenKind::To) {
+            self.advance();
+        } else if matches!(self.peek_kind(), Some(TokenKind::BlockId)) {
+            return Err(self.error_with_hint(
+                "PATH syntax: include the TO keyword between the two block IDs (e.g., PATH blk_a TO blk_b)",
+            ));
+        } else {
+            self.expect(TokenKind::To)?;
+        }
         let to_id = self.expect_block_id()?;
 
         let max_length = if self.check(TokenKind::Max) {
@@ -684,22 +700,30 @@ impl<'a> Parser<'a> {
             match self.peek_kind() {
                 Some(TokenKind::Role) => {
                     self.advance();
-                    self.expect(TokenKind::Eq)?;
+                    self.expect_eq_with_hint(
+                        "FIND ROLE must use '=' (e.g., ROLE=heading1)",
+                    )?;
                     cmd.role = Some(self.expect_ident_or_str()?);
                 }
                 Some(TokenKind::Tag) => {
                     self.advance();
-                    self.expect(TokenKind::Eq)?;
+                    self.expect_eq_with_hint(
+                        "FIND TAG must use '=' (e.g., TAG=\"important\")",
+                    )?;
                     cmd.tag = Some(self.expect_str()?);
                 }
                 Some(TokenKind::Label) => {
                     self.advance();
-                    self.expect(TokenKind::Eq)?;
+                    self.expect_eq_with_hint(
+                        "FIND LABEL must use '=' (e.g., LABEL=\"summary\")",
+                    )?;
                     cmd.label = Some(self.expect_str()?);
                 }
                 Some(TokenKind::Pattern) => {
                     self.advance();
-                    self.expect(TokenKind::Eq)?;
+                    self.expect_eq_with_hint(
+                        "FIND PATTERN must use '=' (e.g., PATTERN=\".*\")",
+                    )?;
                     cmd.pattern = Some(self.expect_str()?);
                 }
                 _ => break,
@@ -790,7 +814,15 @@ impl<'a> Parser<'a> {
         } else if self.check(TokenKind::Path) {
             self.advance();
             let from_id = self.expect_block_id()?;
-            self.expect(TokenKind::To)?;
+            if self.check(TokenKind::To) {
+                self.advance();
+            } else if matches!(self.peek_kind(), Some(TokenKind::BlockId)) {
+                return Err(self.error_with_hint(
+                    "CTX ADD PATH syntax: include the TO keyword between the two block IDs",
+                ));
+            } else {
+                self.expect(TokenKind::To)?;
+            }
             let to_id = self.expect_block_id()?;
             ContextAddTarget::Path { from_id, to_id }
         } else {
@@ -805,12 +837,14 @@ impl<'a> Parser<'a> {
             match self.peek_kind() {
                 Some(TokenKind::Reason) => {
                     self.advance();
-                    self.expect(TokenKind::Eq)?;
+                    self.expect_eq_with_hint(
+                        "CTX ADD REASON must use '=' (e.g., REASON=\"for_llm\")",
+                    )?;
                     reason = Some(self.expect_str()?);
                 }
                 Some(TokenKind::Relevance) => {
                     self.advance();
-                    self.expect(TokenKind::Eq)?;
+                    self.expect_eq_with_hint("CTX ADD RELEVANCE must use '=' (e.g., RELEVANCE=0.8)")?;
                     relevance = Some(self.expect_float()?);
                 }
                 _ => break,
@@ -1454,6 +1488,23 @@ impl<'a> Parser<'a> {
                 | Some(TokenKind::True)
                 | Some(TokenKind::False)
                 | Some(TokenKind::Null)
+                // Allow keywords to be used as property names
+                | Some(TokenKind::Label)
+                | Some(TokenKind::Role)
+                | Some(TokenKind::Tag)
+                | Some(TokenKind::Tags)
+                | Some(TokenKind::Mode)
+                | Some(TokenKind::Depth)
+                | Some(TokenKind::Limit)
+                | Some(TokenKind::Max)
+                | Some(TokenKind::Format)
+                | Some(TokenKind::Method)
+                | Some(TokenKind::Reason)
+                | Some(TokenKind::Relevance)
+                | Some(TokenKind::Pattern)
+                | Some(TokenKind::Full)
+                | Some(TokenKind::Preview)
+                | Some(TokenKind::MetadataToken)
         )
     }
     fn expect_ident_or_keyword(&mut self) -> ParseResult<String> {
@@ -1498,6 +1549,15 @@ impl<'a> Parser<'a> {
             Ok(n)
         } else {
             Err(self.error("integer"))
+        }
+    }
+
+    fn expect_eq_with_hint(&mut self, hint: &str) -> ParseResult<()> {
+        if self.check(TokenKind::Eq) {
+            self.advance();
+            Ok(())
+        } else {
+            Err(self.error_with_hint(hint))
         }
     }
     fn try_str(&mut self) -> Option<String> {
@@ -1556,6 +1616,13 @@ impl<'a> Parser<'a> {
             found: f,
             line: l,
             column: c,
+        }
+    }
+    fn error_with_hint(&self, message: &str) -> ParseError {
+        let line = self.peek().map(|t| t.line).unwrap_or(0);
+        ParseError::InvalidSyntax {
+            message: message.into(),
+            line,
         }
     }
 }
