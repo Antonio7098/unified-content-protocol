@@ -33,3 +33,9 @@ benchmark_*.txt
 
 notes.txt
 .venv/
+
+# Python build artifacts
+crates/ucp-python/dist/
+**/__pycache__/
+*.pyc
+crates/ucp-python/python/ucp/_core*.so

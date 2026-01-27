@@ -16,7 +16,7 @@ The Markdown translator enables:
 === "Rust"
     ```toml
     [dependencies]
-    ucp-translator-markdown = "0.1.7"
+    ucp-translator-markdown = "0.1.8"
     ```
 
 === "Python"

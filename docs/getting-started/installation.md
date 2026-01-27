@@ -25,7 +25,7 @@ This guide covers how to install and configure UCP for your project.
 
     ```toml
     [dependencies]
-    ucp-api = "0.1.7"
+    ucp-api = "0.1.8"
     ```
 
     ### Individual Crates
@@ -35,15 +35,19 @@ This guide covers how to install and configure UCP for your project.
     ```toml
     [dependencies]
     # Core types only
-    ucm-core = "0.1.7"
+    ucm-core = "0.1.8"
+
     # Core + transformation engine
-    ucm-engine = "0.1.7"
+    ucm-engine = "0.1.8"
+
     # UCL command parsing
-    ucl-parser = "0.1.7"
+    ucl-parser = "0.1.8"
+
     # Markdown conversion
-    ucp-translator-markdown = "0.1.7"
+    ucp-translator-markdown = "0.1.8"
+
     # Observability utilities
-    ucp-observe = "0.1.7"
+    ucp-observe = "0.1.8"
     ```
 
 === "Python"
@@ -180,8 +184,8 @@ If you're using multiple UCP crates, ensure they're all from the same version:
 
 ```toml
 [dependencies]
-ucm-core = "0.1.7"
-ucm-engine = "0.1.7"
+ucm-core = "0.1.8"
+ucm-engine = "0.1.8"  # Must match ucm-core version
 ```
 
 ## Next Steps

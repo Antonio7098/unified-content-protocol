@@ -34,6 +34,17 @@ from ucp._core import (
     TraversalResult,
     TraversalNode,
     WriteSectionResult,
+    # Agent traversal system
+    AgentTraversal,
+    AgentSessionId,
+    SessionConfig,
+    AgentCapabilities,
+    ViewMode,
+    NavigationResult,
+    ExpansionResult,
+    BlockView,
+    SearchResult,
+    FindResult,
     # Section utilities
     ClearResult,
     DeletedContent,
@@ -72,7 +83,7 @@ from ucp._core import (
     ParseError,
 )
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 __all__ = [
     # Classes
     "BlockId",
@@ -97,6 +108,17 @@ __all__ = [
     "TraversalResult",
     "TraversalNode",
     "WriteSectionResult",
+    # Agent traversal system
+    "AgentTraversal",
+    "AgentSessionId",
+    "SessionConfig",
+    "AgentCapabilities",
+    "ViewMode",
+    "NavigationResult",
+    "ExpansionResult",
+    "BlockView",
+    "SearchResult",
+    "FindResult",
     # Section utilities
     "ClearResult",
     "DeletedContent",

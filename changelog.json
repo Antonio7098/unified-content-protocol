@@ -19,6 +19,135 @@
   },
   "entries": [
     {
+      "version": "v0.1.8",
+      "date": "2026-01-27",
+      "changes": [
+        {
+          "type": "added",
+          "area": "agent.core",
+          "description": "Implemented Agent Graph Traversal System (ucp-agent crate) with session management, cursor tracking, expansion strategies, and view modes for intelligent knowledge graph navigation.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/src/session.rs",
+            "crates/ucp-agent/src/cursor.rs",
+            "crates/ucp-agent/src/operations.rs",
+            "crates/ucp-agent/src/expansion.rs",
+            "crates/ucp-agent/Cargo.toml"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "agent.safety",
+          "description": "Implemented safety mechanisms: depth guards (RAII), circuit breakers (state machine), operation budgets, and session limits for robust agent execution.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/src/safety.rs",
+            "crates/ucp-agent/src/error.rs",
+            "crates/ucp-agent/src/metrics.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "agent.rag",
+          "description": "Added pluggable RAG provider trait for semantic search with NullRagProvider and MockRagProvider implementations for testing and extensibility.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/src/rag.rs",
+            "crates/ucp-agent/src/lib.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "ucl-parser.agent",
+          "description": "Extended UCL parser with traversal commands (GOTO, BACK, EXPAND, FOLLOW, PATH, SEARCH, FIND, VIEW) and context commands (CTX ADD/REMOVE/CLEAR/EXPAND/COMPRESS/PRUNE/RENDER/STATS/FOCUS).",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucl-parser/src/lexer.rs",
+            "crates/ucl-parser/src/ast.rs",
+            "crates/ucl-parser/src/parser.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "agent.executor",
+          "description": "Implemented UCL command executor for agent traversal and context operations with async search support and result caching.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/src/executor.rs",
+            "crates/ucp-agent/src/lib.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.python.agent",
+          "description": "Added Python bindings for Agent Traversal System via PyO3 with full API coverage and async support for semantic search.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src/agent.rs",
+            "crates/ucp-python/Cargo.toml"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.wasm.agent",
+          "description": "Added WASM bindings for Agent Traversal System via wasm-bindgen with JavaScript-friendly API, async Promise support, and JSON serialization.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-wasm/src/agent.rs",
+            "crates/ucp-wasm/src/lib.rs",
+            "crates/ucp-wasm/Cargo.toml"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "tests.agent",
+          "description": "Implemented 38 comprehensive integration tests covering session management, navigation, expansion, search, context operations, path finding, and UCL execution.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/tests/integration_tests.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "docs.agent",
+          "description": "Created comprehensive documentation for Agent Traversal System including overview, API reference, UCL commands guide, usage examples, and architecture deep-dive.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/ucp-agent/index.md",
+            "docs/ucp-agent/api.md",
+            "docs/ucp-agent/ucl-commands.md",
+            "docs/ucp-agent/examples.md",
+            "docs/ucp-agent/architecture.md",
+            "docs/index.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped version to 0.1.8 across workspace, bindings, and docs to publish the Agent Graph Traversal release.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "crates/ucp-agent/Cargo.toml",
+            "crates/ucp-python/pyproject.toml",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/Cargo.toml",
+            "docs/**"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.7",
       "date": "2025-01-23",
       "changes": [
@@ -85,6 +214,114 @@
           "files_affected": [
             "crates/ucm-engine/src/transaction.rs",
             "crates/ucm-engine/src/traversal.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "agent.core",
+          "description": "Implemented Agent Graph Traversal System (ucp-agent crate) with session management, cursor tracking, expansion strategies, and view modes for intelligent knowledge graph navigation.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/src/session.rs",
+            "crates/ucp-agent/src/cursor.rs",
+            "crates/ucp-agent/src/operations.rs",
+            "crates/ucp-agent/src/expansion.rs",
+            "crates/ucp-agent/Cargo.toml"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "agent.safety",
+          "description": "Implemented safety mechanisms: depth guards (RAII), circuit breakers (state machine), operation budgets, and session limits for robust agent execution.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/src/safety.rs",
+            "crates/ucp-agent/src/error.rs",
+            "crates/ucp-agent/src/metrics.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "agent.rag",
+          "description": "Added pluggable RAG provider trait for semantic search with NullRagProvider and MockRagProvider implementations for testing and extensibility.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/src/rag.rs",
+            "crates/ucp-agent/src/lib.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "ucl-parser.agent",
+          "description": "Extended UCL parser with traversal commands (GOTO, BACK, EXPAND, FOLLOW, PATH, SEARCH, FIND, VIEW) and context commands (CTX ADD/REMOVE/CLEAR/EXPAND/COMPRESS/PRUNE/RENDER/STATS/FOCUS).",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucl-parser/src/lexer.rs",
+            "crates/ucl-parser/src/ast.rs",
+            "crates/ucl-parser/src/parser.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "agent.executor",
+          "description": "Implemented UCL command executor for agent traversal and context operations with async search support and result caching.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/src/executor.rs",
+            "crates/ucp-agent/src/lib.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.python.agent",
+          "description": "Added Python bindings for Agent Traversal System via PyO3 with full API coverage and async support for semantic search.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src/agent.rs",
+            "crates/ucp-python/Cargo.toml"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "sdk.wasm.agent",
+          "description": "Added WASM bindings for Agent Traversal System via wasm-bindgen with JavaScript-friendly API, async Promise support, and JSON serialization.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-wasm/src/agent.rs",
+            "crates/ucp-wasm/src/lib.rs",
+            "crates/ucp-wasm/Cargo.toml"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "tests.agent",
+          "description": "Implemented 38 comprehensive integration tests covering session management, navigation, expansion, search, context operations, path finding, and UCL execution.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-agent/tests/integration_tests.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "docs.agent",
+          "description": "Created comprehensive documentation for Agent Traversal System including overview, API reference, UCL commands guide, usage examples, and architecture deep-dive.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/ucp-agent/index.md",
+            "docs/ucp-agent/api.md",
+            "docs/ucp-agent/ucl-commands.md",
+            "docs/ucp-agent/examples.md",
+            "docs/ucp-agent/architecture.md",
+            "docs/index.md"
           ],
           "issues": []
         },

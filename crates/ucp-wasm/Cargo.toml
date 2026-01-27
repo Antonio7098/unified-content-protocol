@@ -1,6 +1,6 @@
 [package.metadata.wasm-pack.package]
 name = "ucp-content"
-version = "0.1.7"
+version = "0.1.8"
 
 [package]
 name = "ucp-wasm"
@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -28,6 +29,7 @@ ucp-llm = { path = "../ucp-llm" }
 ucp-translator-markdown = { path = "../translators/markdown" }
 ucp-translator-html = { path = "../translators/html" }
 ucp-observe = { path = "../ucp-observe" }
+ucp-agent = { path = "../ucp-agent" }
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 console_error_panic_hook = "0.1"
 getrandom = { version = "0.3", features = ["wasm_js"] }

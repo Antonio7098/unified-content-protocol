@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ucp-content"
-version = "0.1.7"
+version = "0.1.8"
 description = "Python bindings for UCP (Unified Content Protocol) - Rust implementation"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -32,4 +32,3 @@ Repository = "https://github.com/unified-content/ucp"
 features = ["pyo3/extension-module"]
 python-source = "python"
 module-name = "ucp._core"
-manylinux = "2_34"
