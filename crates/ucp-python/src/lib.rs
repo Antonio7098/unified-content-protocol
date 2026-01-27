@@ -23,7 +23,7 @@ mod types;
 use agent::{
     PyAgentCapabilities, PyAgentSessionId, PyAgentTraversal, PyBlockView, PyConnection,
     PyExpansionResult, PyFindResult, PyNavigationResult, PyNeighborhoodView, PySearchResult,
-    PySessionConfig,
+    PySessionConfig, PyViewMode,
 };
 use block::PyBlock;
 use content::PyContent;
@@ -172,6 +172,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAgentSessionId>()?;
     m.add_class::<PySessionConfig>()?;
     m.add_class::<PyAgentCapabilities>()?;
+    m.add_class::<PyViewMode>()?;
     m.add_class::<PyNavigationResult>()?;
     m.add_class::<PyExpansionResult>()?;
     m.add_class::<PyBlockView>()?;
