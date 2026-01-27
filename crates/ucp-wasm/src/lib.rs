@@ -5,9 +5,9 @@
 #![allow(clippy::useless_conversion)]
 #![allow(unexpected_cfgs)]
 
-use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value, to_value};
+use wasm_bindgen::prelude::*;
 
 // Core modules
 mod agent;
@@ -24,7 +24,6 @@ mod snapshot;
 mod types;
 
 // Re-export key types
-pub use types::*;
 pub use agent::*;
 pub use block::*;
 pub use content::*;
@@ -36,6 +35,7 @@ pub use llm::*;
 pub use observe::*;
 pub use section::*;
 pub use snapshot::*;
+pub use types::*;
 
 /// Initialize the WASM module.
 #[wasm_bindgen(start)]

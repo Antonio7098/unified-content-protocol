@@ -27,7 +27,6 @@ pub enum SessionState {
     Error { reason: String },
 }
 
-
 /// Agent capabilities define what operations are permitted.
 #[derive(Debug, Clone)]
 pub struct AgentCapabilities {

@@ -38,9 +38,7 @@ use errors::{
     PyBlockNotFoundError, PyCycleDetectedError, PyInvalidBlockIdError, PyParseError, PyUcpError,
     PyValidationError,
 };
-use llm::{
-    PyIdMapper, PyPromptBuilder, PyPromptBuilderConfig, PyPromptBuilderMode,
-};
+use llm::{PyIdMapper, PyPromptBuilder, PyPromptBuilderConfig, PyPromptBuilderMode};
 use observe::PyObserver;
 use section::PySection;
 use snapshot::PySnapshot;
@@ -104,12 +102,12 @@ fn ucp_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyObserver>()?;
 
     // Errors
-    m.add("UcpError", _py.get_type::<PyUcpError>())?;
-    m.add("ParseError", _py.get_type::<PyParseError>())?;
-    m.add("InvalidBlockIdError", _py.get_type::<PyInvalidBlockIdError>())?;
-    m.add("BlockNotFoundError", _py.get_type::<PyBlockNotFoundError>())?;
-    m.add("CycleDetectedError", _py.get_type::<PyCycleDetectedError>())?;
-    m.add("ValidationError", _py.get_type::<PyValidationError>())?;
+    m.add_class::<PyUcpError>()?;
+    m.add_class::<PyParseError>()?;
+    m.add_class::<PyInvalidBlockIdError>()?;
+    m.add_class::<PyBlockNotFoundError>()?;
+    m.add_class::<PyCycleDetectedError>()?;
+    m.add_class::<PyValidationError>()?;
 
     Ok(())
 }

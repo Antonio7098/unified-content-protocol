@@ -144,7 +144,6 @@ pub enum ViewMode {
     Adaptive { interest_threshold: f32 },
 }
 
-
 impl ViewMode {
     pub fn preview(length: usize) -> Self {
         Self::Preview { length }
