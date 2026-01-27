@@ -17,7 +17,6 @@ from ucp import (
     AgentTraversal,
     BlockId,
     ViewMode,
-    SessionConfig,
 )
 
 

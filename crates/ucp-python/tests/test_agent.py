@@ -240,7 +240,7 @@ class TestFind:
         traversal.close_session(session)
 
 
-class TestFindPath:
+class TestFindPathExtended:
     """Test path finding operations."""
 
     def test_find_path_same_node(self):
@@ -354,16 +354,16 @@ class TestAgentCapabilities:
     def test_default_capabilities(self):
         """Test default capabilities."""
         caps = ucp.AgentCapabilities()
-        assert caps.can_traverse == True
-        assert caps.can_search == True
-        assert caps.can_modify_context == True
-        assert caps.can_coordinate == True
+        assert caps.can_traverse
+        assert caps.can_search
+        assert caps.can_modify_context
+        assert caps.can_coordinate
 
     def test_read_only_capabilities(self):
         """Test read-only capabilities."""
         caps = ucp.AgentCapabilities.read_only()
-        assert caps.can_traverse == True
-        assert caps.can_modify_context == False
+        assert caps.can_traverse
+        assert not caps.can_modify_context
 
 
 class TestSessionConfig:
@@ -450,8 +450,8 @@ class TestUpdateDocument:
         session = traversal.create_session()
 
         # Add blocks
-        child1 = doc.add_block(doc.root_id, "Child 1")
-        child2 = doc.add_block(doc.root_id, "Child 2")
+        doc.add_block(doc.root_id, "Child 1")
+        doc.add_block(doc.root_id, "Child 2")
 
         # Update document
         traversal.update_document(doc)
@@ -620,8 +620,8 @@ class TestViewNeighborhood:
     def test_view_neighborhood_with_children(self):
         """Test neighborhood shows children."""
         doc = ucp.create("Test Document")
-        child1 = doc.add_block(doc.root_id, "Child 1")
-        child2 = doc.add_block(doc.root_id, "Child 2")
+        doc.add_block(doc.root_id, "Child 1")
+        doc.add_block(doc.root_id, "Child 2")
 
         traversal = ucp.AgentTraversal(doc)
         session = traversal.create_session()
