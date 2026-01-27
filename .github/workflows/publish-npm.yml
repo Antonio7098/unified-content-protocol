@@ -87,10 +87,6 @@ jobs:
         working-directory: crates/ucp-wasm/pkg
         run: npm install
 
-      - name: Build package
-        working-directory: crates/ucp-wasm/pkg
-        run: npm run build
-
       - name: Publish to npm (trusted publisher)
         working-directory: crates/ucp-wasm/pkg
         run: npm publish --provenance --access public
