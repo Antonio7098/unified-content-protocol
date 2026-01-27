@@ -3,9 +3,8 @@
 use std::sync::Arc;
 use ucm_core::{Block, BlockId, Content, Document};
 use ucp_agent::{
-    AgentCapabilities, AgentError, AgentTraversal, ExpandDirection, ExpandOptions,
-    GlobalLimits, MockRagProvider, RagProvider, SearchOptions, SessionConfig, SessionLimits,
-    ViewMode,
+    AgentCapabilities, AgentError, AgentTraversal, ExpandDirection, ExpandOptions, GlobalLimits,
+    MockRagProvider, RagProvider, SearchOptions, SessionConfig, SessionLimits, ViewMode,
 };
 
 /// Helper to create a test document with a known structure.
@@ -23,11 +22,14 @@ fn create_test_document() -> Document {
     //   └── child3 (paragraph)
 
     // Create child blocks
-    let child1 = Block::new(Content::text("Child 1 - Introduction"), Some("heading1"))
-        .with_tag("important");
-    let child2 = Block::new(Content::text("Child 2 - Methods"), Some("heading2"))
-        .with_tag("methods");
-    let child3 = Block::new(Content::text("Child 3 - Simple paragraph"), Some("paragraph"));
+    let child1 =
+        Block::new(Content::text("Child 1 - Introduction"), Some("heading1")).with_tag("important");
+    let child2 =
+        Block::new(Content::text("Child 2 - Methods"), Some("heading2")).with_tag("methods");
+    let child3 = Block::new(
+        Content::text("Child 3 - Simple paragraph"),
+        Some("paragraph"),
+    );
 
     let child1_id = doc.add_block(child1, &root).unwrap();
     let child2_id = doc.add_block(child2, &root).unwrap();
@@ -61,7 +63,9 @@ fn create_test_document() -> Document {
 
 /// Create a random-looking block ID for testing "not found" scenarios.
 fn fake_block_id() -> BlockId {
-    BlockId::from_bytes([0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77])
+    BlockId::from_bytes([
+        0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+    ])
 }
 
 // ==================== Session Management Tests ====================
@@ -118,7 +122,10 @@ fn test_max_sessions_limit() {
 
     // Third should fail
     let result = traversal.create_session(SessionConfig::default());
-    assert!(matches!(result, Err(AgentError::MaxSessionsReached { max: 2 })));
+    assert!(matches!(
+        result,
+        Err(AgentError::MaxSessionsReached { max: 2 })
+    ));
 }
 
 #[test]
@@ -388,13 +395,17 @@ async fn test_search_with_mock_rag() {
     let mut mock_rag = MockRagProvider::new();
     mock_rag.add_result(root_id, 0.95, Some("Test content"));
 
-    let traversal = AgentTraversal::new(doc)
-        .with_rag_provider(Arc::new(mock_rag) as Arc<dyn RagProvider>);
+    let traversal =
+        AgentTraversal::new(doc).with_rag_provider(Arc::new(mock_rag) as Arc<dyn RagProvider>);
 
     let session_id = traversal.create_session(SessionConfig::default()).unwrap();
 
     let result = traversal
-        .search(&session_id, "test query", SearchOptions::new().with_limit(10))
+        .search(
+            &session_id,
+            "test query",
+            SearchOptions::new().with_limit(10),
+        )
         .await;
 
     assert!(result.is_ok());
@@ -691,13 +702,16 @@ async fn test_execute_ucl_find() {
     let session_id = traversal.create_session(SessionConfig::default()).unwrap();
 
     // UCL syntax for FIND uses uppercase keywords: ROLE=, TAG=, LABEL=, PATTERN=
-    let result =
-        ucp_agent::execute_ucl(&traversal, &session_id, "FIND ROLE=paragraph").await;
+    let result = ucp_agent::execute_ucl(&traversal, &session_id, "FIND ROLE=paragraph").await;
 
     if let Err(ref e) = result {
         eprintln!("Error: {:?}", e);
     }
-    assert!(result.is_ok(), "UCL FIND should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "UCL FIND should succeed: {:?}",
+        result.err()
+    );
 
     traversal.close_session(&session_id).unwrap();
 }
@@ -731,7 +745,11 @@ async fn test_execute_ucl_multiple_commands() {
     if let Err(ref e) = result {
         eprintln!("Error: {:?}", e);
     }
-    assert!(result.is_ok(), "Multiple UCL commands should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Multiple UCL commands should succeed: {:?}",
+        result.err()
+    );
     let results = result.unwrap();
     assert_eq!(results.len(), 3);
 

@@ -700,30 +700,22 @@ impl<'a> Parser<'a> {
             match self.peek_kind() {
                 Some(TokenKind::Role) => {
                     self.advance();
-                    self.expect_eq_with_hint(
-                        "FIND ROLE must use '=' (e.g., ROLE=heading1)",
-                    )?;
+                    self.expect_eq_with_hint("FIND ROLE must use '=' (e.g., ROLE=heading1)")?;
                     cmd.role = Some(self.expect_ident_or_str()?);
                 }
                 Some(TokenKind::Tag) => {
                     self.advance();
-                    self.expect_eq_with_hint(
-                        "FIND TAG must use '=' (e.g., TAG=\"important\")",
-                    )?;
+                    self.expect_eq_with_hint("FIND TAG must use '=' (e.g., TAG=\"important\")")?;
                     cmd.tag = Some(self.expect_str()?);
                 }
                 Some(TokenKind::Label) => {
                     self.advance();
-                    self.expect_eq_with_hint(
-                        "FIND LABEL must use '=' (e.g., LABEL=\"summary\")",
-                    )?;
+                    self.expect_eq_with_hint("FIND LABEL must use '=' (e.g., LABEL=\"summary\")")?;
                     cmd.label = Some(self.expect_str()?);
                 }
                 Some(TokenKind::Pattern) => {
                     self.advance();
-                    self.expect_eq_with_hint(
-                        "FIND PATTERN must use '=' (e.g., PATTERN=\".*\")",
-                    )?;
+                    self.expect_eq_with_hint("FIND PATTERN must use '=' (e.g., PATTERN=\".*\")")?;
                     cmd.pattern = Some(self.expect_str()?);
                 }
                 _ => break,
@@ -796,7 +788,9 @@ impl<'a> Parser<'a> {
                 Ok(Command::Context(ContextCommand::Stats))
             }
             Some(TokenKind::Focus) => self.parse_ctx_focus(),
-            _ => Err(self.error("CTX subcommand (ADD/REMOVE/CLEAR/EXPAND/COMPRESS/PRUNE/RENDER/STATS/FOCUS)")),
+            _ => Err(self.error(
+                "CTX subcommand (ADD/REMOVE/CLEAR/EXPAND/COMPRESS/PRUNE/RENDER/STATS/FOCUS)",
+            )),
         }
     }
 
@@ -844,7 +838,9 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Relevance) => {
                     self.advance();
-                    self.expect_eq_with_hint("CTX ADD RELEVANCE must use '=' (e.g., RELEVANCE=0.8)")?;
+                    self.expect_eq_with_hint(
+                        "CTX ADD RELEVANCE must use '=' (e.g., RELEVANCE=0.8)",
+                    )?;
                     relevance = Some(self.expect_float()?);
                 }
                 _ => break,
@@ -955,10 +951,12 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(Command::Context(ContextCommand::Prune(ContextPruneCommand {
-            min_relevance,
-            max_age_secs,
-        })))
+        Ok(Command::Context(ContextCommand::Prune(
+            ContextPruneCommand {
+                min_relevance,
+                max_age_secs,
+            },
+        )))
     }
 
     /// Parse CTX RENDER [format=DEFAULT|SHORT_IDS|MARKDOWN]
@@ -1682,7 +1680,8 @@ mod tests {
 
     #[test]
     fn test_parse_expand() {
-        let r = Parser::new("EXPAND blk_abc123def456 DOWN DEPTH=3 MODE=PREVIEW").parse_commands_only();
+        let r =
+            Parser::new("EXPAND blk_abc123def456 DOWN DEPTH=3 MODE=PREVIEW").parse_commands_only();
         assert!(r.is_ok(), "Parse error: {:?}", r.err());
         match &r.unwrap()[0] {
             Command::Expand(cmd) => {
@@ -1767,7 +1766,9 @@ mod tests {
         assert!(r.is_ok(), "Parse error: {:?}", r.err());
         match &r.unwrap()[0] {
             Command::View(cmd) => {
-                assert!(matches!(cmd.target, ViewTarget::Block(ref id) if id == "blk_abc123def456"));
+                assert!(
+                    matches!(cmd.target, ViewTarget::Block(ref id) if id == "blk_abc123def456")
+                );
                 assert!(matches!(cmd.mode, ViewMode::Metadata));
             }
             _ => panic!("Expected View command"),
@@ -1793,11 +1794,14 @@ mod tests {
 
     #[test]
     fn test_parse_ctx_add_block() {
-        let r = Parser::new(r#"CTX ADD blk_abc123def456 REASON="semantic_relevance""#).parse_commands_only();
+        let r = Parser::new(r#"CTX ADD blk_abc123def456 REASON="semantic_relevance""#)
+            .parse_commands_only();
         assert!(r.is_ok(), "Parse error: {:?}", r.err());
         match &r.unwrap()[0] {
             Command::Context(ContextCommand::Add(cmd)) => {
-                assert!(matches!(cmd.target, ContextAddTarget::Block(ref id) if id == "blk_abc123def456"));
+                assert!(
+                    matches!(cmd.target, ContextAddTarget::Block(ref id) if id == "blk_abc123def456")
+                );
                 assert_eq!(cmd.reason, Some("semantic_relevance".to_string()));
             }
             _ => panic!("Expected CTX ADD command"),
@@ -1822,7 +1826,9 @@ mod tests {
         assert!(r.is_ok(), "Parse error: {:?}", r.err());
         match &r.unwrap()[0] {
             Command::Context(ContextCommand::Add(cmd)) => {
-                assert!(matches!(cmd.target, ContextAddTarget::Children { ref parent_id } if parent_id == "blk_abc123def456"));
+                assert!(
+                    matches!(cmd.target, ContextAddTarget::Children { ref parent_id } if parent_id == "blk_abc123def456")
+                );
             }
             _ => panic!("Expected CTX ADD CHILDREN command"),
         }
@@ -1844,7 +1850,10 @@ mod tests {
     fn test_parse_ctx_clear() {
         let r = Parser::new("CTX CLEAR").parse_commands_only();
         assert!(r.is_ok(), "Parse error: {:?}", r.err());
-        assert!(matches!(r.unwrap()[0], Command::Context(ContextCommand::Clear)));
+        assert!(matches!(
+            r.unwrap()[0],
+            Command::Context(ContextCommand::Clear)
+        ));
     }
 
     #[test]
@@ -1901,7 +1910,10 @@ mod tests {
     fn test_parse_ctx_stats() {
         let r = Parser::new("CTX STATS").parse_commands_only();
         assert!(r.is_ok(), "Parse error: {:?}", r.err());
-        assert!(matches!(r.unwrap()[0], Command::Context(ContextCommand::Stats)));
+        assert!(matches!(
+            r.unwrap()[0],
+            Command::Context(ContextCommand::Stats)
+        ));
     }
 
     #[test]

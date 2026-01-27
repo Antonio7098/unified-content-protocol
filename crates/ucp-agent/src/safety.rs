@@ -226,7 +226,10 @@ impl CircuitBreaker {
                 self.failure_count.store(0, Ordering::Relaxed);
             }
             CircuitState::HalfOpen => {
-                let successes = self.success_count_in_half_open.fetch_add(1, Ordering::Relaxed) + 1;
+                let successes = self
+                    .success_count_in_half_open
+                    .fetch_add(1, Ordering::Relaxed)
+                    + 1;
                 if successes >= self.success_threshold {
                     // Transition back to closed
                     *self.state.write().unwrap() = CircuitState::Closed;

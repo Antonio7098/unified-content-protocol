@@ -825,11 +825,7 @@ impl WasmAgentTraversal {
 
     /// Execute UCL commands from a string.
     #[wasm_bindgen(js_name = executeUcl)]
-    pub fn execute_ucl(
-        &self,
-        session_id: &WasmAgentSessionId,
-        ucl_input: &str,
-    ) -> js_sys::Promise {
+    pub fn execute_ucl(&self, session_id: &WasmAgentSessionId, ucl_input: &str) -> js_sys::Promise {
         let inner = Arc::clone(&self.inner);
         let session_id = session_id.inner.clone();
         let ucl_input = ucl_input.to_string();
@@ -948,11 +944,7 @@ fn expansion_result_to_js(result: &ucp_agent::ExpansionResult) -> JsValue {
 fn search_result_to_js(result: &ucp_agent::RagSearchResults, query: &str) -> JsValue {
     let obj = js_sys::Object::new();
 
-    let _ = js_sys::Reflect::set(
-        &obj,
-        &JsValue::from_str("query"),
-        &JsValue::from_str(query),
-    );
+    let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("query"), &JsValue::from_str(query));
     let _ = js_sys::Reflect::set(
         &obj,
         &JsValue::from_str("totalSearched"),
@@ -1082,7 +1074,11 @@ fn neighborhood_view_to_js(view: &ucp_agent::NeighborhoodView) -> JsValue {
     let connections_arr = js_sys::Array::new();
     for (block_view, edge_type) in &view.connections {
         let conn_obj = js_sys::Object::new();
-        let _ = js_sys::Reflect::set(&conn_obj, &JsValue::from_str("block"), &block_view_to_js(block_view));
+        let _ = js_sys::Reflect::set(
+            &conn_obj,
+            &JsValue::from_str("block"),
+            &block_view_to_js(block_view),
+        );
         let _ = js_sys::Reflect::set(
             &conn_obj,
             &JsValue::from_str("edgeType"),

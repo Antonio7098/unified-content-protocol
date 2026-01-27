@@ -41,7 +41,8 @@ impl SessionMetrics {
 
     pub fn record_expansion(&self, blocks_count: usize) {
         self.expansion_count.fetch_add(1, Ordering::Relaxed);
-        self.blocks_visited.fetch_add(blocks_count, Ordering::Relaxed);
+        self.blocks_visited
+            .fetch_add(blocks_count, Ordering::Relaxed);
     }
 
     pub fn record_search(&self) {
@@ -153,7 +154,7 @@ pub struct OperationMetrics {
 }
 
 impl OperationMetrics {
-    pub fn new(operation: &str) -> OperationMetricsBuilder {
+    pub fn start(operation: &str) -> OperationMetricsBuilder {
         OperationMetricsBuilder {
             operation: operation.to_string(),
             start: Instant::now(),
@@ -207,9 +208,7 @@ mod tests {
 
     #[test]
     fn test_operation_metrics() {
-        let op = OperationMetrics::new("navigate")
-            .blocks(3)
-            .finish(true);
+        let op = OperationMetrics::start("navigate").blocks(3).finish(true);
 
         assert_eq!(op.operation, "navigate");
         assert!(op.success);

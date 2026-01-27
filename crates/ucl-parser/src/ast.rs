@@ -261,8 +261,10 @@ impl Default for BackCommand {
 /// Direction for graph expansion
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum ExpandDirection {
     /// Expand to children (BFS)
+    #[default]
     Down,
     /// Expand to ancestors
     Up,
@@ -270,12 +272,6 @@ pub enum ExpandDirection {
     Both,
     /// Follow semantic edges only
     Semantic,
-}
-
-impl Default for ExpandDirection {
-    fn default() -> Self {
-        Self::Down
-    }
 }
 
 impl ExpandDirection {
@@ -293,8 +289,10 @@ impl ExpandDirection {
 /// View mode for block content display
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum ViewMode {
     /// Show full content
+    #[default]
     Full,
     /// Show first N characters as preview
     Preview { length: usize },
@@ -302,12 +300,6 @@ pub enum ViewMode {
     Metadata,
     /// Show only block IDs and structure
     IdsOnly,
-}
-
-impl Default for ViewMode {
-    fn default() -> Self {
-        Self::Full
-    }
 }
 
 impl ViewMode {
@@ -552,19 +544,15 @@ impl CompressionMethod {
 /// Render format for context output
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum RenderFormat {
     /// Default format
+    #[default]
     Default,
     /// Use short IDs (1, 2, 3...) for token efficiency
     ShortIds,
     /// Render as markdown
     Markdown,
-}
-
-impl Default for RenderFormat {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl RenderFormat {

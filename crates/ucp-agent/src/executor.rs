@@ -5,10 +5,9 @@ use crate::error::{AgentError, AgentSessionId, Result};
 use crate::operations::{AgentTraversal, ExpandDirection, ExpandOptions, SearchOptions};
 use serde::{Deserialize, Serialize};
 use ucl_parser::ast::{
-    BackCommand, Command, CompressionMethod, ContextAddCommand, ContextAddTarget,
-    ContextCommand, ContextExpandCommand, ContextPruneCommand, ExpandCommand, FindCommand,
-    FollowCommand, GotoCommand, PathFindCommand, RenderFormat, SearchCommand, ViewCommand,
-    ViewTarget,
+    BackCommand, Command, CompressionMethod, ContextAddCommand, ContextAddTarget, ContextCommand,
+    ContextExpandCommand, ContextPruneCommand, ExpandCommand, FindCommand, FollowCommand,
+    GotoCommand, PathFindCommand, RenderFormat, SearchCommand, ViewCommand, ViewTarget,
 };
 use ucm_core::BlockId;
 
@@ -210,7 +209,9 @@ impl<'a> UclExecutor<'a> {
             }
         }
 
-        let result = self.traversal.expand(session_id, block_id, direction, options)?;
+        let result = self
+            .traversal
+            .expand(session_id, block_id, direction, options)?;
 
         Ok(ExecutionResult::Expansion(ExpansionResultSerde {
             root: result.root.to_string(),
@@ -266,7 +267,9 @@ impl<'a> UclExecutor<'a> {
         let from_id = parse_block_id(&cmd.from_id)?;
         let to_id = parse_block_id(&cmd.to_id)?;
 
-        let path = self.traversal.find_path(session_id, from_id, to_id, cmd.max_length)?;
+        let path = self
+            .traversal
+            .find_path(session_id, from_id, to_id, cmd.max_length)?;
 
         Ok(ExecutionResult::Path(PathResultSerde {
             from: from_id.to_string(),
@@ -285,7 +288,10 @@ impl<'a> UclExecutor<'a> {
             .with_limit(cmd.limit.unwrap_or(10))
             .with_min_similarity(cmd.min_similarity.unwrap_or(0.0));
 
-        let result = self.traversal.search(session_id, &cmd.query, options).await?;
+        let result = self
+            .traversal
+            .search(session_id, &cmd.query, options)
+            .await?;
 
         Ok(ExecutionResult::Search(SearchResultSerde {
             query: result.query,
@@ -396,12 +402,8 @@ impl<'a> UclExecutor<'a> {
             ContextCommand::Compress { method } => {
                 self.execute_ctx_compress(session_id, method).await
             }
-            ContextCommand::Prune(prune_cmd) => {
-                self.execute_ctx_prune(session_id, prune_cmd).await
-            }
-            ContextCommand::Render { format } => {
-                self.execute_ctx_render(session_id, format).await
-            }
+            ContextCommand::Prune(prune_cmd) => self.execute_ctx_prune(session_id, prune_cmd).await,
+            ContextCommand::Render { format } => self.execute_ctx_render(session_id, format).await,
             ContextCommand::Stats => self.execute_ctx_stats(session_id).await,
             ContextCommand::Focus { block_id } => {
                 let bid = block_id.map(|s| parse_block_id(&s)).transpose()?;
@@ -423,7 +425,8 @@ impl<'a> UclExecutor<'a> {
         match cmd.target {
             ContextAddTarget::Block(block_id_str) => {
                 let block_id = parse_block_id(&block_id_str)?;
-                self.traversal.context_add(session_id, block_id, cmd.reason, cmd.relevance)?;
+                self.traversal
+                    .context_add(session_id, block_id, cmd.reason, cmd.relevance)?;
                 Ok(ExecutionResult::Context(ContextResultSerde {
                     operation: "add".to_string(),
                     affected_blocks: 1,
@@ -600,7 +603,9 @@ mod tests {
     async fn test_execute_goto() {
         let doc = create_test_document();
         let traversal = AgentTraversal::new(doc);
-        let session_id = traversal.create_session(crate::session::SessionConfig::default()).unwrap();
+        let session_id = traversal
+            .create_session(crate::session::SessionConfig::default())
+            .unwrap();
 
         let executor = UclExecutor::new(&traversal);
         let cmd = Command::Goto(GotoCommand {
@@ -616,7 +621,9 @@ mod tests {
     async fn test_execute_back_empty_history() {
         let doc = create_test_document();
         let traversal = AgentTraversal::new(doc);
-        let session_id = traversal.create_session(crate::session::SessionConfig::default()).unwrap();
+        let session_id = traversal
+            .create_session(crate::session::SessionConfig::default())
+            .unwrap();
 
         let executor = UclExecutor::new(&traversal);
         let cmd = Command::Back(BackCommand { steps: 1 });
@@ -629,7 +636,9 @@ mod tests {
     async fn test_execute_search_no_rag() {
         let doc = create_test_document();
         let traversal = AgentTraversal::new(doc);
-        let session_id = traversal.create_session(crate::session::SessionConfig::default()).unwrap();
+        let session_id = traversal
+            .create_session(crate::session::SessionConfig::default())
+            .unwrap();
 
         let executor = UclExecutor::new(&traversal);
         let cmd = Command::Search(SearchCommand {

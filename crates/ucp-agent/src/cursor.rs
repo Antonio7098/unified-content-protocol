@@ -34,7 +34,7 @@ impl TraversalCursor {
     /// Move cursor to a new position.
     pub fn move_to(&mut self, new_position: BlockId) {
         // Add current position to breadcrumbs
-        self.breadcrumbs.push_back(self.position.clone());
+        self.breadcrumbs.push_back(self.position);
         if self.breadcrumbs.len() > self.max_breadcrumbs {
             self.breadcrumbs.pop_front();
         }
@@ -54,7 +54,7 @@ impl TraversalCursor {
                 return None;
             }
         }
-        Some(self.position.clone())
+        Some(self.position)
     }
 
     /// Check if we can go back.
@@ -122,22 +122,21 @@ impl CursorNeighborhood {
 
     /// Total blocks in neighborhood.
     pub fn total_blocks(&self) -> usize {
-        self.ancestors.len()
-            + self.children.len()
-            + self.siblings.len()
-            + self.connections.len()
+        self.ancestors.len() + self.children.len() + self.siblings.len() + self.connections.len()
     }
 }
 
 /// How much detail to show in traversal results.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ViewMode {
     /// Just block IDs and structure.
     IdsOnly,
     /// Structure with short previews (first N characters).
     Preview { length: usize },
     /// Full content for blocks in view.
+    #[default]
     Full,
     /// Metadata only (semantic role, tags, edge counts).
     Metadata,
@@ -145,11 +144,6 @@ pub enum ViewMode {
     Adaptive { interest_threshold: f32 },
 }
 
-impl Default for ViewMode {
-    fn default() -> Self {
-        Self::Full
-    }
-}
 
 impl ViewMode {
     pub fn preview(length: usize) -> Self {

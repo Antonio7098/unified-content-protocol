@@ -12,8 +12,10 @@ use ucm_core::{BlockId, EdgeType};
 /// Session state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum SessionState {
     /// Session is active and accepting commands.
+    #[default]
     Active,
     /// Session is temporarily paused.
     Paused,
@@ -25,11 +27,6 @@ pub enum SessionState {
     Error { reason: String },
 }
 
-impl Default for SessionState {
-    fn default() -> Self {
-        Self::Active
-    }
-}
 
 /// Agent capabilities define what operations are permitted.
 #[derive(Debug, Clone)]
@@ -343,10 +340,7 @@ mod tests {
 
     #[test]
     fn test_session_state_transitions() {
-        let mut session = AgentSession::new(
-            block_id("blk_000000000001"),
-            SessionConfig::default(),
-        );
+        let mut session = AgentSession::new(block_id("blk_000000000001"), SessionConfig::default());
 
         assert!(session.is_active());
 
@@ -376,10 +370,7 @@ mod tests {
 
     #[test]
     fn test_last_results() {
-        let mut session = AgentSession::new(
-            block_id("blk_000000000001"),
-            SessionConfig::default(),
-        );
+        let mut session = AgentSession::new(block_id("blk_000000000001"), SessionConfig::default());
 
         // Initially no results
         assert!(session.get_last_results().is_err());

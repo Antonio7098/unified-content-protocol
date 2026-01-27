@@ -194,10 +194,7 @@ impl PySessionConfig {
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "SessionConfig(name={:?})",
-            self.inner.name
-        )
+        format!("SessionConfig(name={:?})", self.inner.name)
     }
 }
 
@@ -221,7 +218,11 @@ impl PyNavigationResult {
     }
 
     fn __repr__(&self) -> String {
-        format!("NavigationResult(position={}, refreshed={})", self.position.inner(), self.refreshed)
+        format!(
+            "NavigationResult(position={}, refreshed={})",
+            self.position.inner(),
+            self.refreshed
+        )
     }
 }
 
@@ -436,57 +437,69 @@ impl PyNeighborhoodView {
 
     #[getter]
     fn ancestors(&self) -> Vec<PyBlockView> {
-        self.ancestors.iter().map(|b| PyBlockView {
-            block_id: b.block_id.clone(),
-            content: b.content.clone(),
-            role: b.role.clone(),
-            tags: b.tags.clone(),
-            children_count: b.children_count,
-            incoming_edges: b.incoming_edges,
-            outgoing_edges: b.outgoing_edges,
-        }).collect()
+        self.ancestors
+            .iter()
+            .map(|b| PyBlockView {
+                block_id: b.block_id.clone(),
+                content: b.content.clone(),
+                role: b.role.clone(),
+                tags: b.tags.clone(),
+                children_count: b.children_count,
+                incoming_edges: b.incoming_edges,
+                outgoing_edges: b.outgoing_edges,
+            })
+            .collect()
     }
 
     #[getter]
     fn children(&self) -> Vec<PyBlockView> {
-        self.children.iter().map(|b| PyBlockView {
-            block_id: b.block_id.clone(),
-            content: b.content.clone(),
-            role: b.role.clone(),
-            tags: b.tags.clone(),
-            children_count: b.children_count,
-            incoming_edges: b.incoming_edges,
-            outgoing_edges: b.outgoing_edges,
-        }).collect()
+        self.children
+            .iter()
+            .map(|b| PyBlockView {
+                block_id: b.block_id.clone(),
+                content: b.content.clone(),
+                role: b.role.clone(),
+                tags: b.tags.clone(),
+                children_count: b.children_count,
+                incoming_edges: b.incoming_edges,
+                outgoing_edges: b.outgoing_edges,
+            })
+            .collect()
     }
 
     #[getter]
     fn siblings(&self) -> Vec<PyBlockView> {
-        self.siblings.iter().map(|b| PyBlockView {
-            block_id: b.block_id.clone(),
-            content: b.content.clone(),
-            role: b.role.clone(),
-            tags: b.tags.clone(),
-            children_count: b.children_count,
-            incoming_edges: b.incoming_edges,
-            outgoing_edges: b.outgoing_edges,
-        }).collect()
+        self.siblings
+            .iter()
+            .map(|b| PyBlockView {
+                block_id: b.block_id.clone(),
+                content: b.content.clone(),
+                role: b.role.clone(),
+                tags: b.tags.clone(),
+                children_count: b.children_count,
+                incoming_edges: b.incoming_edges,
+                outgoing_edges: b.outgoing_edges,
+            })
+            .collect()
     }
 
     #[getter]
     fn connections(&self) -> Vec<PyConnection> {
-        self.connections.iter().map(|c| PyConnection {
-            block: PyBlockView {
-                block_id: c.block.block_id.clone(),
-                content: c.block.content.clone(),
-                role: c.block.role.clone(),
-                tags: c.block.tags.clone(),
-                children_count: c.block.children_count,
-                incoming_edges: c.block.incoming_edges,
-                outgoing_edges: c.block.outgoing_edges,
-            },
-            edge_type: c.edge_type.clone(),
-        }).collect()
+        self.connections
+            .iter()
+            .map(|c| PyConnection {
+                block: PyBlockView {
+                    block_id: c.block.block_id.clone(),
+                    content: c.block.content.clone(),
+                    role: c.block.role.clone(),
+                    tags: c.block.tags.clone(),
+                    children_count: c.block.children_count,
+                    incoming_edges: c.block.incoming_edges,
+                    outgoing_edges: c.block.outgoing_edges,
+                },
+                edge_type: c.edge_type.clone(),
+            })
+            .collect()
     }
 
     fn __repr__(&self) -> String {
@@ -754,12 +767,14 @@ impl PyAgentTraversal {
             ancestors: result.ancestors.iter().map(convert_block_view).collect(),
             children: result.children.iter().map(convert_block_view).collect(),
             siblings: result.siblings.iter().map(convert_block_view).collect(),
-            connections: result.connections.iter().map(|(bv, edge_type)| {
-                PyConnection {
+            connections: result
+                .connections
+                .iter()
+                .map(|(bv, edge_type)| PyConnection {
                     block: convert_block_view(bv),
                     edge_type: format!("{:?}", edge_type),
-                }
-            }).collect(),
+                })
+                .collect(),
         })
     }
 
@@ -783,7 +798,9 @@ impl PyAgentTraversal {
         pattern: Option<&str>,
     ) -> PyResult<PyFindResult> {
         // Support both `tag` (singular) and `tags` (plural) for better DX
-        let effective_tag = tag.map(|t| t.to_string()).or_else(|| tags.and_then(|t| t.first().cloned()));
+        let effective_tag = tag
+            .map(|t| t.to_string())
+            .or_else(|| tags.and_then(|t| t.first().cloned()));
         let tag_ref = effective_tag.as_deref();
 
         let result = self
@@ -825,9 +842,9 @@ impl PyAgentTraversal {
             .with_limit(limit)
             .with_min_similarity(min_similarity);
 
-        let results = self.runtime.block_on(async {
-            self.inner.search(&session_id.inner, query, options).await
-        });
+        let results = self
+            .runtime
+            .block_on(async { self.inner.search(&session_id.inner, query, options).await });
 
         let results = results.map_err(|e| {
             let msg = e.to_string();
@@ -898,11 +915,7 @@ impl PyAgentTraversal {
     }
 
     /// Remove a block from context (CTX REMOVE command).
-    fn context_remove(
-        &self,
-        session_id: &PyAgentSessionId,
-        block_id: &PyBlockId,
-    ) -> PyResult<()> {
+    fn context_remove(&self, session_id: &PyAgentSessionId, block_id: &PyBlockId) -> PyResult<()> {
         self.inner
             .context_remove(&session_id.inner, *block_id.inner())
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))

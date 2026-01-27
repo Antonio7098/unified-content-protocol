@@ -100,7 +100,7 @@ impl RagSearchResults {
     }
 
     pub fn block_ids(&self) -> Vec<BlockId> {
-        self.matches.iter().map(|m| m.block_id.clone()).collect()
+        self.matches.iter().map(|m| m.block_id).collect()
     }
 }
 

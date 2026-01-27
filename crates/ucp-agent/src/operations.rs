@@ -222,18 +222,20 @@ impl AgentTraversal {
     /// Use this when you've added blocks to the original document
     /// after creating the AgentTraversal.
     pub fn update_document(&self, document: Document) -> Result<()> {
-        let mut doc = self.document.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let mut doc = self
+            .document
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
         *doc = document;
         Ok(())
     }
 
     /// Get a clone of the internal document.
     pub fn get_document(&self) -> Result<Document> {
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
         Ok(doc.clone())
     }
 
@@ -243,9 +245,10 @@ impl AgentTraversal {
     pub fn create_session(&self, config: SessionConfig) -> Result<AgentSessionId> {
         self.circuit_breaker.can_proceed()?;
 
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
         if sessions.len() >= self.global_limits.max_sessions {
             return Err(AgentError::MaxSessionsReached {
@@ -253,12 +256,13 @@ impl AgentTraversal {
             });
         }
 
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         // Get start block or default to document root
-        let start_block = config.start_block.clone().unwrap_or(doc.root);
+        let start_block = config.start_block.unwrap_or(doc.root);
 
         let session = AgentSession::new(start_block, config);
         let session_id = session.id.clone();
@@ -268,10 +272,14 @@ impl AgentTraversal {
     }
 
     /// Get a reference to a session.
-    pub fn get_session(&self, id: &AgentSessionId) -> Result<std::sync::RwLockReadGuard<'_, HashMap<AgentSessionId, AgentSession>>> {
-        let sessions = self.sessions.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+    pub fn get_session(
+        &self,
+        id: &AgentSessionId,
+    ) -> Result<std::sync::RwLockReadGuard<'_, HashMap<AgentSessionId, AgentSession>>> {
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
         if !sessions.contains_key(id) {
             return Err(AgentError::SessionNotFound(id.clone()));
         }
@@ -280,13 +288,14 @@ impl AgentTraversal {
 
     /// Close a session.
     pub fn close_session(&self, id: &AgentSessionId) -> Result<()> {
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get_mut(id).ok_or_else(|| {
-            AgentError::SessionNotFound(id.clone())
-        })?;
+        let session = sessions
+            .get_mut(id)
+            .ok_or_else(|| AgentError::SessionNotFound(id.clone()))?;
 
         session.complete();
         sessions.remove(id);
@@ -296,25 +305,31 @@ impl AgentTraversal {
     // ==================== Navigation ====================
 
     /// Navigate to a specific block.
-    pub fn navigate_to(&self, session_id: &AgentSessionId, target: BlockId) -> Result<NavigationResult> {
+    pub fn navigate_to(
+        &self,
+        session_id: &AgentSessionId,
+        target: BlockId,
+    ) -> Result<NavigationResult> {
         self.circuit_breaker.can_proceed()?;
         let _guard = self.depth_guard.try_enter()?;
         let start = Instant::now();
 
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get_mut(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_traverse()?;
 
         // Verify block exists
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         if doc.get_block(&target).is_none() {
             return Err(AgentError::BlockNotFound(target));
@@ -344,25 +359,30 @@ impl AgentTraversal {
         self.circuit_breaker.can_proceed()?;
         let start = Instant::now();
 
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get_mut(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_traverse()?;
 
-        let position = session.cursor.go_back(steps).ok_or(AgentError::EmptyHistory)?;
+        let position = session
+            .cursor
+            .go_back(steps)
+            .ok_or(AgentError::EmptyHistory)?;
 
         session.touch();
         session.metrics.record_navigation();
 
         // Refresh neighborhood
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         let neighborhood = self.compute_neighborhood(&doc, &position)?;
         session.cursor.update_neighborhood(neighborhood.clone());
@@ -390,13 +410,14 @@ impl AgentTraversal {
         let _guard = self.depth_guard.try_enter()?;
         let start = Instant::now();
 
-        let sessions = self.sessions.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_traverse()?;
 
@@ -408,9 +429,10 @@ impl AgentTraversal {
             });
         }
 
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         // Build traversal filter
         let filter = self.build_traversal_filter(&options);
@@ -431,9 +453,10 @@ impl AgentTraversal {
 
         // Update metrics
         drop(sessions);
-        let mut sessions_mut = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions_mut = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
         if let Some(session) = sessions_mut.get_mut(session_id) {
             session.metrics.record_expansion(total_blocks);
@@ -461,16 +484,20 @@ impl AgentTraversal {
         self.circuit_breaker.can_proceed()?;
         let start = Instant::now();
 
-        let rag = self.rag_provider.as_ref().ok_or(AgentError::RagNotConfigured)?;
+        let rag = self
+            .rag_provider
+            .as_ref()
+            .ok_or(AgentError::RagNotConfigured)?;
 
         {
-            let sessions = self.sessions.read().map_err(|_| {
-                AgentError::Internal("Failed to acquire sessions lock".to_string())
-            })?;
+            let sessions = self
+                .sessions
+                .read()
+                .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-            let session = sessions.get(session_id).ok_or_else(|| {
-                AgentError::SessionNotFound(session_id.clone())
-            })?;
+            let session = sessions
+                .get(session_id)
+                .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
             session.check_can_search()?;
         }
@@ -482,9 +509,10 @@ impl AgentTraversal {
         let results = rag.search(query, rag_options).await?;
 
         // Store results for CTX ADD RESULTS
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
         if let Some(session) = sessions.get_mut(session_id) {
             session.store_results(results.block_ids());
@@ -508,34 +536,40 @@ impl AgentTraversal {
         self.circuit_breaker.can_proceed()?;
         let start = Instant::now();
 
-        let sessions = self.sessions.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_search()?;
 
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         let mut matches = Vec::new();
         let mut total_searched = 0;
 
         // Build regex if pattern provided
-        let regex = pattern.map(|p| regex::Regex::new(p)).transpose().map_err(|e| {
-            AgentError::Internal(format!("Invalid regex pattern: {}", e))
-        })?;
+        let regex = pattern
+            .map(regex::Regex::new)
+            .transpose()
+            .map_err(|e| AgentError::Internal(format!("Invalid regex pattern: {}", e)))?;
 
         for block in doc.blocks.values() {
             total_searched += 1;
 
             // Filter by role
             if let Some(r) = role {
-                let block_role = block.metadata.semantic_role.as_ref()
+                let block_role = block
+                    .metadata
+                    .semantic_role
+                    .as_ref()
                     .map(|sr| sr.category.as_str())
                     .unwrap_or("");
                 if block_role != r {
@@ -570,9 +604,10 @@ impl AgentTraversal {
 
         // Store results for CTX ADD RESULTS
         drop(sessions);
-        let mut sessions_mut = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions_mut = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
         if let Some(session) = sessions_mut.get_mut(session_id) {
             session.store_results(matches.clone());
@@ -598,19 +633,21 @@ impl AgentTraversal {
     ) -> Result<BlockView> {
         self.circuit_breaker.can_proceed()?;
 
-        let sessions = self.sessions.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_active()?;
 
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         self.view_block_internal(&doc, &block_id, &mode)
     }
@@ -619,13 +656,14 @@ impl AgentTraversal {
     pub fn view_neighborhood(&self, session_id: &AgentSessionId) -> Result<NeighborhoodView> {
         self.circuit_breaker.can_proceed()?;
 
-        let sessions = self.sessions.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_active()?;
 
@@ -635,9 +673,10 @@ impl AgentTraversal {
         // Release session lock before calling view_block
         drop(sessions);
 
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         let neighborhood = self.compute_neighborhood(&doc, &position)?;
 
@@ -693,19 +732,21 @@ impl AgentTraversal {
         let _guard = self.depth_guard.try_enter()?;
         let start = Instant::now();
 
-        let sessions = self.sessions.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_traverse()?;
 
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         // Simple BFS path finding
         let max_depth = max_length.unwrap_or(10);
@@ -713,9 +754,10 @@ impl AgentTraversal {
 
         // Update metrics
         drop(sessions);
-        let mut sessions_mut = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions_mut = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
         if let Some(session) = sessions_mut.get_mut(session_id) {
             session.metrics.record_traversal();
@@ -737,20 +779,22 @@ impl AgentTraversal {
         _reason: Option<String>,
         _relevance: Option<f32>,
     ) -> Result<()> {
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get_mut(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_modify_context()?;
 
         // For now, we just verify the block exists
-        let doc = self.document.read().map_err(|_| {
-            AgentError::Internal("Failed to acquire document lock".to_string())
-        })?;
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
 
         if doc.get_block(&block_id).is_none() {
             return Err(AgentError::BlockNotFound(block_id));
@@ -766,13 +810,14 @@ impl AgentTraversal {
 
     /// Add all last results to context.
     pub fn context_add_results(&self, session_id: &AgentSessionId) -> Result<Vec<BlockId>> {
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get_mut(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_modify_context()?;
 
@@ -785,13 +830,14 @@ impl AgentTraversal {
 
     /// Remove a block from context.
     pub fn context_remove(&self, session_id: &AgentSessionId, _block_id: BlockId) -> Result<()> {
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get_mut(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_modify_context()?;
         session.metrics.record_context_remove();
@@ -802,13 +848,14 @@ impl AgentTraversal {
 
     /// Clear the context window.
     pub fn context_clear(&self, session_id: &AgentSessionId) -> Result<()> {
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get_mut(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_modify_context()?;
         session.touch();
@@ -817,14 +864,19 @@ impl AgentTraversal {
     }
 
     /// Set focus block.
-    pub fn context_focus(&self, session_id: &AgentSessionId, block_id: Option<BlockId>) -> Result<()> {
-        let mut sessions = self.sessions.write().map_err(|_| {
-            AgentError::Internal("Failed to acquire sessions lock".to_string())
-        })?;
+    pub fn context_focus(
+        &self,
+        session_id: &AgentSessionId,
+        block_id: Option<BlockId>,
+    ) -> Result<()> {
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
 
-        let session = sessions.get_mut(session_id).ok_or_else(|| {
-            AgentError::SessionNotFound(session_id.clone())
-        })?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.set_focus(block_id);
         session.touch();
@@ -834,7 +886,11 @@ impl AgentTraversal {
 
     // ==================== Internal Helpers ====================
 
-    fn compute_neighborhood(&self, doc: &Document, position: &BlockId) -> Result<CursorNeighborhood> {
+    fn compute_neighborhood(
+        &self,
+        doc: &Document,
+        position: &BlockId,
+    ) -> Result<CursorNeighborhood> {
         let mut neighborhood = CursorNeighborhood::new();
 
         // Get ancestors
@@ -870,10 +926,15 @@ impl AgentTraversal {
         Ok(neighborhood)
     }
 
-    fn view_block_internal(&self, doc: &Document, block_id: &BlockId, mode: &ViewMode) -> Result<BlockView> {
-        let block = doc.get_block(block_id).ok_or_else(|| {
-            AgentError::BlockNotFound(*block_id)
-        })?;
+    fn view_block_internal(
+        &self,
+        doc: &Document,
+        block_id: &BlockId,
+        mode: &ViewMode,
+    ) -> Result<BlockView> {
+        let block = doc
+            .get_block(block_id)
+            .ok_or(AgentError::BlockNotFound(*block_id))?;
 
         let content = match mode {
             ViewMode::IdsOnly => None,
@@ -892,7 +953,11 @@ impl AgentTraversal {
         Ok(BlockView {
             block_id: *block_id,
             content,
-            role: block.metadata.semantic_role.as_ref().map(|r| r.category.as_str().to_string()),
+            role: block
+                .metadata
+                .semantic_role
+                .as_ref()
+                .map(|r| r.category.as_str().to_string()),
             tags: block.metadata.tags.clone(),
             children_count: doc.children(block_id).len(),
             incoming_edges,
@@ -906,7 +971,9 @@ impl AgentTraversal {
             ucm_core::Content::Code(c) => c.source.clone(),
             ucm_core::Content::Table(t) => format!("Table: {} rows", t.rows.len()),
             ucm_core::Content::Math(m) => m.expression.clone(),
-            ucm_core::Content::Media(m) => m.alt_text.clone().unwrap_or_else(|| "Media".to_string()),
+            ucm_core::Content::Media(m) => {
+                m.alt_text.clone().unwrap_or_else(|| "Media".to_string())
+            }
             ucm_core::Content::Json { .. } => "JSON data".to_string(),
             ucm_core::Content::Binary { .. } => "Binary data".to_string(),
             ucm_core::Content::Composite { children, .. } => {
@@ -937,14 +1004,16 @@ impl AgentTraversal {
         filter: &TraversalFilter,
     ) -> Result<Vec<Vec<BlockId>>> {
         let engine = TraversalEngine::new();
-        let result = engine.navigate(
-            doc,
-            Some(*block_id),
-            NavigateDirection::BreadthFirst,
-            Some(depth),
-            Some(filter.clone()),
-            TraversalOutput::StructureOnly,
-        ).map_err(|e| AgentError::EngineError(e.to_string()))?;
+        let result = engine
+            .navigate(
+                doc,
+                Some(*block_id),
+                NavigateDirection::BreadthFirst,
+                Some(depth),
+                Some(filter.clone()),
+                TraversalOutput::StructureOnly,
+            )
+            .map_err(|e| AgentError::EngineError(e.to_string()))?;
 
         // Group by depth level
         let mut levels: Vec<Vec<BlockId>> = vec![Vec::new(); depth + 1];
@@ -962,7 +1031,12 @@ impl AgentTraversal {
         Ok(levels)
     }
 
-    fn expand_up(&self, doc: &Document, block_id: &BlockId, depth: usize) -> Result<Vec<Vec<BlockId>>> {
+    fn expand_up(
+        &self,
+        doc: &Document,
+        block_id: &BlockId,
+        depth: usize,
+    ) -> Result<Vec<Vec<BlockId>>> {
         let mut levels = Vec::new();
         let mut current = *block_id;
 
@@ -978,7 +1052,12 @@ impl AgentTraversal {
         Ok(levels)
     }
 
-    fn expand_semantic(&self, doc: &Document, block_id: &BlockId, depth: usize) -> Result<Vec<Vec<BlockId>>> {
+    fn expand_semantic(
+        &self,
+        doc: &Document,
+        block_id: &BlockId,
+        depth: usize,
+    ) -> Result<Vec<Vec<BlockId>>> {
         let mut levels = Vec::new();
         let mut visited = std::collections::HashSet::new();
         let mut current_level = vec![*block_id];
@@ -1007,7 +1086,13 @@ impl AgentTraversal {
         Ok(levels)
     }
 
-    fn bfs_path(&self, doc: &Document, from: &BlockId, to: &BlockId, max_depth: usize) -> Result<Vec<BlockId>> {
+    fn bfs_path(
+        &self,
+        doc: &Document,
+        from: &BlockId,
+        to: &BlockId,
+        max_depth: usize,
+    ) -> Result<Vec<BlockId>> {
         use std::collections::{HashSet, VecDeque};
 
         if from == to {
@@ -1141,6 +1226,9 @@ mod tests {
 
         // Third should fail
         let result = traversal.create_session(SessionConfig::default());
-        assert!(matches!(result, Err(AgentError::MaxSessionsReached { max: 2 })));
+        assert!(matches!(
+            result,
+            Err(AgentError::MaxSessionsReached { max: 2 })
+        ));
     }
 }
