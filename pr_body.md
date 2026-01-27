@@ -1,7 +1,7 @@
-# Agent Graph Traversal System (v0.1.7)
+# Agent Graph Traversal System (v0.1.8)
 
 ## Summary
-This PR introduces the **Agent Graph Traversal System**, a powerful new capability for AI agents to navigate, search, and manage context within the Unified Content Protocol. It also completes the migration of the Python and JavaScript SDKs to use direct Rust bindings via PyO3 and wasm-bindgen, replacing the legacy pure-language implementations.
+This PR publishes the **Agent Graph Traversal System** release (workspace version **0.1.8**). It delivers the dedicated `ucp-agent` crate plus Python/WASM bindings, end-to-end tests, and docs enabling agents to navigate, search, and manage context across UCP knowledge graphs.
 
 ## Key Changes
 
@@ -38,6 +38,6 @@ This PR introduces the **Agent Graph Traversal System**, a powerful new capabili
   - `examples.md`: Usage patterns.
   - `architecture.md`: Design decisions.
 
-## Versioning
-- Bumped workspace version to `0.1.7`.
-- Changelog updated in `changelog.json`.
+## Versioning & Changelog
+- Bumped workspace + bindings to `0.1.8`.
+- Added `v0.1.8` changelog entry (graph traversal) and kept `v0.1.7` for the prior bindings migration.
