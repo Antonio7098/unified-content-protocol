@@ -275,3 +275,116 @@ pub fn write_stateful_document(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ucm_core::Document;
+
+    #[test]
+    fn test_cli_state_new() {
+        let state = CliState::new();
+        assert!(state.sessions.is_empty());
+        assert!(state.snapshots.is_empty());
+        assert!(state.transaction.is_none());
+    }
+
+    #[test]
+    fn test_agent_session_goto() {
+        let mut session = AgentSessionState::new("test-session".to_string(), None, None);
+        let block_id = ucm_core::BlockId::root();
+
+        session.goto(&block_id);
+
+        assert_eq!(session.current_block, Some(block_id.to_string()));
+        assert_eq!(session.history.len(), 0); // First goto doesn't add to history
+    }
+
+    #[test]
+    fn test_agent_session_back() {
+        let mut session = AgentSessionState::new("test-session".to_string(), None, None);
+        let block1 = ucm_core::BlockId::root();
+        let block2 = ucm_core::BlockId::from_hex("aabbccddeeff001122334455").unwrap();
+
+        session.goto(&block1);
+        session.goto(&block2);
+
+        let result = session.back(1);
+        assert_eq!(result, Some(block1.clone()));
+        assert_eq!(session.current_block, Some(block1.to_string()));
+    }
+
+    #[test]
+    fn test_agent_session_back_empty() {
+        let mut session = AgentSessionState::new("test-session".to_string(), None, None);
+        let result = session.back(1);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_agent_session_context() {
+        let mut session = AgentSessionState::new("test-session".to_string(), None, None);
+        let block1 = ucm_core::BlockId::root();
+        let block2 = ucm_core::BlockId::from_hex("aabbccddeeff001122334455").unwrap();
+
+        session.add_to_context(&block1);
+        session.add_to_context(&block2);
+
+        assert_eq!(session.context_blocks.len(), 2);
+
+        session.remove_from_context(&block1);
+        assert_eq!(session.context_blocks.len(), 1);
+        assert!(!session.context_blocks.contains(&block1.to_string()));
+        assert!(session.context_blocks.contains(&block2.to_string()));
+    }
+
+    #[test]
+    fn test_snapshot_info_create_restore() {
+        let doc = Document::create();
+        let snapshot = SnapshotInfo::create(
+            "test-snapshot".to_string(),
+            Some("Test description".to_string()),
+            &doc,
+        ).expect("Should create snapshot");
+
+        assert_eq!(snapshot.name, "test-snapshot");
+        assert_eq!(snapshot.description, Some("Test description".to_string()));
+        assert_eq!(snapshot.block_count, doc.block_count());
+
+        let restored = snapshot.restore().expect("Should restore");
+        assert_eq!(restored.block_count(), doc.block_count());
+    }
+
+    #[test]
+    fn test_transaction_state_new() {
+        let doc = Document::create();
+        let tx = TransactionState::new(Some("test-tx".to_string()), &doc)
+            .expect("Should create transaction");
+
+        assert_eq!(tx.name, Some("test-tx".to_string()));
+        assert!(tx.savepoints.is_empty());
+    }
+
+    #[test]
+    fn test_transaction_state_savepoint() {
+        let doc = Document::create();
+        let mut tx = TransactionState::new(None, &doc)
+            .expect("Should create transaction");
+
+        tx.create_savepoint("sp1".to_string(), &doc)
+            .expect("Should create savepoint");
+
+        assert_eq!(tx.savepoints.len(), 1);
+        assert_eq!(tx.savepoints[0].name, "sp1");
+    }
+
+    #[test]
+    fn test_stateful_document_from_document() {
+        let doc = Document::create();
+        let stateful = StatefulDocument::from_document(doc);
+
+        assert!(stateful.cli_state.sessions.is_empty());
+        assert!(stateful.cli_state.snapshots.is_empty());
+        assert!(stateful.cli_state.transaction.is_none());
+    }
+}

@@ -527,3 +527,93 @@ pub fn write_output(content: &str, output: Option<String>) -> anyhow::Result<()>
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ucm_core::{Block, Content};
+
+    #[test]
+    fn test_document_json_roundtrip() {
+        let doc = Document::create();
+        let json = DocumentJson::from_document(&doc);
+        let restored = json.to_document().expect("Should restore document");
+
+        assert_eq!(doc.id.0, restored.id.0);
+        assert_eq!(doc.root, restored.root);
+        assert_eq!(doc.block_count(), restored.block_count());
+    }
+
+    #[test]
+    fn test_document_json_preserves_blocks() {
+        let mut doc = Document::create();
+        let block = Block::new(Content::text("Hello, world!"), Some("paragraph"));
+        let block_id = doc.add_block(block, &doc.root.clone()).expect("Should add block");
+
+        let json = DocumentJson::from_document(&doc);
+        let restored = json.to_document().expect("Should restore document");
+
+        assert!(restored.get_block(&block_id).is_some());
+    }
+
+    #[test]
+    fn test_document_json_preserves_metadata() {
+        let mut doc = Document::create();
+        doc.metadata.title = Some("Test Title".to_string());
+        doc.metadata.description = Some("Test Description".to_string());
+
+        let json = DocumentJson::from_document(&doc);
+        let restored = json.to_document().expect("Should restore document");
+
+        assert_eq!(restored.metadata.title, Some("Test Title".to_string()));
+        assert_eq!(restored.metadata.description, Some("Test Description".to_string()));
+    }
+
+    #[test]
+    fn test_content_preview_text() {
+        let content = Content::text("Hello, world!");
+        let preview = content_preview(&content, 100);
+        assert_eq!(preview, "Hello, world!");
+    }
+
+    #[test]
+    fn test_content_preview_truncation() {
+        let content = Content::text("This is a very long text that should be truncated");
+        let preview = content_preview(&content, 20);
+        assert!(preview.len() <= 23); // 20 + "..."
+        assert!(preview.ends_with("..."));
+    }
+
+    #[test]
+    fn test_content_preview_code() {
+        let content = Content::code("rust", "fn main() {}");
+        let preview = content_preview(&content, 100);
+        assert!(preview.contains("rust"));
+        assert!(preview.contains("fn main()"));
+    }
+
+    #[test]
+    fn test_block_summary_from_block() {
+        let block = Block::new(Content::text("Test content"), Some("paragraph"));
+        let summary = BlockSummary::from_block(&block);
+
+        assert!(!summary.id.is_empty());
+        assert_eq!(summary.content_type, "text");
+        assert_eq!(summary.role, "paragraph");
+    }
+
+    #[test]
+    fn test_edge_summary() {
+        use ucm_core::Edge;
+
+        let source_id = BlockId::root();
+        let target_id = BlockId::from_hex("aabbccddeeff001122334455").unwrap();
+        let edge = Edge::new(ucm_core::EdgeType::References, target_id.clone());
+
+        let summary = EdgeSummary::new(&source_id, &edge);
+
+        assert_eq!(summary.source, source_id.to_string());
+        assert_eq!(summary.target, target_id.to_string());
+        assert!(summary.edge_type.contains("References"));
+    }
+}

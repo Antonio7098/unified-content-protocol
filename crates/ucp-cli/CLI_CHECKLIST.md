@@ -63,7 +63,7 @@ This checklist tracks the implementation status of CLI features based on the Rus
 - [x] `snapshot restore` - Load version
 - [x] `snapshot list` - Show snapshots
 - [x] `snapshot delete` - Remove snapshot
-- [ ] `snapshot diff` - Compare versions (not implemented - needs snapshot storage)
+- [x] `snapshot diff` - Compare versions
 
 ### Translators
 - [x] `import markdown` - Parse markdown file to document
@@ -184,10 +184,10 @@ This checklist tracks the implementation status of CLI features based on the Rus
 | Navigation | 6/6 | _/_ | _/_ |
 | Structure | 2/2 | _/_ | _/_ |
 | Transactions | 4/4 | _/_ | _/_ |
-| Snapshots | 4/5 | _/_ | _/_ |
+| Snapshots | 5/5 | _/_ | _/_ |
 | Translators | 4/4 | _/_ | _/_ |
 | UCL | 2/2 | _/_ | _/_ |
 | Agent | 13/13 | _/_ | _/_ |
 | LLM | 5/5 | _/_ | _/_ |
 | Observability | 3/3 | _/_ | _/_ |
-| **Total** | **69/70** | **_/_** | **_/_** |
+| **Total** | **70/70** | **_/_** | **_/_** |

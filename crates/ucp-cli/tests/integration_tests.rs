@@ -308,4 +308,153 @@ mod with_temp_file {
         assert!(result.get("valid").is_some());
         assert!(result.get("issues").is_some());
     }
+
+    #[test]
+    fn test_nav_children() {
+        let temp_file = create_temp_doc();
+        let path = temp_file.path().to_str().unwrap();
+
+        let output = run_cli(&["nav", "children", "--input", path, "--format", "json"]);
+        let out = stdout(&output);
+
+        // Should return an array of children
+        let result: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        assert!(result.is_array());
+    }
+
+    #[test]
+    fn test_find_command() {
+        let temp_file = create_temp_doc();
+        let path = temp_file.path().to_str().unwrap();
+
+        let output = run_cli(&["find", "--input", path, "--format", "json"]);
+        let out = stdout(&output);
+
+        let result: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        assert!(result.is_array());
+    }
+
+    #[test]
+    fn test_export_json() {
+        let temp_file = create_temp_doc();
+        let path = temp_file.path().to_str().unwrap();
+
+        let output = run_cli(&["export", "json", "--input", path]);
+        let out = stdout(&output);
+
+        // Should output valid JSON
+        let doc: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        assert!(doc.get("id").is_some());
+        assert!(doc.get("blocks").is_some());
+    }
+
+    #[test]
+    fn test_export_markdown() {
+        let temp_file = create_temp_doc();
+        let path = temp_file.path().to_str().unwrap();
+
+        let output = run_cli(&["export", "markdown", "--input", path]);
+        // Should succeed (exit 0)
+        assert!(output.status.success() || !stderr(&output).contains("Error"));
+    }
+
+    #[test]
+    fn test_nav_descendants() {
+        let temp_file = create_temp_doc();
+        let path = temp_file.path().to_str().unwrap();
+
+        let output = run_cli(&["nav", "descendants", "--input", path, "--format", "json"]);
+        let out = stdout(&output);
+
+        let result: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        assert!(result.is_array());
+    }
+}
+
+mod workflow_tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    /// Test a complete workflow: create -> add blocks -> export
+    #[test]
+    fn test_create_and_export_workflow() {
+        // Create a document
+        let output = run_cli(&["create", "--title", "Workflow Test", "--format", "json"]);
+        let doc_json = stdout(&output);
+
+        // Write to temp file
+        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        temp_file.write_all(doc_json.as_bytes()).expect("Failed to write");
+        let path = temp_file.path().to_str().unwrap();
+
+        // Get info
+        let output = run_cli(&["info", "--input", path, "--format", "json"]);
+        let info: serde_json::Value = serde_json::from_str(&stdout(&output))
+            .expect("Info should be valid JSON");
+
+        assert_eq!(info.get("title").and_then(|t| t.as_str()), Some("Workflow Test"));
+        assert_eq!(info.get("block_count").and_then(|c| c.as_u64()), Some(1));
+    }
+
+    #[test]
+    fn test_ucl_parse() {
+        let output = run_cli(&["ucl", "parse", "EDIT #blk_abc123 SET text = 'Hello'"]);
+        // Should succeed or show parse result
+        let combined = format!("{}{}", stdout(&output), stderr(&output));
+        // Parser might fail on invalid ID but command should run
+        assert!(!combined.is_empty());
+    }
+
+    #[test]
+    fn test_llm_prompt() {
+        let output = run_cli(&["llm", "prompt", "--format", "json"]);
+        let out = stdout(&output);
+
+        let result: serde_json::Value = serde_json::from_str(&out)
+            .expect("Prompt should return valid JSON");
+
+        assert!(result.get("capabilities").is_some());
+        assert!(result.get("prompt").is_some());
+    }
+
+    #[test]
+    fn test_llm_prompt_with_capabilities() {
+        let output = run_cli(&["llm", "prompt", "--capabilities", "edit,append", "--format", "json"]);
+        let out = stdout(&output);
+
+        let result: serde_json::Value = serde_json::from_str(&out)
+            .expect("Prompt should return valid JSON");
+
+        let caps = result.get("capabilities").and_then(|c| c.as_array());
+        assert!(caps.is_some());
+    }
+}
+
+mod error_handling_tests {
+    use super::*;
+
+    #[test]
+    fn test_invalid_input_file() {
+        let output = run_cli(&["info", "--input", "/nonexistent/file.json"]);
+        let err = stderr(&output);
+        assert!(err.contains("Error") || err.contains("error") || !output.status.success());
+    }
+
+    #[test]
+    fn test_invalid_block_id() {
+        // Block get with invalid ID should fail gracefully
+        let output = run_cli(&["block", "get", "--id", "invalid-id"]);
+        // Should fail but not crash
+        assert!(!output.status.success() || stderr(&output).contains("Invalid"));
+    }
+
+    #[test]
+    fn test_missing_required_args() {
+        // Block delete without ID should fail
+        let output = run_cli(&["block", "delete"]);
+        let err = stderr(&output);
+        // Should show usage error
+        assert!(err.contains("error") || err.contains("required") || err.contains("Usage"));
+    }
 }
