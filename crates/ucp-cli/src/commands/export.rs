@@ -3,7 +3,7 @@
 use anyhow::Result;
 
 use crate::cli::{ExportCommands, OutputFormat};
-use crate::output::{print_success, read_document, write_output};
+use crate::output::{read_document, write_output, DocumentJson};
 
 pub fn handle(cmd: ExportCommands, format: OutputFormat) -> Result<()> {
     match cmd {
@@ -44,11 +44,12 @@ fn json(
     _format: OutputFormat,
 ) -> Result<()> {
     let doc = read_document(input)?;
+    let doc_json = DocumentJson::from_document(&doc);
 
     let json_str = if pretty {
-        serde_json::to_string_pretty(&doc)?
+        serde_json::to_string_pretty(&doc_json)?
     } else {
-        serde_json::to_string(&doc)?
+        serde_json::to_string(&doc_json)?
     };
 
     write_output(&json_str, output)?;

@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Result};
 use serde::Serialize;
 use std::str::FromStr;
-use ucm_core::{Block, BlockId, BlockMetadata, Content, SemanticRole};
+use ucm_core::{Block, BlockId, Content};
 use ucm_engine::{EditOperator, Engine, MoveTarget, Operation};
 
 use crate::cli::{BlockCommands, OutputFormat};
@@ -11,6 +11,26 @@ use crate::output::{
     print_block, print_block_table, print_error, print_success, read_document, write_document,
     BlockSummary,
 };
+
+/// Serializable version of OperationResult for JSON output
+#[derive(Serialize)]
+struct OperationResultJson {
+    success: bool,
+    affected_blocks: Vec<String>,
+    warnings: Vec<String>,
+    error: Option<String>,
+}
+
+impl From<&ucm_engine::OperationResult> for OperationResultJson {
+    fn from(result: &ucm_engine::OperationResult) -> Self {
+        Self {
+            success: result.success,
+            affected_blocks: result.affected_blocks.iter().map(|id| id.to_string()).collect(),
+            warnings: result.warnings.clone(),
+            error: result.error.clone(),
+        }
+    }
+}
 
 pub fn handle(cmd: BlockCommands, format: OutputFormat) -> Result<()> {
     match cmd {
@@ -218,7 +238,8 @@ fn delete(
 
     match format {
         OutputFormat::Json => {
-            println!("{}", serde_json::to_string_pretty(&result)?);
+            let json_result = OperationResultJson::from(&result);
+            println!("{}", serde_json::to_string_pretty(&json_result)?);
         }
         OutputFormat::Text => {
             if result.success {
@@ -285,7 +306,8 @@ fn move_block(
 
     match format {
         OutputFormat::Json => {
-            println!("{}", serde_json::to_string_pretty(&result)?);
+            let json_result = OperationResultJson::from(&result);
+            println!("{}", serde_json::to_string_pretty(&json_result)?);
         }
         OutputFormat::Text => {
             if result.success {

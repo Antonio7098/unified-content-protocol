@@ -176,8 +176,8 @@ fn prompt(capabilities: String, format: OutputFormat) -> Result<()> {
             .collect()
     };
 
-    let builder = PromptBuilder::new().with_capabilities(&caps);
-    let prompt_text = builder.build();
+    let builder = PromptBuilder::new().with_capabilities(caps.clone());
+    let prompt_text = builder.build_system_prompt();
 
     match format {
         OutputFormat::Json => {

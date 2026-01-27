@@ -5,7 +5,7 @@ use colored::Colorize;
 use serde::Serialize;
 
 use crate::cli::{OutputFormat, SnapshotCommands};
-use crate::output::{print_error, print_success};
+use crate::output::print_success;
 use crate::state::{read_stateful_document, write_stateful_document, SnapshotInfo};
 
 pub fn handle(cmd: SnapshotCommands, format: OutputFormat) -> Result<()> {

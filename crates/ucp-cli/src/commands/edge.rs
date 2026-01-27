@@ -11,6 +11,26 @@ use crate::output::{
     print_edge_table, print_error, print_success, read_document, write_document, EdgeSummary,
 };
 
+/// Serializable version of OperationResult for JSON output
+#[derive(Serialize)]
+struct OperationResultJson {
+    success: bool,
+    affected_blocks: Vec<String>,
+    warnings: Vec<String>,
+    error: Option<String>,
+}
+
+impl From<&ucm_engine::OperationResult> for OperationResultJson {
+    fn from(result: &ucm_engine::OperationResult) -> Self {
+        Self {
+            success: result.success,
+            affected_blocks: result.affected_blocks.iter().map(|id| id.to_string()).collect(),
+            warnings: result.warnings.clone(),
+            error: result.error.clone(),
+        }
+    }
+}
+
 pub fn handle(cmd: EdgeCommands, format: OutputFormat) -> Result<()> {
     match cmd {
         EdgeCommands::Add {
@@ -91,7 +111,8 @@ fn add(
 
     match format {
         OutputFormat::Json => {
-            println!("{}", serde_json::to_string_pretty(&result)?);
+            let json_result = OperationResultJson::from(&result);
+            println!("{}", serde_json::to_string_pretty(&json_result)?);
         }
         OutputFormat::Text => {
             if result.success {
@@ -139,7 +160,8 @@ fn remove(
 
     match format {
         OutputFormat::Json => {
-            println!("{}", serde_json::to_string_pretty(&result)?);
+            let json_result = OperationResultJson::from(&result);
+            println!("{}", serde_json::to_string_pretty(&json_result)?);
         }
         OutputFormat::Text => {
             if result.success {
@@ -186,10 +208,17 @@ fn list(
     // Get incoming edges (from edge index)
     if !outgoing_only {
         let incoming = doc.edge_index.incoming_to(&block_id);
-        for (source_id, edge) in incoming {
-            // Avoid duplicates if showing both
-            if incoming_only || !edges.iter().any(|(s, e)| s == source_id && e.target == edge.target) {
-                edges.push((*source_id, edge.clone()));
+        for (edge_type, source_id) in incoming {
+            // Look up the source block to get the actual Edge object
+            if let Some(source_block) = doc.get_block(source_id) {
+                for edge in &source_block.edges {
+                    if edge.target == block_id && &edge.edge_type == edge_type {
+                        // Avoid duplicates if showing both
+                        if incoming_only || !edges.iter().any(|(s, e)| s == source_id && e.target == edge.target) {
+                            edges.push((*source_id, edge.clone()));
+                        }
+                    }
+                }
             }
         }
     }

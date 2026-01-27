@@ -6,7 +6,6 @@ use crate::commands::{
     agent, block, document, edge, export, find, import, llm, nav, prune, snapshot, tree, tx, ucl,
     validate,
 };
-use crate::error::CliResult;
 
 /// UCP - Unified Content Protocol CLI
 ///

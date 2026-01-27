@@ -20,7 +20,7 @@ pub fn prune(
 
     let engine = Engine::new();
     let condition = if let Some(t) = tag {
-        Some(PruneCondition::WithTag(t))
+        Some(PruneCondition::TagContains(t))
     } else {
         Some(PruneCondition::Unreachable)
     };

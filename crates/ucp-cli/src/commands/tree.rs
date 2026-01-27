@@ -49,7 +49,7 @@ pub fn tree(
                 Some(TreeNode {
                     id: block_id.to_string(),
                     label: block.metadata.label.clone(),
-                    role: block.metadata.semantic_role.clone(),
+                    role: block.metadata.semantic_role.as_ref().map(|r| r.to_string()),
                     content_type: block.content.type_tag().to_string(),
                     children,
                 })

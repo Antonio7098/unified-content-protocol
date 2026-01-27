@@ -1,7 +1,6 @@
 //! Import commands
 
 use anyhow::Result;
-use serde::Serialize;
 
 use crate::cli::{ImportCommands, OutputFormat};
 use crate::output::{print_success, read_file, write_document};

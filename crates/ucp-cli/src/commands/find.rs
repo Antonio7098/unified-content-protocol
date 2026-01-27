@@ -21,14 +21,15 @@ pub fn find(
 
     let pattern_regex = pattern.as_ref().map(|p| Regex::new(p)).transpose()?;
 
-    let mut matches: Vec<&Block> = doc
+    let matches: Vec<&Block> = doc
         .blocks
         .values()
         .filter(|block| {
             // Filter by role
             if let Some(ref r) = role {
                 if let Some(ref block_role) = block.metadata.semantic_role {
-                    if !block_role.contains(r) {
+                    let role_str = block_role.to_string();
+                    if !role_str.to_lowercase().contains(&r.to_lowercase()) {
                         return false;
                     }
                 } else {

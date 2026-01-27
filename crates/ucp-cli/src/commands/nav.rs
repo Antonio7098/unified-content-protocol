@@ -58,7 +58,7 @@ fn parent(input: Option<String>, id: String, format: OutputFormat) -> Result<()>
     let block_id =
         BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
-    let parent_id = doc.parent_of(&block_id);
+    let parent_id = doc.parent(&block_id);
 
     match format {
         OutputFormat::Json => {
@@ -76,7 +76,7 @@ fn parent(input: Option<String>, id: String, format: OutputFormat) -> Result<()>
         OutputFormat::Text => {
             if let Some(pid) = parent_id {
                 println!("Parent of {}: {}", id, pid);
-                if let Some(parent_block) = doc.get_block(&pid) {
+                if let Some(parent_block) = doc.get_block(pid) {
                     print_block(parent_block, false);
                 }
             } else {
@@ -95,11 +95,12 @@ fn siblings(input: Option<String>, id: String, format: OutputFormat) -> Result<(
         BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
     // Get parent, then get all children of parent
-    let sibling_ids = if let Some(parent_id) = doc.parent_of(&block_id) {
-        doc.children(&parent_id)
-            .into_iter()
-            .filter(|bid| bid != &block_id)
-            .collect::<Vec<_>>()
+    let sibling_ids: Vec<BlockId> = if let Some(parent_id) = doc.parent(&block_id) {
+        doc.children(parent_id)
+            .iter()
+            .filter(|bid| *bid != &block_id)
+            .cloned()
+            .collect()
     } else {
         Vec::new()
     };
@@ -157,8 +158,8 @@ fn descendants(
         }
 
         for child_id in doc.children(block_id) {
-            results.push((child_id, current_depth));
-            collect_descendants(doc, &child_id, current_depth + 1, max_depth, results);
+            results.push((child_id.clone(), current_depth));
+            collect_descendants(doc, child_id, current_depth + 1, max_depth, results);
         }
     }
 
@@ -186,7 +187,7 @@ fn descendants(
                         id: id.to_string(),
                         depth: *depth,
                         content_type: b.content.type_tag().to_string(),
-                        role: b.metadata.semantic_role.clone(),
+                        role: b.metadata.semantic_role.as_ref().map(|r| r.to_string()),
                     })
                 })
                 .collect();

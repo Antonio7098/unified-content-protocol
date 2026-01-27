@@ -7,7 +7,7 @@ use std::str::FromStr;
 use ucm_core::BlockId;
 
 use crate::cli::{AgentCommands, AgentContextCommands, AgentSessionCommands, OutputFormat};
-use crate::output::{content_preview, print_block, print_error, print_success, read_document};
+use crate::output::{content_preview, print_block, print_success, read_document};
 use crate::state::{read_stateful_document, write_stateful_document, AgentSessionState};
 
 pub fn handle(cmd: AgentCommands, format: OutputFormat) -> Result<()> {
@@ -712,7 +712,7 @@ fn context_remove(
     Ok(())
 }
 
-fn context_clear(session: String, format: OutputFormat) -> Result<()> {
+fn context_clear(_session: String, format: OutputFormat) -> Result<()> {
     // Without input file, we can't persist
     match format {
         OutputFormat::Json => {

@@ -2,10 +2,10 @@
 
 use anyhow::Result;
 use serde::Serialize;
-use ucm_core::Document;
+use ucm_core::{Document, TokenModel};
 
 use crate::cli::OutputFormat;
-use crate::output::{print_document_info, print_success, write_document, read_document};
+use crate::output::{print_document_info, print_success, write_document, read_document, DocumentJson};
 
 /// Create a new document
 pub fn create(output: Option<String>, title: Option<String>, format: OutputFormat) -> Result<()> {
@@ -26,7 +26,8 @@ pub fn create(output: Option<String>, title: Option<String>, format: OutputForma
                 // In text mode without output, show the document info
                 print_success("Created new document");
                 print_document_info(&doc);
-                println!("\n{}", serde_json::to_string_pretty(&doc)?);
+                let doc_json = DocumentJson::from_document(&doc);
+                println!("\n{}", serde_json::to_string_pretty(&doc_json)?);
             }
         }
     }
@@ -54,8 +55,8 @@ pub fn info(input: Option<String>, format: OutputFormat) -> Result<()> {
         id: doc.id.to_string(),
         root: doc.root.to_string(),
         block_count: doc.block_count(),
-        total_tokens: doc.total_tokens(),
-        version: doc.version.0,
+        total_tokens: Some(doc.total_tokens(TokenModel::Generic)),
+        version: doc.version.counter,
         title: doc.metadata.title.clone(),
         description: doc.metadata.description.clone(),
         edge_count: doc.edge_index.edge_count(),

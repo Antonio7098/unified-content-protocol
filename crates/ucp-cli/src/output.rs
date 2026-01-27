@@ -3,7 +3,7 @@
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{self, Write};
+use std::io;
 use tabled::{Table, Tabled};
 use ucm_core::{Block, BlockId, Document, Edge};
 
@@ -242,7 +242,7 @@ pub fn content_preview(content: &ucm_core::Content, max_len: usize) -> String {
         ),
         ucm_core::Content::Math(math) => format!("Math: {}", math.expression),
         ucm_core::Content::Media(media) => {
-            format!("Media: {:?} - {:?}", media.media_type, media.sources)
+            format!("Media: {:?} - {:?}", media.media_type, media.source)
         }
         ucm_core::Content::Json { value, .. } => {
             serde_json::to_string_pretty(value).unwrap_or_else(|_| "{}".to_string())
@@ -274,13 +274,12 @@ pub fn print_document_info(doc: &Document) {
         doc.block_count().to_string().green()
     );
 
-    if let Some(total_tokens) = doc.total_tokens() {
-        println!(
-            "{}: ~{}",
-            "Total Tokens".white(),
-            total_tokens.to_string().yellow()
-        );
-    }
+    let total_tokens = doc.total_tokens(ucm_core::TokenModel::Generic);
+    println!(
+        "{}: ~{}",
+        "Total Tokens".white(),
+        total_tokens.to_string().yellow()
+    );
 
     println!("{}: v{}", "Version".white(), doc.version.counter);
 
@@ -447,7 +446,7 @@ impl EdgeSummary {
     pub fn new(source: &BlockId, edge: &Edge) -> Self {
         Self {
             source: source.to_string(),
-            edge_type: edge.edge_type.to_string(),
+            edge_type: format!("{:?}", edge.edge_type),
             target: edge.target.to_string(),
         }
     }
@@ -465,7 +464,7 @@ pub fn print_edge_table(edges: &[(BlockId, Edge)]) {
 
 /// Print validation results
 pub fn print_validation_result(result: &ucm_engine::ValidationResult) {
-    if result.is_valid {
+    if result.valid {
         print_success("Document is valid");
     } else {
         print_error("Document validation failed");
