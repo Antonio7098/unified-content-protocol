@@ -1,6 +1,6 @@
 [package]
 name = "ucp-agent"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 description = "Agent graph traversal system for UCP knowledge graphs"
 license = "MIT OR Apache-2.0"
