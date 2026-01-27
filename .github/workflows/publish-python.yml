@@ -49,7 +49,7 @@ jobs:
 
       - name: Build distribution
         working-directory: crates/ucp-python
-        run: maturin build --release --sdist --wheel --out dist
+        run: maturin build --release --sdist --out dist
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
