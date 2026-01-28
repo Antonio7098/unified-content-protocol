@@ -19,6 +19,62 @@
   },
   "entries": [
     {
+      "version": "v0.1.9",
+      "date": "2026-01-27",
+      "changes": [
+        {
+          "type": "added",
+          "area": "cli.core",
+          "description": "Implemented full-featured ucp-cli binary covering document, block, edge, navigation, transaction, snapshot, import/export, agent, UCL, and LLM workflows with consistent output formatting and tracing controls.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-cli/src/main.rs",
+            "crates/ucp-cli/src/cli.rs",
+            "crates/ucp-cli/src/commands/*",
+            "crates/ucp-cli/src/state.rs",
+            "crates/ucp-cli/src/output.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "cli.tests",
+          "description": "Added 17 unit tests and 33 integration tests validating document flows, block/edge operations, navigation, import/export, UCL execution, and agent/LLM tooling for the CLI.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-cli/tests/integration_tests.rs",
+            "crates/ucp-cli/src/output.rs",
+            "crates/ucp-cli/src/state.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "docs.cli",
+          "description": "Documented the CLI, feature matrix, workflows, and version guidance across docs/README.md, docs/index.md, getting-started guides, and a dedicated docs/ucp-cli/README.md reference.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/README.md",
+            "docs/index.md",
+            "docs/getting-started/installation.md",
+            "docs/ucp-cli/README.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped documentation references to version 0.1.9 for all core crates and recorded the CLI release details in the changelog.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/**",
+            "changelog.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.8",
       "date": "2026-01-27",
       "changes": [

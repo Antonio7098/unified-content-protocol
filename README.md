@@ -1,17 +1,31 @@
 # Unified Content Protocol (UCP)
 
-> Latest release: v0.1.8
+> Latest release: v0.1.9
 
-Unified Content Protocol is a graph-based intermediate representation for structured content. It provides deterministic, token-efficient building blocks that make it easy to ingest, transform, and serve complex documents to both humans and LLM-powered systems.
+Unified Content Protocol is a graph-based intermediate representation (IR) for structured documents. It provides deterministic, token-efficient building blocks so teams can ingest, transform, and serve complex knowledge graphs to both traditional applications and LLM-powered agents.
 
-## Why UCP?
+## Highlights
 
-- **Deterministic core model** – Content-addressed blocks (`BlockId`) guarantee that identical content always hashes to the same ID.
-- **Rich content types** – Text, code, tables, math, media, JSON, binary, and composite blocks share consistent metadata, edges, and versioning.
-- **Transformation engine** – Batched operations, transactions, snapshots, and validation keep documents consistent while edits stream in.
-- **Unified Content Language (UCL)** – A token-efficient DSL for scripting structural changes, suitable for LLM prompting and automation.
-- **High-level API** – `ucp-api` wraps all core crates into an ergonomic client for applications and services.
-- **Observability-first** – Built-in tracing hooks, audit helpers, and metrics collection make it production friendly.
+- **Deterministic Rust core** – Content-addressed blocks (`BlockId`) ensure reproducible IDs, metadata, and edges no matter where content was created.
+- **Full fidelity content types** – Text, code, tables, math, media, JSON, composites, and binary payloads all follow the same schema and validation rules.
+- **Powerful automation surface** – The `ucp-cli` binary exposes every operation (document, block, edge, agent traversal, LLM utilities) with JSON-friendly output for CI and scripting.
+- **Consistent SDKs** – Rust (`ucp-api`), Python (`ucp-content` via PyO3), and JavaScript/WASM (wasm-bindgen) all share the same core engine so workflows stay portable.
+- **LLM-ready toolkit** – `ucp-llm` ships IdMapper + PromptBuilder utilities, along with CLI helpers to shorten/expand UCL for token efficiency.
+
+## Ecosystem at a Glance
+
+| Component | Description |
+| --- | --- |
+| `ucm-core` | Core data model (Block, Document, Content, Edge, Metadata, IDs). |
+| `ucm-engine` | Transformation engine offering edit operators, transactions, snapshots, validation. |
+| `ucl-parser` | Lexer/parser/AST for the Unified Content Language (UCL). |
+| `ucp-api` | High-level Rust client that re-exports all core capabilities. |
+| `ucp-cli` | Command-line interface covering documents, blocks, edges, navigation, agents, import/export, and LLM tooling. |
+| `ucp-llm` | IdMapper + PromptBuilder for token-efficient prompts and UCL scaffolding. |
+| `ucp-content` (Python) | PyO3 bindings offering the full Document + Engine + Agent stack. |
+| `@ucp-core/core` (JS/WASM) | wasm-bindgen bindings for browsers, Node, and edge runtimes. |
+| Translators | Markdown & HTML ingestion pipelines with semantic role mapping. |
+| `ucp-observe` | Tracing, audit logging, and metrics helpers for production deployments. |
 
 ## Repository Layout
 
@@ -22,95 +36,95 @@ Unified Content Protocol is a graph-based intermediate representation for struct
 │   ├── ucm-engine/          # Transformation engine, transactions, snapshots, validation
 │   ├── ucl-parser/          # Lexer, parser, and AST for Unified Content Language
 │   ├── ucp-api/             # High-level API surface bundling core crates
+│   ├── ucp-cli/             # Command-line interface + integration tests
+│   ├── ucp-llm/             # IdMapper, PromptBuilder, presets for LLM prompts
 │   ├── ucp-observe/         # Tracing, audit logging, metrics helpers
-│   └── translators/
-│       ├── markdown/        # Markdown ⇄ UCP translator
-│       └── html/            # HTML → UCP translator
-├── docs/                    # Full documentation set (see below)
+│   └── translators/         # Markdown ⇄ UCP, HTML → UCP
+├── packages/                # Python + JS/WASM SDKs (PyO3 & wasm-bindgen bindings)
+├── docs/                    # Full documentation site
 └── ...                      # Tooling, workspace config, CI, etc.
 ```
 
 ## Getting Started
 
-1. **Install Rust** (1.70 or newer) and clone the repository:
+1. **Install Rust** (1.70+) and clone the repository:
    ```bash
    git clone https://github.com/<org>/unified-content-protocol.git
    cd unified-content-protocol
    ```
-2. **Build the workspace**:
+2. **Build & test** the entire workspace:
    ```bash
    cargo build --workspace
-   ```
-3. **Run tests**:
-   ```bash
    cargo test --workspace
    ```
-4. **Add to another project** (example using the high-level API):
+3. **Explore the CLI** (JSON output is perfect for automation):
+   ```bash
+   cargo run -p ucp-cli -- --help
+   cargo run -p ucp-cli -- create --title "CLI Demo" --format json
+   ```
+4. **Add the Rust API to another project**:
    ```toml
    [dependencies]
-   ucp-api = "0.1.8"
+   ucp-api = "0.1.9"
    ```
 
-## SDK Installation
+### SDK Installation Matrix
 
-| SDK | Command |
+| Target | Command |
 | --- | --- |
-| Rust (workspace) | `ucp-api = "0.1.8"` (or other crates at `0.1.8`) |
-| Python | `pip install ucp-content==0.1.8` |
-| JavaScript / TypeScript | `npm install @ucp-core/core@0.1.8` |
+| Rust | `ucp-api = "0.1.9"` (or depend on individual crates at the same version). |
+| Python | `pip install ucp-content==0.1.9` |
+| JavaScript / TypeScript | `npm install @ucp-core/core@0.1.9` |
 
-## Documentation
+## Documentation & CLI Guide
 
-All documentation lives in [`/docs`](./docs/index.md) and is structured for direct use by the documentation frontend. Highlights:
+The full docs live in [`/docs`](./docs/index.md). Highlights include Getting Started sequences, crate deep dives, translator walkthroughs, agent architecture notes, and an end-to-end CLI usage guide. Every CLI subcommand mirrors the Rust `Commands` enum, so the documentation always stays in sync with the source.
 
-- **Getting Started** – Installation, quick start, and core concepts
-- **ucm-core** – Blocks, content types, metadata, IDs, documents, edges
-- **ucm-engine** – Operations, transactions, snapshots, validation
-- **ucl-parser** – Full UCL syntax + command reference
-- **ucp-api** – Client usage patterns and examples
-- **Translators** – Markdown and HTML ingestion guides with configuration examples
-- **ucp-observe** – Tracing, audit, and metrics helpers
-- **Examples** – Basic → Advanced programs covering real workflows
-
-## Example Snippet
+## Example: Deterministic Edits with IdMapper
 
 ```rust
-use serde_json::Value;
+use anyhow::Result;
 use ucp_api::UcpClient;
-use ucm_core::{Content, Document};
+use ucp_llm::IdMapper;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
+    // 1. Build a document using the Rust client
     let client = UcpClient::new();
     let mut doc = client.create_document();
     let root = doc.root.clone();
 
-    // Add content
-    client.add_text(&mut doc, &root, "Hello, UCP!", Some("intro"))?;
+    client.add_text(&mut doc, &root, "Product Spec", Some("title"))?;
+    client.add_text(&mut doc, &root, "CLI-based editing demo", Some("intro"))?;
+
+    // 2. Execute UCL to append a code sample
     client.execute_ucl(&mut doc, r#"
-        APPEND blk_ff00000000000000000000 code WITH lang="rust" :: "fn main() {}"
+        APPEND blk_root code WITH label="example" :: "fn add(a: i32, b: i32) -> i32 { a + b }"
     "#)?;
 
-    // Validate and serialize
-    if doc.validate().is_empty() {
-        println!("Document is valid");
-    }
+    // 3. Generate a token-efficient mapper for LLM prompts
+    let mapper = IdMapper::from_document(&doc);
+    let prompt = mapper.document_to_prompt(&doc);
+    println!("Prompt snippet:\n{}", prompt);
 
-    let json = client.to_json(&doc)?;
-    println!("{}", json);
+    // 4. Shorten and expand UCL using the mapper
+    let long_ucl = "EDIT blk_root SET metadata.tags += [\"release\"]";
+    let short_ucl = mapper.shorten_ucl(long_ucl);
+    assert_eq!(short_ucl, "EDIT 1 SET metadata.tags += [\"release\"]");
+    let expanded = mapper.expand_ucl(&short_ucl);
+    assert_eq!(expanded, long_ucl);
 
-    // Pretty-print if desired
-    let pretty: Value = serde_json::from_str(&json)?;
-    println!("{}", serde_json::to_string_pretty(&pretty)?);
     Ok(())
 }
 ```
 
+This pattern mirrors the CLI’s `llm` subcommands (`id-map`, `shorten-ucl`, `expand-ucl`), so shell scripts and SDKs can share the exact same workflow.
+
 ## Contributing
 
-1. Fork the repository and create a feature branch.
-2. Run `cargo fmt`, `cargo clippy --all-targets`, and `cargo test --workspace` before opening a PR.
-3. Follow the documentation style and include examples where appropriate.
+1. Fork the repository, create a feature branch, and keep commits scoped.
+2. Run `cargo fmt`, `cargo clippy --all-targets`, `cargo test --workspace`, plus any relevant `npm`/`pytest` suites when touching SDKs.
+3. Update docs or examples when adding new capabilities—especially CLI and SDK surfaces.
 
 ## License
 
-This project follows the license declared in the workspace `Cargo.toml`. See the [`LICENSE`](./LICENSE) file for details.
+This project follows the license declared in the workspace `Cargo.toml`. See [`LICENSE`](./LICENSE) for details.

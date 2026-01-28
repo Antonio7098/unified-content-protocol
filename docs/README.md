@@ -10,6 +10,9 @@ UCP provides a token-efficient, deterministic framework for representing and tra
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
+│                         ucp-cli                                  │
+│        (Command-line interface & automation tooling)             │
+├─────────────────────────────────────────────────────────────────┤
 │                         ucp-api                                  │
 │              (High-level API for applications)                   │
 ├─────────────────────────────────────────────────────────────────┤
@@ -32,6 +35,7 @@ UCP provides a token-efficient, deterministic framework for representing and tra
 | [`ucm-engine`](./ucm-engine/README.md) | Transformation engine for applying operations to documents |
 | [`ucl-parser`](./ucl-parser/README.md) | Parser for the Unified Content Language (UCL) |
 | [`ucp-api`](./ucp-api/README.md) | High-level API for application integration |
+| [`ucp-cli`](./ucp-cli/README.md) | Command-line interface covering the full UCP surface |
 | [`ucp-translator-markdown`](./translators/markdown/README.md) | Bidirectional Markdown conversion |
 | [`ucp-translator-html`](./translators/html/README.md) | HTML → UCM translator with semantic extraction |
 | [`ucp-llm`](./ucp-llm/README.md) | LLM utilities (ID mapping, prompt building) |
@@ -45,7 +49,7 @@ Add UCP to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ucp-api = "0.1.8"
+ucp-api = "0.1.9"
 ```
 
 ### Basic Usage
@@ -137,6 +141,8 @@ docs/
 │   │   └── README.md
 │   └── html/
 │       └── README.md
+├── ucp-cli/
+│   └── README.md
 ├── ucp-llm/
 │   └── README.md
 ├── ucp-observe/

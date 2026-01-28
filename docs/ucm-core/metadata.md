@@ -562,7 +562,7 @@ The content hash enables change detection.
 === "JavaScript"
     ```javascript
     // Timestamp properties are ISO strings on document metadata
-    // but individual block timestamps may not be directly exposed in JS v0.1.6
+    // but individual block timestamps may not be directly exposed in JS v0.1.9
     ```
 
 ## Custom Metadata
