@@ -7,7 +7,7 @@ Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major a
 === "Rust"
     ```toml
     [dependencies]
-    ucp-api = "0.1.7"
+    ucp-api = "0.1.9"
     ```
 
 === "Python"
@@ -25,6 +25,7 @@ Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major a
 - [Installation](./getting-started/installation.md)
 - [Quick Start Guide](./getting-started/quick-start.md)
 - [Core Concepts](./getting-started/concepts.md)
+- [CLI Usage Guide](./getting-started/cli-guide.md)
 
 ## Core Model (ucm-core)
 
@@ -54,6 +55,20 @@ Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major a
 ## High-Level API (ucp-api)
 
 - [Client Overview](./ucp-api/README.md)
+
+## JavaScript SDK (@ucp-core/core)
+
+- [SDK Reference & Installation](./ucp-js/README.md)
+
+## Command-Line Interface (ucp-cli)
+
+- [Overview & Command Reference](./ucp-cli/README.md)
+- [Hands-on Usage Guide](./getting-started/cli-guide.md)
+
+```bash
+cargo run -p ucp-cli -- --help
+cargo run -p ucp-cli -- create --title "My Document"
+```
 
 ## Translators
 
