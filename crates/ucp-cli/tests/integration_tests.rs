@@ -373,7 +373,7 @@ mod with_temp_file {
         let temp_doc = create_temp_doc();
         let doc_path = temp_doc.path().to_str().unwrap().to_string();
 
-        let mut out_file = NamedTempFile::new().expect("Failed to create temp output");
+        let out_file = NamedTempFile::new().expect("Failed to create temp output");
         let out_path = out_file.path().to_str().unwrap().to_string();
 
         let mut ucl_file = NamedTempFile::new().expect("Failed to create temp UCL file");

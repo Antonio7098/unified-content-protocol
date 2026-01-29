@@ -48,7 +48,7 @@ pub fn handle(cmd: BlockCommands, format: OutputFormat) -> Result<()> {
             label,
             role,
             tags,
-        } => add(
+        } => add(AddArgs {
             input,
             output,
             parent,
@@ -58,8 +58,7 @@ pub fn handle(cmd: BlockCommands, format: OutputFormat) -> Result<()> {
             label,
             role,
             tags,
-            format,
-        ),
+        }, format),
         BlockCommands::Get {
             input,
             id,
@@ -80,7 +79,15 @@ pub fn handle(cmd: BlockCommands, format: OutputFormat) -> Result<()> {
             before,
             after,
             index,
-        } => move_block(input, output, id, to_parent, before, after, index, format),
+        } => move_block(MoveBlockArgs {
+            input,
+            output,
+            id,
+            to_parent,
+            before,
+            after,
+            index,
+        }, format),
         BlockCommands::List { input, ids_only } => list(input, ids_only, format),
         BlockCommands::Update {
             input,
@@ -92,105 +99,140 @@ pub fn handle(cmd: BlockCommands, format: OutputFormat) -> Result<()> {
             summary,
             add_tag,
             remove_tag,
-        } => update(
-            input, output, id, content, label, role, summary, add_tag, remove_tag, format,
-        ),
+        } => update(UpdateArgs {
+            input,
+            output,
+            id,
+            content,
+            label,
+            role,
+            summary,
+            add_tag,
+            remove_tag,
+        }, format),
     }
 }
 
-fn add(
+#[derive(clap::Args)]
+struct AddArgs {
+    /// Input document file
+    #[arg(short, long)]
     input: Option<String>,
+
+    /// Output document file
+    #[arg(short, long)]
     output: Option<String>,
+
+    /// Parent block ID
+    #[arg(short, long)]
     parent: Option<String>,
+
+    /// Content type
+    #[arg(short = 't', long, default_value = "text")]
     content_type: String,
+
+    /// Block content (reads from stdin if not provided)
+    #[arg(short, long)]
     content: Option<String>,
+
+    /// Language for code blocks
+    #[arg(short, long)]
     language: Option<String>,
+
+    /// Block label
+    #[arg(short, long)]
     label: Option<String>,
+
+    /// Semantic role
+    #[arg(short, long)]
     role: Option<String>,
+
+    /// Comma-separated tags
+    #[arg(short, long)]
     tags: Option<String>,
-    format: OutputFormat,
-) -> Result<()> {
-    let mut doc = if input.is_some() {
-        read_document(input)?
+}
+
+fn add(args: AddArgs, format: OutputFormat) -> Result<()> {
+    let mut doc = if args.input.is_some() {
+        read_document(args.input.as_deref().map(|s| s.to_string()))?
     } else {
         ucm_core::Document::create()
     };
 
-    let parent_id = if let Some(p) = parent {
-        BlockId::from_str(&p).map_err(|_| anyhow!("Invalid parent block ID: {}", p))?
-    } else {
-        doc.root
-    };
-
-    // Get content from argument or stdin
-    let content_str = if let Some(c) = content {
-        c
-    } else {
-        use std::io::Read;
-        let mut buffer = String::new();
-        std::io::stdin().read_to_string(&mut buffer)?;
-        buffer.trim().to_string()
-    };
-
-    // Build content based on type
-    let block_content = match content_type.to_lowercase().as_str() {
-        "text" => Content::text(&content_str),
-        "markdown" => Content::markdown(&content_str),
-        "code" => {
-            let lang = language.unwrap_or_else(|| "plaintext".to_string());
-            Content::code(&lang, &content_str)
+    let content = match args.content {
+        Some(c) => c,
+        None => {
+            use std::io::Read;
+            let mut buffer = String::new();
+            std::io::stdin().read_to_string(&mut buffer)?;
+            buffer.trim().to_string()
         }
-        "json" => Content::json(serde_json::from_str(&content_str)?),
+    };
+
+    let content = match args.content_type.to_lowercase().as_str() {
+        "text" => Content::text(&content),
+        "code" => {
+            let lang = args.language.unwrap_or_else(|| "plaintext".to_string());
+            Content::code(&lang, &content)
+        }
+        "markdown" => Content::markdown(&content),
+        "json" => Content::json(serde_json::from_str(&content)?),
         "math" => Content::Math(ucm_core::Math {
-            expression: content_str,
+            expression: content,
             format: ucm_core::MathFormat::LaTeX,
             display_mode: false,
         }),
         "table" => {
             // Expect JSON table definition
-            let table: ucm_core::Table = serde_json::from_str(&content_str)?;
+            let table: ucm_core::Table = serde_json::from_str(&content)?;
             Content::Table(table)
         }
         "media" => {
             // Expect JSON media definition
-            let media: ucm_core::Media = serde_json::from_str(&content_str)?;
+            let media: ucm_core::Media = serde_json::from_str(&content)?;
             Content::Media(media)
         }
-        _ => return Err(anyhow!("Unknown content type: {}", content_type)),
+        _ => return Err(anyhow!("Unknown content type: {}", args.content_type)),
     };
 
-    // Build block with metadata
-    let mut block = Block::new(block_content, role.as_deref());
+    let parent_id = args.parent
+        .map(|p| p.parse().map_err(|e| anyhow::anyhow!("Invalid parent ID: {}", e)))
+        .transpose()?
+        .unwrap_or_else(|| doc.root);
 
-    if let Some(l) = label {
-        block.metadata.label = Some(l);
-    }
-
-    if let Some(t) = tags {
-        block.metadata.tags = t.split(',').map(|s| s.trim().to_string()).collect();
-    }
+    let block = Block {
+        id: BlockId::generate(),
+        content,
+        metadata: BlockMetadata {
+            label: args.label,
+            role: args.role,
+            summary: None,
+            tags: args.tags.as_deref().map(|t| t.split(',').map(|s| s.trim().to_string()).collect()).unwrap_or_default(),
+            created_at: chrono::Utc::now(),
+            modified_at: chrono::Utc::now(),
+        },
+        children: Vec::new(),
+        edges: Vec::new(),
+    };
 
     let block_id = doc.add_block(block, &parent_id)?;
 
+    write_document(&doc, args.output)?;
+
     match format {
-        OutputFormat::Json => {
-            #[derive(Serialize)]
-            struct AddResult {
-                success: bool,
-                block_id: String,
-            }
-            let result = AddResult {
-                success: true,
-                block_id: block_id.to_string(),
-            };
-            println!("{}", serde_json::to_string_pretty(&result)?);
-        }
         OutputFormat::Text => {
-            print_success(&format!("Added block: {}", block_id));
+            print_success("Block added successfully");
+            println!("Block ID: {}", block_id);
+        }
+        OutputFormat::Json => {
+            let result = serde_json::json!({
+                "block_id": block_id,
+                "status": "success"
+            });
+            println!("{}", serde_json::to_string_pretty(&result)?);
         }
     }
 
-    write_document(&doc, output)?;
     Ok(())
 }
 
@@ -263,33 +305,61 @@ fn delete(
     Ok(())
 }
 
-fn move_block(
+#[derive(clap::Args)]
+struct MoveBlockArgs {
+    /// Input document file
+    #[arg(short, long)]
     input: Option<String>,
-    output: Option<String>,
-    id: String,
-    to_parent: Option<String>,
-    before: Option<String>,
-    after: Option<String>,
-    index: Option<usize>,
-    format: OutputFormat,
-) -> Result<()> {
-    let mut doc = read_document(input)?;
-    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
-    let target = if let Some(parent) = to_parent {
-        let parent_id = BlockId::from_str(&parent)
-            .map_err(|_| anyhow!("Invalid parent block ID: {}", parent))?;
-        MoveTarget::ToParent { parent_id, index }
-    } else if let Some(sibling) = before {
-        let sibling_id = BlockId::from_str(&sibling)
-            .map_err(|_| anyhow!("Invalid sibling block ID: {}", sibling))?;
-        MoveTarget::Before { sibling_id }
-    } else if let Some(sibling) = after {
-        let sibling_id = BlockId::from_str(&sibling)
-            .map_err(|_| anyhow!("Invalid sibling block ID: {}", sibling))?;
-        MoveTarget::After { sibling_id }
-    } else {
-        return Err(anyhow!("Must specify --to-parent, --before, or --after"));
+    /// Output document file
+    #[arg(short, long)]
+    output: Option<String>,
+
+    /// Block ID to move
+    #[arg(short, long)]
+    id: String,
+
+    /// Target parent block ID
+    #[arg(long)]
+    to_parent: Option<String>,
+
+    /// Insert before this block ID
+    #[arg(long)]
+    before: Option<String>,
+
+    /// Insert after this block ID
+    #[arg(long)]
+    after: Option<String>,
+
+    /// Index at which to insert
+    #[arg(long)]
+    index: Option<usize>,
+}
+
+#[derive(Debug)]
+struct MoveBlockTarget {
+    to_parent: Option<BlockId>,
+    before: Option<BlockId>,
+    after: Option<BlockId>,
+    index: Option<usize>,
+}
+
+fn move_block(args: MoveBlockArgs, format: OutputFormat) -> Result<()> {
+    let mut doc = read_document(args.input)?;
+    let block_id = BlockId::from_str(&args.id).map_err(|_| anyhow!("Invalid block ID: {}", args.id))?;
+
+    let target = MoveBlockTarget {
+        to_parent: args.to_parent.map(|p| BlockId::from_str(&p).map_err(|_| anyhow!("Invalid parent block ID: {}", p))).transpose(),
+        before: args.before.map(|b| BlockId::from_str(&b).map_err(|_| anyhow!("Invalid before block ID: {}", b))).transpose(),
+        after: args.after.map(|a| BlockId::from_str(&a).map_err(|_| anyhow!("Invalid after block ID: {}", a))).transpose(),
+        index: args.index,
+    };
+
+    let target = match (target.to_parent, target.before, target.after) {
+        (Some(parent), _, _) => MoveTarget::ToParent { parent_id: parent, index: target.index },
+        (_, Some(before), _) => MoveTarget::Before { sibling_id: before },
+        (_, _, Some(after)) => MoveTarget::After { sibling_id: after },
+        _ => return Err(anyhow!("Must specify --to-parent, --before, or --after")),
     };
 
     let engine = Engine::new();
@@ -304,7 +374,7 @@ fn move_block(
         }
         OutputFormat::Text => {
             if result.success {
-                print_success(&format!("Moved block {}", id));
+                print_success(&format!("Moved block {}", args.id));
             } else {
                 print_error(&format!(
                     "Failed to move block: {}",
@@ -314,7 +384,7 @@ fn move_block(
         }
     }
 
-    write_document(&doc, output)?;
+    write_document(&doc, args.output)?;
     Ok(())
 }
 
@@ -348,26 +418,54 @@ fn list(input: Option<String>, ids_only: bool, format: OutputFormat) -> Result<(
     Ok(())
 }
 
-fn update(
+#[derive(clap::Args)]
+struct UpdateArgs {
+    /// Input document file
+    #[arg(short, long)]
     input: Option<String>,
+
+    /// Output document file
+    #[arg(short, long)]
     output: Option<String>,
+
+    /// Block ID to update
+    #[arg(short, long)]
     id: String,
+
+    /// New block content
+    #[arg(short, long)]
     content: Option<String>,
+
+    /// Block label
+    #[arg(short, long)]
     label: Option<String>,
+
+    /// Semantic role
+    #[arg(short, long)]
     role: Option<String>,
+
+    /// Block summary
+    #[arg(long)]
     summary: Option<String>,
+
+    /// Tags to add
+    #[arg(long)]
     add_tag: Option<String>,
+
+    /// Tags to remove
+    #[arg(long)]
     remove_tag: Option<String>,
-    format: OutputFormat,
-) -> Result<()> {
-    let mut doc = read_document(input)?;
-    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
+}
+
+fn update(args: UpdateArgs, format: OutputFormat) -> Result<()> {
+    let mut doc = read_document(args.input)?;
+    let block_id = BlockId::from_str(&args.id).map_err(|_| anyhow!("Invalid block ID: {}", args.id))?;
 
     let engine = Engine::new();
     let mut results = Vec::new();
 
     // Update content if provided
-    if let Some(new_content) = content {
+    if let Some(new_content) = args.content {
         let op = Operation::Edit {
             block_id,
             path: "content.text".to_string(),
@@ -377,8 +475,8 @@ fn update(
         results.push(engine.execute(&mut doc, op)?);
     }
 
-    // Update label
-    if let Some(new_label) = label {
+    // Update label if provided
+    if let Some(new_label) = args.label {
         let op = Operation::Edit {
             block_id,
             path: "metadata.label".to_string(),
@@ -388,8 +486,8 @@ fn update(
         results.push(engine.execute(&mut doc, op)?);
     }
 
-    // Update role
-    if let Some(new_role) = role {
+    // Update role if provided
+    if let Some(new_role) = args.role {
         let op = Operation::Edit {
             block_id,
             path: "metadata.semantic_role".to_string(),
@@ -399,8 +497,8 @@ fn update(
         results.push(engine.execute(&mut doc, op)?);
     }
 
-    // Update summary
-    if let Some(new_summary) = summary {
+    // Update summary if provided
+    if let Some(new_summary) = args.summary {
         let op = Operation::Edit {
             block_id,
             path: "metadata.summary".to_string(),
@@ -410,23 +508,23 @@ fn update(
         results.push(engine.execute(&mut doc, op)?);
     }
 
-    // Add tag
-    if let Some(tag) = add_tag {
+    // Add tags if provided
+    if let Some(tags) = args.add_tag {
         let op = Operation::Edit {
             block_id,
             path: "metadata.tags".to_string(),
-            value: serde_json::Value::String(tag),
+            value: serde_json::Value::String(tags),
             operator: EditOperator::Append,
         };
         results.push(engine.execute(&mut doc, op)?);
     }
 
-    // Remove tag
-    if let Some(tag) = remove_tag {
+    // Remove tags if provided
+    if let Some(tags) = args.remove_tag {
         let op = Operation::Edit {
             block_id,
             path: "metadata.tags".to_string(),
-            value: serde_json::Value::String(tag),
+            value: serde_json::Value::String(tags),
             operator: EditOperator::Remove,
         };
         results.push(engine.execute(&mut doc, op)?);
@@ -451,7 +549,7 @@ fn update(
             if success {
                 print_success(&format!(
                     "Updated block {} ({} operations)",
-                    id,
+                    args.id,
                     results.len()
                 ));
             } else {
@@ -460,6 +558,6 @@ fn update(
         }
     }
 
-    write_document(&doc, output)?;
+    write_document(&doc, args.output)?;
     Ok(())
 }

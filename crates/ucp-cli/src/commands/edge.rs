@@ -45,7 +45,7 @@ pub fn handle(cmd: EdgeCommands, format: OutputFormat) -> Result<()> {
             target,
             description,
             confidence,
-        } => add(
+        } => add(AddEdgeArgs {
             input,
             output,
             source,
@@ -53,8 +53,7 @@ pub fn handle(cmd: EdgeCommands, format: OutputFormat) -> Result<()> {
             target,
             description,
             confidence,
-            format,
-        ),
+        }, format),
         EdgeCommands::Remove {
             input,
             output,
@@ -71,31 +70,53 @@ pub fn handle(cmd: EdgeCommands, format: OutputFormat) -> Result<()> {
     }
 }
 
-fn add(
+#[derive(clap::Args)]
+struct AddEdgeArgs {
+    /// Input document file
+    #[arg(short, long)]
     input: Option<String>,
+
+    /// Output document file
+    #[arg(short, long)]
     output: Option<String>,
+
+    /// Source block ID
+    #[arg(short, long)]
     source: String,
+
+    /// Edge type
+    #[arg(short = 't', long)]
     edge_type: String,
+
+    /// Target block ID
+    #[arg(short, long)]
     target: String,
+
+    /// Edge description
+    #[arg(long)]
     description: Option<String>,
+
+    /// Edge confidence score
+    #[arg(long)]
     confidence: Option<f64>,
-    format: OutputFormat,
-) -> Result<()> {
-    let mut doc = read_document(input)?;
+}
+
+fn add(args: AddEdgeArgs, format: OutputFormat) -> Result<()> {
+    let mut doc = read_document(args.input)?;
 
     let source_id =
-        BlockId::from_str(&source).map_err(|_| anyhow!("Invalid source block ID: {}", source))?;
+        BlockId::from_str(&args.source).map_err(|_| anyhow!("Invalid source block ID: {}", args.source))?;
     let target_id =
-        BlockId::from_str(&target).map_err(|_| anyhow!("Invalid target block ID: {}", target))?;
-    let et = EdgeType::from_str(&edge_type).unwrap_or(EdgeType::References);
+        BlockId::from_str(&args.target).map_err(|_| anyhow!("Invalid target block ID: {}", args.target))?;
+    let et = EdgeType::from_str(&args.edge_type).unwrap_or(EdgeType::References);
 
     // Build metadata if provided
-    let metadata: Option<serde_json::Value> = if description.is_some() || confidence.is_some() {
+    let metadata: Option<serde_json::Value> = if args.description.is_some() || args.confidence.is_some() {
         let mut meta = serde_json::Map::new();
-        if let Some(desc) = description {
+        if let Some(desc) = args.description {
             meta.insert("description".to_string(), serde_json::Value::String(desc));
         }
-        if let Some(conf) = confidence {
+        if let Some(conf) = args.confidence {
             meta.insert("confidence".to_string(), serde_json::json!(conf));
         }
         Some(serde_json::Value::Object(meta))
@@ -122,7 +143,7 @@ fn add(
             if result.success {
                 print_success(&format!(
                     "Created edge: {} --{}-> {}",
-                    source, edge_type, target
+                    args.source, args.edge_type, args.target
                 ));
             } else {
                 print_error(&format!(
@@ -133,7 +154,7 @@ fn add(
         }
     }
 
-    write_document(&doc, output)?;
+    write_document(&doc, args.output)?;
     Ok(())
 }
 

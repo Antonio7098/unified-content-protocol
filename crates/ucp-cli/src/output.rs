@@ -266,8 +266,8 @@ pub fn print_document_info(doc: &Document) {
     println!("{}", "Document Information".cyan().bold());
     println!("{}", "═".repeat(60).cyan());
 
-    println!("{}: {}", "Document ID".white().bold(), doc.id.to_string());
-    println!("{}: {}", "Root Block".white(), doc.root.to_string());
+    println!("{}: {}", "Document ID".white().bold(), doc.id);
+    println!("{}: {}", "Root Block".white(), doc.root);
     println!(
         "{}: {}",
         "Block Count".white(),

@@ -160,7 +160,7 @@ fn descendants(
         }
 
         for child_id in doc.children(block_id) {
-            results.push((child_id.clone(), current_depth));
+            results.push((*child_id, current_depth));
             collect_descendants(doc, child_id, current_depth + 1, max_depth, results);
         }
     }
