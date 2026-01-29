@@ -1,6 +1,6 @@
 [package.metadata.wasm-pack.package]
 name = "ucp-content"
-version = "0.1.8"
+version = "0.1.9"
 
 [package]
 name = "ucp-wasm"

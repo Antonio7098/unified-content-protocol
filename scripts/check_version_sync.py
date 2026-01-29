@@ -15,6 +15,7 @@ import tomllib
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CARGO_TOML = REPO_ROOT / "Cargo.toml"
 PYPROJECT_TOML = REPO_ROOT / "crates" / "ucp-python" / "pyproject.toml"
+WASM_PACK_TOML = REPO_ROOT / "crates" / "ucp-wasm" / "Cargo.toml"
 # WASM package.json is generated in pkg/, but we can check the Cargo.toml metadata or the editor package
 # For now, let's point to ucm-editor as the representative JS package, or skip JS check if not applicable
 # ucm-editor moved out of repository - JS version check disabled
@@ -141,6 +142,15 @@ def load_python_version() -> str:
         return data["project"]["version"]
     except KeyError as exc:  # pragma: no cover
         raise SystemExit("pyproject.toml is missing [project].version") from exc
+
+
+def load_wasm_pack_version() -> str:
+    with WASM_PACK_TOML.open("rb") as fp:
+        data = tomllib.load(fp)
+    try:
+        return data["package"]["metadata"]["wasm-pack"]["package"]["version"]
+    except KeyError as exc:  # pragma: no cover
+        raise SystemExit("crates/ucp-wasm/Cargo.toml is missing [package.metadata.wasm-pack.package].version") from exc
 
 
 def load_js_version() -> str:
@@ -278,11 +288,16 @@ def main(argv: list[str] | None = None) -> int:
 
     workspace_version = load_workspace_version()
     python_version = load_python_version()
+    wasm_pack_version = load_wasm_pack_version()
     js_version = load_js_version()
 
     if python_version != workspace_version:
         errors.append(
             f"packages/ucp-python/pyproject.toml version {python_version} does not match {workspace_version}."
+        )
+    if wasm_pack_version != workspace_version:
+        errors.append(
+            f"crates/ucp-wasm/Cargo.toml [package.metadata.wasm-pack.package] version {wasm_pack_version} does not match {workspace_version}."
         )
     if js_version != workspace_version and js_version != "disabled":
         errors.append(
