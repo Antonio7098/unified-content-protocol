@@ -2,6 +2,7 @@
 
 use thiserror::Error;
 
+#[allow(dead_code)]
 #[derive(Debug, Error)]
 pub enum CliError {
     #[error("IO error: {0}")]
@@ -44,6 +45,7 @@ pub enum CliError {
     Other(String),
 }
 
+#[allow(dead_code)]
 pub type CliResult<T> = Result<T, CliError>;
 
 impl From<anyhow::Error> for CliError {

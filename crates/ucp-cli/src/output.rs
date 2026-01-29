@@ -137,6 +137,7 @@ impl DocumentJson {
 }
 
 /// Print a value in the specified format
+#[allow(dead_code)]
 pub fn print_value<T: Serialize + std::fmt::Display>(value: &T, format: OutputFormat) {
     match format {
         OutputFormat::Json => {
@@ -149,6 +150,7 @@ pub fn print_value<T: Serialize + std::fmt::Display>(value: &T, format: OutputFo
 }
 
 /// Print a serializable value as JSON or a custom text format
+#[allow(dead_code)]
 pub fn print_output<T: Serialize>(value: &T, format: OutputFormat, text_fn: impl FnOnce(&T)) {
     match format {
         OutputFormat::Json => {
@@ -176,6 +178,7 @@ pub fn print_warning(message: &str) {
 }
 
 /// Print an info message
+#[allow(dead_code)]
 pub fn print_info(message: &str) {
     println!("{} {}", "ℹ".blue().bold(), message);
 }
@@ -616,7 +619,7 @@ mod tests {
 
         let source_id = BlockId::root();
         let target_id = BlockId::from_hex("aabbccddeeff001122334455").unwrap();
-        let edge = Edge::new(ucm_core::EdgeType::References, target_id.clone());
+        let edge = Edge::new(ucm_core::EdgeType::References, target_id);
 
         let summary = EdgeSummary::new(&source_id, &edge);
 

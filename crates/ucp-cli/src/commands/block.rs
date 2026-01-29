@@ -204,7 +204,7 @@ fn add(args: AddArgs, format: OutputFormat) -> Result<()> {
         _ => return Err(anyhow!("Unknown content type: {}", args.content_type)),
     };
 
-    let parent_id = parse_block_id(args.parent, "parent")?.unwrap_or_else(|| doc.root);
+    let parent_id = parse_block_id(args.parent, "parent")?.unwrap_or(doc.root);
 
     let mut block = Block::new(content, args.role.as_deref());
 

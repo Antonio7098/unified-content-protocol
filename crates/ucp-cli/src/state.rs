@@ -87,6 +87,7 @@ impl AgentSessionState {
         self.context_blocks.retain(|b| b != &id_str);
     }
 
+    #[allow(dead_code)]
     pub fn clear_context(&mut self) {
         self.context_blocks.clear();
     }
@@ -155,6 +156,7 @@ impl TransactionState {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn rollback_to_savepoint(&self, name: &str) -> anyhow::Result<Option<Document>> {
         for savepoint in self.savepoints.iter().rev() {
             if savepoint.name == name {
@@ -196,6 +198,7 @@ struct StatefulDocumentJson {
 }
 
 impl StatefulDocument {
+    #[allow(dead_code)]
     pub fn new(document: Document) -> Self {
         Self {
             document,
@@ -314,7 +317,7 @@ mod tests {
         session.goto(&block2);
 
         let result = session.back(1);
-        assert_eq!(result, Some(block1.clone()));
+        assert_eq!(result, Some(block1));
         assert_eq!(session.current_block, Some(block1.to_string()));
     }
 

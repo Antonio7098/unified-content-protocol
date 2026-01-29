@@ -315,7 +315,7 @@ fn expand(
 
         if direction == "down" || direction == "both" {
             for child_id in doc.children(block_id) {
-                collect_expansion(doc, &child_id, direction, depth, current_depth + 1, results);
+                collect_expansion(doc, child_id, direction, depth, current_depth + 1, results);
             }
         }
 

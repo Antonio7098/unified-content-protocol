@@ -77,7 +77,8 @@ fn shorten_ucl(ucl: String, mapping: String, format: OutputFormat) -> Result<()>
     #[derive(serde::Deserialize)]
     struct IdMapping {
         block_id: String,
-        short_id: u32,
+        #[serde(rename = "short_id")]
+        _short_id: u32,
     }
 
     let mappings: Vec<IdMapping> = serde_json::from_str(&mapping_json)?;
@@ -121,7 +122,8 @@ fn expand_ucl(ucl: String, mapping: String, format: OutputFormat) -> Result<()> 
     #[derive(serde::Deserialize)]
     struct IdMapping {
         block_id: String,
-        short_id: u32,
+        #[serde(rename = "short_id")]
+        _short_id: u32,
     }
 
     let mappings: Vec<IdMapping> = serde_json::from_str(&mapping_json)?;
