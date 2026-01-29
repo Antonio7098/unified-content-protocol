@@ -16,7 +16,7 @@ The engine is the execution layer of UCP, responsible for:
 === "Rust"
     ```toml
     [dependencies]
-    ucm-engine = "0.1.9"
+    ucm-engine = "0.1.10"
     ```
 
 === "Python"

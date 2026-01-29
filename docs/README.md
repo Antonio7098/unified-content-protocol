@@ -49,7 +49,7 @@ Add UCP to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ucp-api = "0.1.9"
+ucp-api = "0.1.10"
 ```
 
 ### Basic Usage
