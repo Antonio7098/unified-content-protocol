@@ -48,17 +48,20 @@ pub fn handle(cmd: BlockCommands, format: OutputFormat) -> Result<()> {
             label,
             role,
             tags,
-        } => add(AddArgs {
-            input,
-            output,
-            parent,
-            content_type,
-            content,
-            language,
-            label,
-            role,
-            tags,
-        }, format),
+        } => add(
+            AddArgs {
+                input,
+                output,
+                parent,
+                content_type,
+                content,
+                language,
+                label,
+                role,
+                tags,
+            },
+            format,
+        ),
         BlockCommands::Get {
             input,
             id,
@@ -79,15 +82,18 @@ pub fn handle(cmd: BlockCommands, format: OutputFormat) -> Result<()> {
             before,
             after,
             index,
-        } => move_block(MoveBlockArgs {
-            input,
-            output,
-            id,
-            to_parent,
-            before,
-            after,
-            index,
-        }, format),
+        } => move_block(
+            MoveBlockArgs {
+                input,
+                output,
+                id,
+                to_parent,
+                before,
+                after,
+                index,
+            },
+            format,
+        ),
         BlockCommands::List { input, ids_only } => list(input, ids_only, format),
         BlockCommands::Update {
             input,
@@ -99,17 +105,20 @@ pub fn handle(cmd: BlockCommands, format: OutputFormat) -> Result<()> {
             summary,
             add_tag,
             remove_tag,
-        } => update(UpdateArgs {
-            input,
-            output,
-            id,
-            content,
-            label,
-            role,
-            summary,
-            add_tag,
-            remove_tag,
-        }, format),
+        } => update(
+            UpdateArgs {
+                input,
+                output,
+                id,
+                content,
+                label,
+                role,
+                summary,
+                add_tag,
+                remove_tag,
+            },
+            format,
+        ),
     }
 }
 
@@ -195,8 +204,12 @@ fn add(args: AddArgs, format: OutputFormat) -> Result<()> {
         _ => return Err(anyhow!("Unknown content type: {}", args.content_type)),
     };
 
-    let parent_id = args.parent
-        .map(|p| p.parse().map_err(|e| anyhow::anyhow!("Invalid parent ID: {}", e)))
+    let parent_id = args
+        .parent
+        .map(|p| {
+            p.parse()
+                .map_err(|e| anyhow::anyhow!("Invalid parent ID: {}", e))
+        })
         .transpose()?
         .unwrap_or_else(|| doc.root);
 
@@ -207,7 +220,11 @@ fn add(args: AddArgs, format: OutputFormat) -> Result<()> {
             label: args.label,
             role: args.role,
             summary: None,
-            tags: args.tags.as_deref().map(|t| t.split(',').map(|s| s.trim().to_string()).collect()).unwrap_or_default(),
+            tags: args
+                .tags
+                .as_deref()
+                .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_default(),
             created_at: chrono::Utc::now(),
             modified_at: chrono::Utc::now(),
         },
@@ -346,17 +363,30 @@ struct MoveBlockTarget {
 
 fn move_block(args: MoveBlockArgs, format: OutputFormat) -> Result<()> {
     let mut doc = read_document(args.input)?;
-    let block_id = BlockId::from_str(&args.id).map_err(|_| anyhow!("Invalid block ID: {}", args.id))?;
+    let block_id =
+        BlockId::from_str(&args.id).map_err(|_| anyhow!("Invalid block ID: {}", args.id))?;
 
     let target = MoveBlockTarget {
-        to_parent: args.to_parent.map(|p| BlockId::from_str(&p).map_err(|_| anyhow!("Invalid parent block ID: {}", p))).transpose(),
-        before: args.before.map(|b| BlockId::from_str(&b).map_err(|_| anyhow!("Invalid before block ID: {}", b))).transpose(),
-        after: args.after.map(|a| BlockId::from_str(&a).map_err(|_| anyhow!("Invalid after block ID: {}", a))).transpose(),
+        to_parent: args
+            .to_parent
+            .map(|p| BlockId::from_str(&p).map_err(|_| anyhow!("Invalid parent block ID: {}", p)))
+            .transpose(),
+        before: args
+            .before
+            .map(|b| BlockId::from_str(&b).map_err(|_| anyhow!("Invalid before block ID: {}", b)))
+            .transpose(),
+        after: args
+            .after
+            .map(|a| BlockId::from_str(&a).map_err(|_| anyhow!("Invalid after block ID: {}", a)))
+            .transpose(),
         index: args.index,
     };
 
     let target = match (target.to_parent, target.before, target.after) {
-        (Some(parent), _, _) => MoveTarget::ToParent { parent_id: parent, index: target.index },
+        (Some(parent), _, _) => MoveTarget::ToParent {
+            parent_id: parent,
+            index: target.index,
+        },
         (_, Some(before), _) => MoveTarget::Before { sibling_id: before },
         (_, _, Some(after)) => MoveTarget::After { sibling_id: after },
         _ => return Err(anyhow!("Must specify --to-parent, --before, or --after")),
@@ -459,7 +489,8 @@ struct UpdateArgs {
 
 fn update(args: UpdateArgs, format: OutputFormat) -> Result<()> {
     let mut doc = read_document(args.input)?;
-    let block_id = BlockId::from_str(&args.id).map_err(|_| anyhow!("Invalid block ID: {}", args.id))?;
+    let block_id =
+        BlockId::from_str(&args.id).map_err(|_| anyhow!("Invalid block ID: {}", args.id))?;
 
     let engine = Engine::new();
     let mut results = Vec::new();

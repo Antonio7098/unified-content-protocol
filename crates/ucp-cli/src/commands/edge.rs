@@ -45,15 +45,18 @@ pub fn handle(cmd: EdgeCommands, format: OutputFormat) -> Result<()> {
             target,
             description,
             confidence,
-        } => add(AddEdgeArgs {
-            input,
-            output,
-            source,
-            edge_type,
-            target,
-            description,
-            confidence,
-        }, format),
+        } => add(
+            AddEdgeArgs {
+                input,
+                output,
+                source,
+                edge_type,
+                target,
+                description,
+                confidence,
+            },
+            format,
+        ),
         EdgeCommands::Remove {
             input,
             output,
@@ -104,25 +107,26 @@ struct AddEdgeArgs {
 fn add(args: AddEdgeArgs, format: OutputFormat) -> Result<()> {
     let mut doc = read_document(args.input)?;
 
-    let source_id =
-        BlockId::from_str(&args.source).map_err(|_| anyhow!("Invalid source block ID: {}", args.source))?;
-    let target_id =
-        BlockId::from_str(&args.target).map_err(|_| anyhow!("Invalid target block ID: {}", args.target))?;
+    let source_id = BlockId::from_str(&args.source)
+        .map_err(|_| anyhow!("Invalid source block ID: {}", args.source))?;
+    let target_id = BlockId::from_str(&args.target)
+        .map_err(|_| anyhow!("Invalid target block ID: {}", args.target))?;
     let et = EdgeType::from_str(&args.edge_type).unwrap_or(EdgeType::References);
 
     // Build metadata if provided
-    let metadata: Option<serde_json::Value> = if args.description.is_some() || args.confidence.is_some() {
-        let mut meta = serde_json::Map::new();
-        if let Some(desc) = args.description {
-            meta.insert("description".to_string(), serde_json::Value::String(desc));
-        }
-        if let Some(conf) = args.confidence {
-            meta.insert("confidence".to_string(), serde_json::json!(conf));
-        }
-        Some(serde_json::Value::Object(meta))
-    } else {
-        None
-    };
+    let metadata: Option<serde_json::Value> =
+        if args.description.is_some() || args.confidence.is_some() {
+            let mut meta = serde_json::Map::new();
+            if let Some(desc) = args.description {
+                meta.insert("description".to_string(), serde_json::Value::String(desc));
+            }
+            if let Some(conf) = args.confidence {
+                meta.insert("confidence".to_string(), serde_json::json!(conf));
+            }
+            Some(serde_json::Value::Object(meta))
+        } else {
+            None
+        };
 
     let engine = Engine::new();
     let op = Operation::Link {
