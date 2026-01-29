@@ -19,6 +19,26 @@
   },
   "entries": [
     {
+      "version": "v0.1.10",
+      "date": "2026-01-29",
+      "changes": [
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Version bump to 0.1.10 for wasm publish fixes and version checks.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "crates/ucp-wasm/Cargo.toml",
+            "scripts/check_version_sync.py",
+            "docs/**",
+            "changelog.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.9",
       "date": "2026-01-27",
       "changes": [
