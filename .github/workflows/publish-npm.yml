@@ -40,6 +40,10 @@ jobs:
         working-directory: crates/ucp-wasm
         run: wasm-pack build --release --target nodejs --out-dir pkg
 
+      - name: Ensure npm package name is ucp-content
+        working-directory: crates/ucp-wasm/pkg
+        run: npm pkg set name=ucp-content
+
       - name: Install dependencies
         working-directory: crates/ucp-wasm/pkg
         run: npm install
@@ -83,10 +87,17 @@ jobs:
         working-directory: crates/ucp-wasm
         run: wasm-pack build --release --target nodejs --out-dir pkg
 
+      - name: Ensure npm package name is ucp-content
+        working-directory: crates/ucp-wasm/pkg
+        run: npm pkg set name=ucp-content
+
       - name: Install dependencies
         working-directory: crates/ucp-wasm/pkg
         run: npm install
 
       - name: Publish to npm (trusted publisher)
         working-directory: crates/ucp-wasm/pkg
+        env:
+          NODE_AUTH_TOKEN: ""
+          NPM_TOKEN: ""
         run: npm publish --provenance --access public
