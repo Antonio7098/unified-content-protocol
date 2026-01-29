@@ -504,7 +504,6 @@ pub fn write_document(doc: &Document, output: Option<String>) -> anyhow::Result<
 
     if let Some(path) = output {
         std::fs::write(&path, &json)?;
-        print_success(&format!("Document written to {}", path));
     } else {
         println!("{}", json);
     }

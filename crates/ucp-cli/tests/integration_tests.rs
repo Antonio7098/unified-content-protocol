@@ -359,6 +359,55 @@ mod with_temp_file {
     }
 
     #[test]
+    fn test_ucl_exec_with_file_short_flag() {
+        let temp_doc = create_temp_doc();
+        let doc_path = temp_doc.path().to_str().unwrap().to_string();
+
+        let mut out_file = NamedTempFile::new().expect("Failed to create temp output");
+        let out_path = out_file.path().to_str().unwrap().to_string();
+
+        let mut ucl_file = NamedTempFile::new().expect("Failed to create temp UCL file");
+        writeln!(ucl_file, "APPEND blk_ff0000000000000000000000 text :: \"More\"")
+            .expect("Failed to write UCL commands");
+        let ucl_path = ucl_file.path().to_str().unwrap().to_string();
+
+        let output = run_cli(&[
+            "ucl",
+            "exec",
+            "--input",
+            doc_path.as_str(),
+            "--output",
+            out_path.as_str(),
+            "-F",
+            ucl_path.as_str(),
+            "--format",
+            "json",
+        ]);
+
+        assert!(output.status.success(), "ucl exec should succeed: {}", stderr(&output));
+        let result: serde_json::Value = serde_json::from_str(&stdout(&output))
+            .expect("ucl exec JSON output");
+        assert_eq!(result.get("commands_executed").and_then(|v| v.as_u64()), Some(1));
+        assert_eq!(result.get("commands_succeeded").and_then(|v| v.as_u64()), Some(1));
+    }
+
+    #[test]
+    fn test_ucl_parse_with_file_short_flag() {
+        let mut ucl_file = NamedTempFile::new().expect("Failed to create temp UCL file");
+        writeln!(ucl_file, "EDIT blk_ff0000000000000000000000 SET text = \"Updated\"")
+            .expect("Failed to write UCL commands");
+        let ucl_path = ucl_file.path().to_str().unwrap().to_string();
+
+        let output = run_cli(&["ucl", "parse", "-F", ucl_path.as_str(), "--format", "json"]);
+        assert!(output.status.success(), "ucl parse should succeed: {}", stderr(&output));
+
+        let result: serde_json::Value = serde_json::from_str(&stdout(&output))
+            .expect("ucl parse JSON output");
+        assert_eq!(result.get("valid").and_then(|v| v.as_bool()), Some(true));
+        assert_eq!(result.get("command_count").and_then(|v| v.as_u64()), Some(1));
+    }
+
+    #[test]
     fn test_nav_descendants() {
         let temp_file = create_temp_doc();
         let path = temp_file.path().to_str().unwrap();

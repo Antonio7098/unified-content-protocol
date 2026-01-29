@@ -675,7 +675,7 @@ pub enum UclCommands {
         commands: Option<String>,
 
         /// UCL file to execute
-        #[arg(short, long)]
+        #[arg(short = 'F', long = "file")]
         file: Option<String>,
     },
 
@@ -686,7 +686,7 @@ pub enum UclCommands {
         commands: Option<String>,
 
         /// UCL file to parse
-        #[arg(short, long)]
+        #[arg(short = 'F', long = "file")]
         file: Option<String>,
     },
 }
