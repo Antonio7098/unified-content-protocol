@@ -16,7 +16,7 @@ The UCP API is the recommended entry point for most applications. It provides:
 === "Rust"
     ```toml
     [dependencies]
-    ucp-api = "0.1.8"
+    ucp-api = "0.1.9"
     ```
 
 === "Python"

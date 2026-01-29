@@ -1,0 +1,38 @@
+can you make it so that i can add semantic links on the graph. when i hover, an icon pops up, and when i drag it to another block it hooks on and a modal appears to choose the link. 
+
+make all things have the same level of visual nesting int he editor, or have the option to toggle. 
+
+make the graph hover modal nicer. a little icon on the graph that opens a modal that shows the block content, allows edit, ect...
+
+what about extending types to h1, h2, ect... i know we had a semantic role field. so that we can display them dirrerently in the editor? what about bullet lists? how do we deal with them?
+
+Here’s a breakdown of each request from @editor-notes.txt with recommended next steps:
+
+Graph semantic links via drag-to-connect
+Need UI affordance on each graph node (hover-revealed icon) that enters a “link mode” and performs drag connections.
+Implementation outline:
+Extend graph data layer to surface available semantic link types (probably reuse existing EdgeType definitions).
+Add hover overlay with a draggable handle; integrate with existing drag state but scoped to link creation.
+On drop, open a modal (likely React dialog) that lists link types + metadata fields; once confirmed, call store method to add edge.
+Considerations: conflict resolution with block drag/drop, keyboard accessibility, undo/redo integration.
+Consistent visual nesting / toggle
+Current block tree uses indentation + vertical lines; bullet alternatives look uneven.
+Proposal: introduce a “flat vs hierarchical” toggle in editor config (persisted per user). In flat mode, each block gets uniform left padding and relies on semantic cues (e.g., subheading badges) instead of indentation.
+Requires:
+New store config flag (e.g., enableNestingIndentation).
+Conditional styles in BlockRenderer children container.
+Optional toolbar toggle so writers can switch easily.
+Graph hover modal improvements
+Ask: replace current raw tooltip with richer preview+actions.
+Suggested flow:
+Add small “info” icon anchored to node (similar style to inline block controls).
+Clicking opens side modal/popover showing block title/content, quick edit button, metadata chips.
+Reuse BlockEditor in read-only mode or add lightweight summary card.
+Action items: design pass for layout, ensure it doesn’t interfere with drag gestures, consider lazy loading content for performance.
+Extended block types (H1/H2 etc.) & bullet lists
+Already have semantic roles but UX should expose them directly.
+Plan:
+Expand type palette in BlockEditor toolbar to include headings, list items, bullet lists (maybe treat lists as dedicated block type with child bullet nodes).
+Update renderer styles to render these roles distinctly (font size, bullet markers).
+For bullet lists, decide on structure: either block with children representing list items or treat block.type = 'list' and parse markdown-style content. Need spec before implementation.
+Also need serialization support so ucp-content recognizes new types and ensures round trips to Markdown/JSON stay consistent.

@@ -71,6 +71,8 @@ The **Block** is the fundamental unit of content in UCM. Every piece of content 
     }
     ```
 
+> **Note:** JavaScript/TypeScript follows camelCase (`contentType`) to match standard JS conventions, while Rust and Python use snake_case (`content_type`). Both refer to the same underlying concept.
+
 ## Creating Blocks
 
 ### Basic Creation

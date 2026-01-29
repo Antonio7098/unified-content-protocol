@@ -1,0 +1,52 @@
+[package]
+name = "ucp-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Command-line interface for Unified Content Protocol"
+keywords = ["ucp", "content", "cli", "document"]
+categories = ["command-line-utilities", "text-processing"]
+
+[[bin]]
+name = "ucp"
+path = "src/main.rs"
+
+[dependencies]
+# Core UCP crates
+ucm-core.workspace = true
+ucm-engine.workspace = true
+ucl-parser.workspace = true
+ucp-observe.workspace = true
+ucp-llm.workspace = true
+ucp-agent.workspace = true
+ucp-translator-markdown.workspace = true
+ucp-translator-html.workspace = true
+
+# CLI
+clap.workspace = true
+clap_complete = "4.4"
+colored.workspace = true
+tabled.workspace = true
+dialoguer.workspace = true
+
+# Core
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+regex.workspace = true
+
+# Async
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+# Tracing
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile = "3.10"
+assert_cmd = "2.0"
+predicates = "3.1"

@@ -12,10 +12,11 @@ members = [
     "crates/translators/html",
     "crates/ucp-python",
     "crates/ucp-wasm",
+    "crates/ucp-cli",
 ]
 
 [workspace.package]
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/unified-content/ucp"
@@ -58,6 +59,12 @@ nom = "7.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 metrics = "0.23"
+
+# CLI
+clap = { version = "4.4", features = ["derive", "cargo"] }
+colored = "2.0"
+tabled = "0.15"
+dialoguer = "0.11"
 
 # Testing
 criterion = "0.5"
