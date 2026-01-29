@@ -204,33 +204,21 @@ fn add(args: AddArgs, format: OutputFormat) -> Result<()> {
         _ => return Err(anyhow!("Unknown content type: {}", args.content_type)),
     };
 
-    let parent_id = args
-        .parent
-        .map(|p| {
-            p.parse()
-                .map_err(|e| anyhow::anyhow!("Invalid parent ID: {}", e))
-        })
-        .transpose()?
-        .unwrap_or_else(|| doc.root);
+    let parent_id = parse_block_id(args.parent, "parent")?.unwrap_or_else(|| doc.root);
 
-    let block = Block {
-        id: BlockId::generate(),
-        content,
-        metadata: BlockMetadata {
-            label: args.label,
-            role: args.role,
-            summary: None,
-            tags: args
-                .tags
-                .as_deref()
-                .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
-                .unwrap_or_default(),
-            created_at: chrono::Utc::now(),
-            modified_at: chrono::Utc::now(),
-        },
-        children: Vec::new(),
-        edges: Vec::new(),
-    };
+    let mut block = Block::new(content, args.role.as_deref());
+
+    if let Some(label) = args.label {
+        block.metadata.label = Some(label);
+    }
+
+    if let Some(tags) = args.tags {
+        block.metadata.tags.extend(
+            tags.split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty()),
+        );
+    }
 
     let block_id = doc.add_block(block, &parent_id)?;
 
@@ -353,39 +341,19 @@ struct MoveBlockArgs {
     index: Option<usize>,
 }
 
-#[derive(Debug)]
-struct MoveBlockTarget {
-    to_parent: Option<BlockId>,
-    before: Option<BlockId>,
-    after: Option<BlockId>,
-    index: Option<usize>,
-}
-
 fn move_block(args: MoveBlockArgs, format: OutputFormat) -> Result<()> {
     let mut doc = read_document(args.input)?;
     let block_id =
         BlockId::from_str(&args.id).map_err(|_| anyhow!("Invalid block ID: {}", args.id))?;
 
-    let target = MoveBlockTarget {
-        to_parent: args
-            .to_parent
-            .map(|p| BlockId::from_str(&p).map_err(|_| anyhow!("Invalid parent block ID: {}", p)))
-            .transpose(),
-        before: args
-            .before
-            .map(|b| BlockId::from_str(&b).map_err(|_| anyhow!("Invalid before block ID: {}", b)))
-            .transpose(),
-        after: args
-            .after
-            .map(|a| BlockId::from_str(&a).map_err(|_| anyhow!("Invalid after block ID: {}", a)))
-            .transpose(),
-        index: args.index,
-    };
+    let to_parent = parse_block_id(args.to_parent, "parent")?;
+    let before = parse_block_id(args.before, "before")?;
+    let after = parse_block_id(args.after, "after")?;
 
-    let target = match (target.to_parent, target.before, target.after) {
+    let target = match (to_parent, before, after) {
         (Some(parent), _, _) => MoveTarget::ToParent {
             parent_id: parent,
-            index: target.index,
+            index: args.index,
         },
         (_, Some(before), _) => MoveTarget::Before { sibling_id: before },
         (_, _, Some(after)) => MoveTarget::After { sibling_id: after },
@@ -416,6 +384,15 @@ fn move_block(args: MoveBlockArgs, format: OutputFormat) -> Result<()> {
 
     write_document(&doc, args.output)?;
     Ok(())
+}
+
+fn parse_block_id(value: Option<String>, field: &str) -> Result<Option<BlockId>> {
+    match value {
+        Some(raw) => BlockId::from_str(&raw)
+            .map(Some)
+            .map_err(|_| anyhow!("Invalid {} block ID: {}", field, raw)),
+        None => Ok(None),
+    }
 }
 
 fn list(input: Option<String>, ids_only: bool, format: OutputFormat) -> Result<()> {
