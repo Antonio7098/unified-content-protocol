@@ -61,7 +61,8 @@ fn test_create_document_with_title() {
     let doc: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
 
     // Check that title is set in metadata
-    let title = doc.get("metadata")
+    let title = doc
+        .get("metadata")
         .and_then(|m| m.get("title"))
         .and_then(|t| t.as_str());
     assert_eq!(title, Some("My Test Document"));
@@ -235,7 +236,8 @@ mod with_temp_file {
             "version": 1
         }"#;
 
-        file.write_all(doc.as_bytes()).expect("Failed to write temp file");
+        file.write_all(doc.as_bytes())
+            .expect("Failed to write temp file");
         file
     }
 
@@ -247,7 +249,8 @@ mod with_temp_file {
         let output = run_cli(&["info", "--input", path, "--format", "json"]);
         let out = stdout(&output);
 
-        let info: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let info: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
 
         assert!(info.get("id").is_some());
         assert!(info.get("block_count").is_some());
@@ -262,7 +265,8 @@ mod with_temp_file {
         let output = run_cli(&["tree", "--input", path, "--format", "json"]);
         let out = stdout(&output);
 
-        let tree: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let tree: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
 
         assert!(tree.get("id").is_some());
         assert!(tree.get("children").is_some());
@@ -276,7 +280,8 @@ mod with_temp_file {
         let output = run_cli(&["block", "list", "--input", path, "--format", "json"]);
         let out = stdout(&output);
 
-        let blocks: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let blocks: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
 
         assert!(blocks.is_array());
     }
@@ -289,7 +294,8 @@ mod with_temp_file {
         let output = run_cli(&["orphans", "--input", path, "--format", "json"]);
         let out = stdout(&output);
 
-        let result: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let result: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
 
         assert!(result.get("count").is_some());
         assert!(result.get("orphans").is_some());
@@ -303,7 +309,8 @@ mod with_temp_file {
         let output = run_cli(&["validate", "--input", path, "--format", "json"]);
         let out = stdout(&output);
 
-        let result: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let result: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
 
         assert!(result.get("valid").is_some());
         assert!(result.get("issues").is_some());
@@ -318,7 +325,8 @@ mod with_temp_file {
         let out = stdout(&output);
 
         // Should return an array of children
-        let result: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let result: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
         assert!(result.is_array());
     }
 
@@ -330,7 +338,8 @@ mod with_temp_file {
         let output = run_cli(&["find", "--input", path, "--format", "json"]);
         let out = stdout(&output);
 
-        let result: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let result: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
         assert!(result.is_array());
     }
 
@@ -343,7 +352,8 @@ mod with_temp_file {
         let out = stdout(&output);
 
         // Should output valid JSON
-        let doc: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let doc: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
         assert!(doc.get("id").is_some());
         assert!(doc.get("blocks").is_some());
     }
@@ -367,8 +377,11 @@ mod with_temp_file {
         let out_path = out_file.path().to_str().unwrap().to_string();
 
         let mut ucl_file = NamedTempFile::new().expect("Failed to create temp UCL file");
-        writeln!(ucl_file, "APPEND blk_ff0000000000000000000000 text :: \"More\"")
-            .expect("Failed to write UCL commands");
+        writeln!(
+            ucl_file,
+            "APPEND blk_ff0000000000000000000000 text :: \"More\""
+        )
+        .expect("Failed to write UCL commands");
         let ucl_path = ucl_file.path().to_str().unwrap().to_string();
 
         let output = run_cli(&[
@@ -384,27 +397,47 @@ mod with_temp_file {
             "json",
         ]);
 
-        assert!(output.status.success(), "ucl exec should succeed: {}", stderr(&output));
-        let result: serde_json::Value = serde_json::from_str(&stdout(&output))
-            .expect("ucl exec JSON output");
-        assert_eq!(result.get("commands_executed").and_then(|v| v.as_u64()), Some(1));
-        assert_eq!(result.get("commands_succeeded").and_then(|v| v.as_u64()), Some(1));
+        assert!(
+            output.status.success(),
+            "ucl exec should succeed: {}",
+            stderr(&output)
+        );
+        let result: serde_json::Value =
+            serde_json::from_str(&stdout(&output)).expect("ucl exec JSON output");
+        assert_eq!(
+            result.get("commands_executed").and_then(|v| v.as_u64()),
+            Some(1)
+        );
+        assert_eq!(
+            result.get("commands_succeeded").and_then(|v| v.as_u64()),
+            Some(1)
+        );
     }
 
     #[test]
     fn test_ucl_parse_with_file_short_flag() {
         let mut ucl_file = NamedTempFile::new().expect("Failed to create temp UCL file");
-        writeln!(ucl_file, "EDIT blk_ff0000000000000000000000 SET text = \"Updated\"")
-            .expect("Failed to write UCL commands");
+        writeln!(
+            ucl_file,
+            "EDIT blk_ff0000000000000000000000 SET text = \"Updated\""
+        )
+        .expect("Failed to write UCL commands");
         let ucl_path = ucl_file.path().to_str().unwrap().to_string();
 
         let output = run_cli(&["ucl", "parse", "-F", ucl_path.as_str(), "--format", "json"]);
-        assert!(output.status.success(), "ucl parse should succeed: {}", stderr(&output));
+        assert!(
+            output.status.success(),
+            "ucl parse should succeed: {}",
+            stderr(&output)
+        );
 
-        let result: serde_json::Value = serde_json::from_str(&stdout(&output))
-            .expect("ucl parse JSON output");
+        let result: serde_json::Value =
+            serde_json::from_str(&stdout(&output)).expect("ucl parse JSON output");
         assert_eq!(result.get("valid").and_then(|v| v.as_bool()), Some(true));
-        assert_eq!(result.get("command_count").and_then(|v| v.as_u64()), Some(1));
+        assert_eq!(
+            result.get("command_count").and_then(|v| v.as_u64()),
+            Some(1)
+        );
     }
 
     #[test]
@@ -415,7 +448,8 @@ mod with_temp_file {
         let output = run_cli(&["nav", "descendants", "--input", path, "--format", "json"]);
         let out = stdout(&output);
 
-        let result: serde_json::Value = serde_json::from_str(&out).expect("Output should be valid JSON");
+        let result: serde_json::Value =
+            serde_json::from_str(&out).expect("Output should be valid JSON");
         assert!(result.is_array());
     }
 }
@@ -434,15 +468,20 @@ mod workflow_tests {
 
         // Write to temp file
         let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        temp_file.write_all(doc_json.as_bytes()).expect("Failed to write");
+        temp_file
+            .write_all(doc_json.as_bytes())
+            .expect("Failed to write");
         let path = temp_file.path().to_str().unwrap();
 
         // Get info
         let output = run_cli(&["info", "--input", path, "--format", "json"]);
-        let info: serde_json::Value = serde_json::from_str(&stdout(&output))
-            .expect("Info should be valid JSON");
+        let info: serde_json::Value =
+            serde_json::from_str(&stdout(&output)).expect("Info should be valid JSON");
 
-        assert_eq!(info.get("title").and_then(|t| t.as_str()), Some("Workflow Test"));
+        assert_eq!(
+            info.get("title").and_then(|t| t.as_str()),
+            Some("Workflow Test")
+        );
         assert_eq!(info.get("block_count").and_then(|c| c.as_u64()), Some(1));
     }
 
@@ -460,8 +499,8 @@ mod workflow_tests {
         let output = run_cli(&["llm", "prompt", "--format", "json"]);
         let out = stdout(&output);
 
-        let result: serde_json::Value = serde_json::from_str(&out)
-            .expect("Prompt should return valid JSON");
+        let result: serde_json::Value =
+            serde_json::from_str(&out).expect("Prompt should return valid JSON");
 
         assert!(result.get("capabilities").is_some());
         assert!(result.get("prompt").is_some());
@@ -469,11 +508,18 @@ mod workflow_tests {
 
     #[test]
     fn test_llm_prompt_with_capabilities() {
-        let output = run_cli(&["llm", "prompt", "--capabilities", "edit,append", "--format", "json"]);
+        let output = run_cli(&[
+            "llm",
+            "prompt",
+            "--capabilities",
+            "edit,append",
+            "--format",
+            "json",
+        ]);
         let out = stdout(&output);
 
-        let result: serde_json::Value = serde_json::from_str(&out)
-            .expect("Prompt should return valid JSON");
+        let result: serde_json::Value =
+            serde_json::from_str(&out).expect("Prompt should return valid JSON");
 
         let caps = result.get("capabilities").and_then(|c| c.as_array());
         assert!(caps.is_some());

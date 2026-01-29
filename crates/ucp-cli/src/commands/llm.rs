@@ -293,11 +293,7 @@ fn context(
                     .as_ref()
                     .map(|t| t.generic)
                     .unwrap_or(50);
-                println!(
-                    "[{}] ({} tokens)",
-                    block.id.to_string().yellow(),
-                    tokens
-                );
+                println!("[{}] ({} tokens)", block.id.to_string().yellow(), tokens);
                 let preview = content_preview(&block.content, 200);
                 println!("{}\n", preview.dimmed());
             }

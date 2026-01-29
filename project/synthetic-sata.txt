@@ -1,0 +1,5 @@
+synthetic date:
+large library of documents.
+generate posssibel user queries (editing, finding), along with the intended output
+generate rewordings
+

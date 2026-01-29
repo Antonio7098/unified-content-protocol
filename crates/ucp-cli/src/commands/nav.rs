@@ -35,8 +35,10 @@ fn children(input: Option<String>, id: Option<String>, format: OutputFormat) -> 
 
     match format {
         OutputFormat::Json => {
-            let summaries: Vec<BlockSummary> =
-                children.iter().map(|b| BlockSummary::from_block(b)).collect();
+            let summaries: Vec<BlockSummary> = children
+                .iter()
+                .map(|b| BlockSummary::from_block(b))
+                .collect();
             println!("{}", serde_json::to_string_pretty(&summaries)?);
         }
         OutputFormat::Text => {
@@ -55,8 +57,7 @@ fn children(input: Option<String>, id: Option<String>, format: OutputFormat) -> 
 fn parent(input: Option<String>, id: String, format: OutputFormat) -> Result<()> {
     let doc = read_document(input)?;
 
-    let block_id =
-        BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
+    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
     let parent_id = doc.parent(&block_id);
 
@@ -91,8 +92,7 @@ fn parent(input: Option<String>, id: String, format: OutputFormat) -> Result<()>
 fn siblings(input: Option<String>, id: String, format: OutputFormat) -> Result<()> {
     let doc = read_document(input)?;
 
-    let block_id =
-        BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
+    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
     // Get parent, then get all children of parent
     let sibling_ids: Vec<BlockId> = if let Some(parent_id) = doc.parent(&block_id) {
@@ -112,8 +112,10 @@ fn siblings(input: Option<String>, id: String, format: OutputFormat) -> Result<(
 
     match format {
         OutputFormat::Json => {
-            let summaries: Vec<BlockSummary> =
-                siblings.iter().map(|b| BlockSummary::from_block(b)).collect();
+            let summaries: Vec<BlockSummary> = siblings
+                .iter()
+                .map(|b| BlockSummary::from_block(b))
+                .collect();
             println!("{}", serde_json::to_string_pretty(&summaries)?);
         }
         OutputFormat::Text => {
@@ -197,11 +199,7 @@ fn descendants(
             if descendants.is_empty() {
                 println!("No descendants found");
             } else {
-                println!(
-                    "Descendants of {} ({} total):",
-                    block_id,
-                    descendants.len()
-                );
+                println!("Descendants of {} ({} total):", block_id, descendants.len());
                 print_block_table(&descendants);
             }
         }

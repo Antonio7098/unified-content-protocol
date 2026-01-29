@@ -41,12 +41,7 @@ fn create(
     let mut stateful = read_stateful_document(input)?;
 
     // Check if snapshot already exists
-    if stateful
-        .state()
-        .snapshots
-        .iter()
-        .any(|s| s.name == name)
-    {
+    if stateful.state().snapshots.iter().any(|s| s.name == name) {
         return Err(anyhow!("Snapshot '{}' already exists", name));
     }
 

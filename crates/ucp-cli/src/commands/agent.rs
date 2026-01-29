@@ -440,7 +440,10 @@ fn follow(
             }
             let result = FollowResult {
                 edge_type,
-                targets: matching_edges.iter().map(|e| e.target.to_string()).collect(),
+                targets: matching_edges
+                    .iter()
+                    .map(|e| e.target.to_string())
+                    .collect(),
             };
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
@@ -510,11 +513,7 @@ fn search(
             if matches.is_empty() {
                 println!("No matches found for '{}'", query);
             } else {
-                println!(
-                    "Found {} matches for '{}':",
-                    matches.len(),
-                    query.green()
-                );
+                println!("Found {} matches for '{}':", matches.len(), query.green());
                 for block in matches {
                     let preview = content_preview(&block.content, 80);
                     let preview_line = preview.lines().next().unwrap_or("");
@@ -614,9 +613,7 @@ fn context_add(
 
     let block_ids: Result<Vec<BlockId>> = ids
         .split(',')
-        .map(|s| {
-            BlockId::from_str(s.trim()).map_err(|_| anyhow!("Invalid block ID: {}", s.trim()))
-        })
+        .map(|s| BlockId::from_str(s.trim()).map_err(|_| anyhow!("Invalid block ID: {}", s.trim())))
         .collect();
     let block_ids = block_ids?;
 
@@ -668,9 +665,7 @@ fn context_remove(
 
     let block_ids: Result<Vec<BlockId>> = ids
         .split(',')
-        .map(|s| {
-            BlockId::from_str(s.trim()).map_err(|_| anyhow!("Invalid block ID: {}", s.trim()))
-        })
+        .map(|s| BlockId::from_str(s.trim()).map_err(|_| anyhow!("Invalid block ID: {}", s.trim())))
         .collect();
     let block_ids = block_ids?;
 
@@ -798,19 +793,17 @@ fn view(input: Option<String>, session: String, mode: String, format: OutputForm
         .ok_or_else(|| anyhow!("Current block not found"))?;
 
     match format {
-        OutputFormat::Json => {
-            match mode.as_str() {
-                "metadata" => {
-                    println!("{}", serde_json::to_string_pretty(&block.metadata)?);
-                }
-                "ids" => {
-                    println!("{}", serde_json::to_string(&block.id)?);
-                }
-                _ => {
-                    println!("{}", serde_json::to_string_pretty(block)?);
-                }
+        OutputFormat::Json => match mode.as_str() {
+            "metadata" => {
+                println!("{}", serde_json::to_string_pretty(&block.metadata)?);
             }
-        }
+            "ids" => {
+                println!("{}", serde_json::to_string(&block.id)?);
+            }
+            _ => {
+                println!("{}", serde_json::to_string_pretty(block)?);
+            }
+        },
         OutputFormat::Text => {
             print_block(block, mode != "metadata");
         }

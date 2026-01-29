@@ -91,8 +91,8 @@ impl DocumentJson {
 
         let mut blocks: HashMap<BlockId, Block> = HashMap::new();
         for (k, v) in &self.blocks {
-            let id = BlockId::from_str(k)
-                .map_err(|_| anyhow::anyhow!("Invalid block ID: {}", k))?;
+            let id =
+                BlockId::from_str(k).map_err(|_| anyhow::anyhow!("Invalid block ID: {}", k))?;
             blocks.insert(id, v.clone());
         }
 
@@ -293,7 +293,11 @@ pub fn print_document_info(doc: &Document) {
 
     // Count edges
     let edge_count = doc.edge_index.edge_count();
-    println!("{}: {}", "Edge Count".white(), edge_count.to_string().blue());
+    println!(
+        "{}: {}",
+        "Edge Count".white(),
+        edge_count.to_string().blue()
+    );
 
     println!("{}", "═".repeat(60).cyan());
 }
@@ -547,7 +551,9 @@ mod tests {
     fn test_document_json_preserves_blocks() {
         let mut doc = Document::create();
         let block = Block::new(Content::text("Hello, world!"), Some("paragraph"));
-        let block_id = doc.add_block(block, &doc.root.clone()).expect("Should add block");
+        let block_id = doc
+            .add_block(block, &doc.root.clone())
+            .expect("Should add block");
 
         let json = DocumentJson::from_document(&doc);
         let restored = json.to_document().expect("Should restore document");
@@ -565,7 +571,10 @@ mod tests {
         let restored = json.to_document().expect("Should restore document");
 
         assert_eq!(restored.metadata.title, Some("Test Title".to_string()));
-        assert_eq!(restored.metadata.description, Some("Test Description".to_string()));
+        assert_eq!(
+            restored.metadata.description,
+            Some("Test Description".to_string())
+        );
     }
 
     #[test]

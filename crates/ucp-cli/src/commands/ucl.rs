@@ -43,8 +43,8 @@ fn exec(
     };
 
     // Parse and execute commands
-    let parsed = ucl_parser::parse_commands(&ucl)
-        .map_err(|e| anyhow::anyhow!("Parse error: {:?}", e))?;
+    let parsed =
+        ucl_parser::parse_commands(&ucl).map_err(|e| anyhow::anyhow!("Parse error: {:?}", e))?;
 
     // Convert to operations and execute
     let mut results = Vec::new();
@@ -115,49 +115,45 @@ fn parse(commands: Option<String>, file: Option<String>, format: OutputFormat) -
     };
 
     match ucl_parser::parse_commands(&ucl) {
-        Ok(parsed) => {
-            match format {
-                OutputFormat::Json => {
-                    #[derive(Serialize)]
-                    struct ParseResult {
-                        valid: bool,
-                        command_count: usize,
-                        commands: Vec<String>,
-                    }
-                    let result = ParseResult {
-                        valid: true,
-                        command_count: parsed.len(),
-                        commands: parsed.iter().map(|c| format!("{:?}", c)).collect(),
-                    };
-                    println!("{}", serde_json::to_string_pretty(&result)?);
+        Ok(parsed) => match format {
+            OutputFormat::Json => {
+                #[derive(Serialize)]
+                struct ParseResult {
+                    valid: bool,
+                    command_count: usize,
+                    commands: Vec<String>,
                 }
-                OutputFormat::Text => {
-                    print_success(&format!("Valid UCL ({} commands)", parsed.len()));
-                    for (i, cmd) in parsed.iter().enumerate() {
-                        println!("  {}: {:?}", i + 1, cmd);
-                    }
+                let result = ParseResult {
+                    valid: true,
+                    command_count: parsed.len(),
+                    commands: parsed.iter().map(|c| format!("{:?}", c)).collect(),
+                };
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            }
+            OutputFormat::Text => {
+                print_success(&format!("Valid UCL ({} commands)", parsed.len()));
+                for (i, cmd) in parsed.iter().enumerate() {
+                    println!("  {}: {:?}", i + 1, cmd);
                 }
             }
-        }
-        Err(e) => {
-            match format {
-                OutputFormat::Json => {
-                    #[derive(Serialize)]
-                    struct ParseResult {
-                        valid: bool,
-                        error: String,
-                    }
-                    let result = ParseResult {
-                        valid: false,
-                        error: format!("{:?}", e),
-                    };
-                    println!("{}", serde_json::to_string_pretty(&result)?);
+        },
+        Err(e) => match format {
+            OutputFormat::Json => {
+                #[derive(Serialize)]
+                struct ParseResult {
+                    valid: bool,
+                    error: String,
                 }
-                OutputFormat::Text => {
-                    print_error(&format!("Invalid UCL: {:?}", e));
-                }
+                let result = ParseResult {
+                    valid: false,
+                    error: format!("{:?}", e),
+                };
+                println!("{}", serde_json::to_string_pretty(&result)?);
             }
-        }
+            OutputFormat::Text => {
+                print_error(&format!("Invalid UCL: {:?}", e));
+            }
+        },
     }
 
     Ok(())
@@ -281,9 +277,9 @@ fn command_to_operation(cmd: &ucl_parser::Command) -> Result<Operation> {
                     description: description.clone(),
                 })
             }
-            ucl_parser::SnapshotCommand::Restore { name } => Ok(Operation::RestoreSnapshot {
-                name: name.clone(),
-            }),
+            ucl_parser::SnapshotCommand::Restore { name } => {
+                Ok(Operation::RestoreSnapshot { name: name.clone() })
+            }
             _ => Err(anyhow::anyhow!("Unsupported snapshot operation")),
         },
         ucl_parser::Command::WriteSection(ws) => {

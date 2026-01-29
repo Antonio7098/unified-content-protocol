@@ -25,7 +25,11 @@ impl From<&ucm_engine::OperationResult> for OperationResultJson {
     fn from(result: &ucm_engine::OperationResult) -> Self {
         Self {
             success: result.success,
-            affected_blocks: result.affected_blocks.iter().map(|id| id.to_string()).collect(),
+            affected_blocks: result
+                .affected_blocks
+                .iter()
+                .map(|id| id.to_string())
+                .collect(),
             warnings: result.warnings.clone(),
             error: result.error.clone(),
         }
@@ -192,8 +196,7 @@ fn add(
 
 fn get(input: Option<String>, id: String, metadata_only: bool, format: OutputFormat) -> Result<()> {
     let doc = read_document(input)?;
-    let block_id =
-        BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
+    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
     let block = doc
         .get_block(&block_id)
@@ -224,8 +227,7 @@ fn delete(
     format: OutputFormat,
 ) -> Result<()> {
     let mut doc = read_document(input)?;
-    let block_id =
-        BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
+    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
     let engine = Engine::new();
     let op = Operation::Delete {
@@ -272,16 +274,12 @@ fn move_block(
     format: OutputFormat,
 ) -> Result<()> {
     let mut doc = read_document(input)?;
-    let block_id =
-        BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
+    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
     let target = if let Some(parent) = to_parent {
         let parent_id = BlockId::from_str(&parent)
             .map_err(|_| anyhow!("Invalid parent block ID: {}", parent))?;
-        MoveTarget::ToParent {
-            parent_id,
-            index,
-        }
+        MoveTarget::ToParent { parent_id, index }
     } else if let Some(sibling) = before {
         let sibling_id = BlockId::from_str(&sibling)
             .map_err(|_| anyhow!("Invalid sibling block ID: {}", sibling))?;
@@ -291,16 +289,11 @@ fn move_block(
             .map_err(|_| anyhow!("Invalid sibling block ID: {}", sibling))?;
         MoveTarget::After { sibling_id }
     } else {
-        return Err(anyhow!(
-            "Must specify --to-parent, --before, or --after"
-        ));
+        return Err(anyhow!("Must specify --to-parent, --before, or --after"));
     };
 
     let engine = Engine::new();
-    let op = Operation::MoveToTarget {
-        block_id,
-        target,
-    };
+    let op = Operation::MoveToTarget { block_id, target };
 
     let result = engine.execute(&mut doc, op)?;
 
@@ -368,8 +361,7 @@ fn update(
     format: OutputFormat,
 ) -> Result<()> {
     let mut doc = read_document(input)?;
-    let block_id =
-        BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
+    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
     let engine = Engine::new();
     let mut results = Vec::new();

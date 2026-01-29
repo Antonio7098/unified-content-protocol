@@ -26,11 +26,7 @@ fn markdown(file: String, output: Option<String>, format: OutputFormat) -> Resul
             write_document(&doc, output)?;
         }
         OutputFormat::Text => {
-            print_success(&format!(
-                "Imported {} ({} blocks)",
-                file,
-                doc.block_count()
-            ));
+            print_success(&format!("Imported {} ({} blocks)", file, doc.block_count()));
             write_document(&doc, output)?;
         }
     }
@@ -61,11 +57,7 @@ fn html(
             write_document(&doc, output)?;
         }
         OutputFormat::Text => {
-            print_success(&format!(
-                "Imported {} ({} blocks)",
-                file,
-                doc.block_count()
-            ));
+            print_success(&format!("Imported {} ({} blocks)", file, doc.block_count()));
             write_document(&doc, output)?;
         }
     }

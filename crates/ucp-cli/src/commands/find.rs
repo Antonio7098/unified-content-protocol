@@ -59,8 +59,10 @@ pub fn find(
 
     match format {
         OutputFormat::Json => {
-            let summaries: Vec<BlockSummary> =
-                matches.iter().map(|b| BlockSummary::from_block(b)).collect();
+            let summaries: Vec<BlockSummary> = matches
+                .iter()
+                .map(|b| BlockSummary::from_block(b))
+                .collect();
             println!("{}", serde_json::to_string_pretty(&summaries)?);
         }
         OutputFormat::Text => {
@@ -96,7 +98,10 @@ pub fn orphans(input: Option<String>, format: OutputFormat) -> Result<()> {
             }
             let result = OrphanResult {
                 count: orphans.len(),
-                orphans: orphans.iter().map(|b| BlockSummary::from_block(b)).collect(),
+                orphans: orphans
+                    .iter()
+                    .map(|b| BlockSummary::from_block(b))
+                    .collect(),
             };
             println!("{}", serde_json::to_string_pretty(&result)?);
         }

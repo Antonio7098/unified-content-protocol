@@ -9,10 +9,18 @@ use crate::state::{read_stateful_document, write_stateful_document, TransactionS
 
 pub fn handle(cmd: TxCommands, format: OutputFormat) -> Result<()> {
     match cmd {
-        TxCommands::Begin { input, output, name } => begin(input, output, name, format),
+        TxCommands::Begin {
+            input,
+            output,
+            name,
+        } => begin(input, output, name, format),
         TxCommands::Commit { input, output } => commit(input, output, format),
         TxCommands::Rollback { input, output } => rollback(input, output, format),
-        TxCommands::Savepoint { input, output, name } => savepoint(input, output, name, format),
+        TxCommands::Savepoint {
+            input,
+            output,
+            name,
+        } => savepoint(input, output, name, format),
     }
 }
 

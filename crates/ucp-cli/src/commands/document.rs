@@ -5,7 +5,9 @@ use serde::Serialize;
 use ucm_core::{Document, TokenModel};
 
 use crate::cli::OutputFormat;
-use crate::output::{print_document_info, print_success, write_document, read_document, DocumentJson};
+use crate::output::{
+    print_document_info, print_success, read_document, write_document, DocumentJson,
+};
 
 /// Create a new document
 pub fn create(output: Option<String>, title: Option<String>, format: OutputFormat) -> Result<()> {

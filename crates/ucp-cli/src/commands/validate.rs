@@ -26,11 +26,15 @@ impl From<&ucm_engine::ValidationResult> for ValidationResultJson {
     fn from(result: &ucm_engine::ValidationResult) -> Self {
         Self {
             valid: result.valid,
-            issues: result.issues.iter().map(|i| ValidationIssueJson {
-                severity: format!("{:?}", i.severity),
-                code: format!("{:?}", i.code),
-                message: i.message.clone(),
-            }).collect(),
+            issues: result
+                .issues
+                .iter()
+                .map(|i| ValidationIssueJson {
+                    severity: format!("{:?}", i.severity),
+                    code: format!("{:?}", i.code),
+                    message: i.message.clone(),
+                })
+                .collect(),
         }
     }
 }

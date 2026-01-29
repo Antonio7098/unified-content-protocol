@@ -24,7 +24,11 @@ impl From<&ucm_engine::OperationResult> for OperationResultJson {
     fn from(result: &ucm_engine::OperationResult) -> Self {
         Self {
             success: result.success,
-            affected_blocks: result.affected_blocks.iter().map(|id| id.to_string()).collect(),
+            affected_blocks: result
+                .affected_blocks
+                .iter()
+                .map(|id| id.to_string())
+                .collect(),
             warnings: result.warnings.clone(),
             error: result.error.clone(),
         }
@@ -191,8 +195,7 @@ fn list(
 ) -> Result<()> {
     let doc = read_document(input)?;
 
-    let block_id =
-        BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
+    let block_id = BlockId::from_str(&id).map_err(|_| anyhow!("Invalid block ID: {}", id))?;
 
     let mut edges: Vec<(BlockId, Edge)> = Vec::new();
 
@@ -214,7 +217,11 @@ fn list(
                 for edge in &source_block.edges {
                     if edge.target == block_id && &edge.edge_type == edge_type {
                         // Avoid duplicates if showing both
-                        if incoming_only || !edges.iter().any(|(s, e)| s == source_id && e.target == edge.target) {
+                        if incoming_only
+                            || !edges
+                                .iter()
+                                .any(|(s, e)| s == source_id && e.target == edge.target)
+                        {
                             edges.push((*source_id, edge.clone()));
                         }
                     }

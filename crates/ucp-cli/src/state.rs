@@ -103,7 +103,11 @@ pub struct SnapshotInfo {
 }
 
 impl SnapshotInfo {
-    pub fn create(name: String, description: Option<String>, doc: &Document) -> anyhow::Result<Self> {
+    pub fn create(
+        name: String,
+        description: Option<String>,
+        doc: &Document,
+    ) -> anyhow::Result<Self> {
         let doc_json = DocumentJson::from_document(doc);
         Ok(Self {
             name,
@@ -345,7 +349,8 @@ mod tests {
             "test-snapshot".to_string(),
             Some("Test description".to_string()),
             &doc,
-        ).expect("Should create snapshot");
+        )
+        .expect("Should create snapshot");
 
         assert_eq!(snapshot.name, "test-snapshot");
         assert_eq!(snapshot.description, Some("Test description".to_string()));
@@ -368,8 +373,7 @@ mod tests {
     #[test]
     fn test_transaction_state_savepoint() {
         let doc = Document::create();
-        let mut tx = TransactionState::new(None, &doc)
-            .expect("Should create transaction");
+        let mut tx = TransactionState::new(None, &doc).expect("Should create transaction");
 
         tx.create_savepoint("sp1".to_string(), &doc)
             .expect("Should create savepoint");
