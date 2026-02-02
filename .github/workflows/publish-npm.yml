@@ -96,7 +96,4 @@ jobs:
 
       - name: Publish to npm (trusted publisher)
         working-directory: crates/ucp-wasm/pkg
-        env:
-          NODE_AUTH_TOKEN: ""
-          NPM_TOKEN: ""
         run: npm publish --provenance --access public
