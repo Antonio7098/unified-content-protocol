@@ -8,6 +8,9 @@ rust-version.workspace = true
 description = "Command-line interface for Unified Content Protocol"
 keywords = ["ucp", "content", "cli", "document"]
 categories = ["command-line-utilities", "text-processing"]
+readme = "README.md"
+authors = ["Unified Content Protocol Contributors"]
+homepage = "https://github.com/unified-content/ucp"
 
 [[bin]]
 name = "ucp"

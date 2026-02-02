@@ -4,6 +4,11 @@ description = "Observability utilities for UCP"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+keywords = ["ucp", "observability", "metrics", "tracing"]
+categories = ["development-tools::debugging"]
+readme = "../../README.md"
 
 [dependencies]
 tracing = { workspace = true }

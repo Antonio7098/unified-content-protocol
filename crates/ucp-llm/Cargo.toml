@@ -4,6 +4,11 @@ description = "LLM-focused utilities for the Unified Content Protocol"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+keywords = ["ucp", "llm", "ai", "tokens", "context"]
+categories = ["text-processing", "command-line-utilities"]
+readme = "../../README.md"
 
 [dependencies]
 ucm-core = { workspace = true }

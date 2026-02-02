@@ -1,31 +1,33 @@
 [package]
 name = "ucp-agent"
-version = "0.1.8"
-edition = "2021"
 description = "Agent graph traversal system for UCP knowledge graphs"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/ucp-gt"
-keywords = ["agent", "traversal", "knowledge-graph", "llm", "context"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+keywords = ["ucp", "agent", "traversal", "knowledge-graph", "llm"]
 categories = ["data-structures", "algorithms"]
+readme = "../../README.md"
 
 [dependencies]
 # Core UCP crates
-ucm-core = { path = "../ucm-core" }
-ucm-engine = { path = "../ucm-engine" }
-ucl-parser = { path = "../ucl-parser" }
+ucm-core = { workspace = true }
+ucm-engine = { workspace = true }
+ucl-parser = { workspace = true }
 
 # Async support
-async-trait = "0.1"
-tokio = { version = "1", features = ["sync", "time"] }
+async-trait = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
 
 # Utilities
 uuid = { version = "1", features = ["v4", "serde", "js"] }
-chrono = { version = "0.4", features = ["serde"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "1"
-tracing = "0.1"
-regex = "1"
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+regex = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
