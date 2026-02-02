@@ -3,13 +3,12 @@
 import pytest
 import sys
 import os
+import importlib.util
 
 # Try to import from pip package first, fall back to local path for development
-try:
-    import ucp_content
-
+if importlib.util.find_spec("ucp_content"):
     print("✓ Using ucp-content from pip package")
-except ImportError:
+else:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "python"))
     print("✓ Using ucp from local build")
 
