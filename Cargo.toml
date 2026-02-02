@@ -16,7 +16,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.10"
+version = "0.1.11"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/unified-content/ucp"
@@ -41,7 +41,7 @@ unicode-normalization = "0.1"
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 # Async
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.0", features = ["sync", "time", "rt", "macros"] }
 futures = "0.3"
 async-trait = "0.1"
 reqwest = { version = "0.12", features = ["json"] }
@@ -70,15 +70,15 @@ dialoguer = "0.11"
 criterion = "0.5"
 proptest = "1.4"
 
-# Internal crates
-ucm-core = { path = "crates/ucm-core" }
-ucm-engine = { path = "crates/ucm-engine" }
-ucl-parser = { path = "crates/ucl-parser" }
-ucp-observe = { path = "crates/ucp-observe" }
-ucp-llm = { path = "crates/ucp-llm" }
-ucp-agent = { path = "crates/ucp-agent" }
-ucp-translator-markdown = { path = "crates/translators/markdown" }
-ucp-translator-html = { path = "crates/translators/html" }
+# Internal crates (published to crates.io)
+ucm-core = { path = "crates/ucm-core", version = "0.1.10" }
+ucm-engine = { path = "crates/ucm-engine", version = "0.1.10" }
+ucl-parser = { path = "crates/ucl-parser", version = "0.1.10" }
+ucp-observe = { path = "crates/ucp-observe", version = "0.1.10" }
+ucp-llm = { path = "crates/ucp-llm", version = "0.1.10" }
+ucp-agent = { path = "crates/ucp-agent", version = "0.1.10" }
+ucp-translator-markdown = { path = "crates/translators/markdown", version = "0.1.10" }
+ucp-translator-html = { path = "crates/translators/html", version = "0.1.10" }
 
 [profile.release]
 lto = true

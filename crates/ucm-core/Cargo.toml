@@ -4,6 +4,11 @@ description = "Core types and traits for the Unified Content Model"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+keywords = ["ucp", "ucm", "content", "document", "core"]
+categories = ["data-structures"]
+readme = "../../README.md"
 
 [dependencies]
 serde = { workspace = true }

@@ -4,6 +4,11 @@ description = "Transformation engine for the Unified Content Model"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+keywords = ["ucp", "ucm", "engine", "transform", "content"]
+categories = ["text-processing"]
+readme = "../../README.md"
 
 [dependencies]
 ucm-core = { workspace = true }

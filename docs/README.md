@@ -43,13 +43,26 @@ UCP provides a token-efficient, deterministic framework for representing and tra
 
 ## Quick Start
 
-### Installation
+### Install the CLI (Recommended for new users)
+
+```bash
+# Install ucp-cli from crates.io
+cargo install ucp-cli
+
+# Verify installation
+ucp --version
+
+# Get help
+ucp --help
+```
+
+### Use in Your Rust Project
 
 Add UCP to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ucp-api = "0.1.10"
+ucp-api = "0.1.11"
 ```
 
 ### Basic Usage

@@ -2,18 +2,54 @@
 
 The **ucp-cli** binary exposes the entire Unified Content Protocol surface area from a single, scriptable entry point. It is ideal for automation, CI pipelines, regression testing, and rapid document inspection without writing host-language code.
 
-## Installation & Invocation
+## Installation
+
+### Install from crates.io (Recommended)
 
 ```bash
-# Run directly from the workspace
-cargo run -p ucp-cli -- --help
+# Install the latest version
+cargo install ucp-cli
 
-# Or install the binary locally
-cargo install --path crates/ucp-cli --force
+# Verify installation
 ucp --version
 ```
 
-Every example below assumes the CLI is invoked through `cargo run -p ucp-cli -- …`. You can drop the cargo wrapper once the binary is installed and simply run `ucp …`.
+### Install from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/Antonio7098/unified-content-protocol.git
+cd unified-content-protocol
+
+# Install from local source
+cargo install --path crates/ucp-cli --force
+
+# Or run without installing
+cargo run -p ucp-cli -- --help
+```
+
+### Build Binary Manually
+
+```bash
+cargo build --release -p ucp-cli
+./target/release/ucp --help
+```
+
+**crates.io:** [https://crates.io/crates/ucp-cli](https://crates.io/crates/ucp-cli)
+
+## Quick Start
+
+```bash
+# Create a new document
+ucp create --title "My Document" --output doc.json
+
+# Get help
+ucp --help
+
+# View a specific command
+ucp create --help
+ucp block --help
+```
 
 ## Global Flags
 

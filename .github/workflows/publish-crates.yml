@@ -1,0 +1,71 @@
+name: publish-crates
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify version sync (tag push)
+        run: python scripts/check_version_sync.py --quiet --require-tag
+
+  publish:
+    needs: version-check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - ucm-core
+          - ucp-observe
+          - ucp-translator-markdown
+          - ucp-translator-html
+          - ucm-engine
+          - ucl-parser
+          - ucp-llm
+          - ucp-agent
+          - ucp-cli
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify version sync (tag push)
+        run: python scripts/check_version_sync.py --quiet --require-tag
+
+      - name: Publish ${{ matrix.crate }} to crates.io
+        uses: katyo/publish-crates@v2
+        with:
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          path: './crates'
+          ignore-unpublished-changes: true
+          crates: ${{ matrix.crate }}
