@@ -18,7 +18,7 @@ ucl-parser = { workspace = true }
 
 # Async support
 async-trait = { workspace = true }
-tokio = { workspace = true, features = ["sync", "time"] }
+tokio = { workspace = true }
 
 # Utilities
 uuid = { version = "1", features = ["v4", "serde", "js"] }
@@ -30,4 +30,4 @@ tracing = { workspace = true }
 regex = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }

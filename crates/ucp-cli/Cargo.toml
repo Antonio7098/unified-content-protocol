@@ -43,7 +43,7 @@ chrono.workspace = true
 regex.workspace = true
 
 # Async
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
 
 # Tracing
 tracing.workspace = true
