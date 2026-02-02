@@ -2,24 +2,72 @@
 
 This guide explains how to publish the UCP CLI and its dependencies to crates.io.
 
-## Prerequisites
+**Two approaches:**
+1. **GitHub Actions (Recommended)** - Automated CI/CD publishing
+2. **Manual publishing** - Publish from your local machine
 
-1. **crates.io Account**: You need an account on [crates.io](https://crates.io)
-2. **API Token**: Generate an API token from your [crates.io settings](https://crates.io/settings/tokens)
+---
+
+## Option 1: GitHub Actions (Automated)
+
+This is the recommended approach. Publishing happens automatically when you push a git tag.
+
+### Step 1: Create a crates.io account
+- Sign up at https://crates.io
+- Verify your email
+
+### Step 2: First-time manual publish (required)
+
+**Important:** Crates must exist on crates.io before GitHub Actions can publish updates.
+
+Publish each crate once manually:
+
+```bash
+# Login to crates.io (you'll need an API token for first publish)
+cargo login <YOUR_API_TOKEN>
+
+# Publish each crate in order
+for crate in ucm-core ucp-observe ucp-translator-markdown ucp-translator-html ucm-engine ucl-parser ucp-llm ucp-agent ucp-cli; do
+    echo "Publishing $crate..."
+    cargo publish -p $crate
+    sleep 30  # Wait for crates.io to index
+done
+```
+
+### Step 3: Set up GitHub repository secrets
+
+Go to your GitHub repo → Settings → Secrets and variables → Actions:
+
+Add:
+- `CARGO_REGISTRY_TOKEN` - Your crates.io API token
+
+### Step 4: Publish via Git tag
+
+```bash
+# Bump version (edit Cargo.toml first)
+git add .
+git commit -m "Release v0.1.11"
+
+# Create and push tag
+git tag v0.1.11
+git push origin v0.1.11
+```
+
+The GitHub Action will automatically publish all crates!
+
+---
+
+## Option 2: Manual Publishing
+
+Publish directly from your machine.
+
+### Prerequisites
+
+1. **crates.io Account**: Sign up at [crates.io](https://crates.io)
+2. **API Token**: Generate from [crates.io settings](https://crates.io/settings/tokens)
 3. **Git configured**: Ensure git user.name and user.email are set
 
-## Setup Steps
-
-### 1. Login to crates.io
-
-```bash
-cargo login <YOUR_CRATES_IO_TOKEN>
-```
-
-Verify login:
-```bash
-cargo whoami
-```
+### Step 1: Login to crates.io
 
 ### 2. Verify Package Metadata
 
@@ -201,6 +249,80 @@ To unyank:
 
 ```bash
 cargo yank -p ucp-cli --version 0.1.10 --undo
+```
+
+## GitHub Actions Workflow
+
+The `.github/workflows/publish-crates.yml` file handles automated publishing.
+
+### How it works:
+
+1. **Trigger**: Runs when you push a tag starting with `v` (e.g., `v0.1.11`)
+2. **Verification**: First builds and tests the workspace
+3. **Publishing**: Publishes all 9 crates in dependency order
+4. **Matrix strategy**: Each crate is published independently
+
+### Workflow file:
+
+```yaml
+name: Publish to crates.io
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --workspace
+      - run: cargo test --workspace
+
+  publish-crates:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate:
+          - ucm-core
+          - ucp-observe
+          - ucp-translator-markdown
+          - ucp-translator-html
+          - ucm-engine
+          - ucl-parser
+          - ucp-llm
+          - ucp-agent
+          - ucp-cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: katyo/publish-crates@v2
+        with:
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          path: './crates'
+          crates: ${{ matrix.crate }}
+```
+
+### Quick Release Checklist:
+
+```bash
+# 1. Ensure tests pass
+cargo test --workspace
+
+# 2. Update version in root Cargo.toml
+# Edit: version = "0.1.11"
+
+# 3. Commit and tag
+git add .
+git commit -m "Release v0.1.11"
+git tag v0.1.11
+git push origin v0.1.11
+
+# 4. GitHub Actions takes over!
+# Watch at: https://github.com/YOUR_USERNAME/ucp/actions
 ```
 
 ## Questions?
