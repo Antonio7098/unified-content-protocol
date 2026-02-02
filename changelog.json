@@ -19,6 +19,29 @@
   },
   "entries": [
     {
+      "version": "v0.1.11",
+      "date": "2026-02-02",
+      "changes": [
+        {
+          "type": "added",
+          "area": "release",
+          "description": "Published all 9 UCP crates to crates.io with full CLI, documentation, and GitHub Actions workflow for automated releases.",
+          "commit": "78f86290",
+          "files_affected": [
+            "Cargo.toml",
+            "crates/*/Cargo.toml",
+            "crates/ucp-cli/README.md",
+            "docs/**",
+            ".github/workflows/publish-crates.yml",
+            "PUBLISHING.md",
+            "publish.sh",
+            "first-publish.sh"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.10",
       "date": "2026-01-29",
       "changes": [
