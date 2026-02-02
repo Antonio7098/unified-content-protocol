@@ -1,34 +1,34 @@
-name: Publish to crates.io
+name: publish-crates
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: read
-  id-token: write  # Required for OIDC
 
 jobs:
-  # First, verify everything builds and tests pass
-  verify:
+  version-check:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build workspace
-        run: cargo build --release --workspace
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Run tests
-        run: cargo test --workspace
+      - name: Verify version sync (tag push)
+        run: python scripts/check_version_sync.py --quiet --require-tag
 
-  # Publish crates in dependency order
-  publish-crates:
-    needs: verify
+  publish:
+    needs: version-check
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -43,61 +43,29 @@ jobs:
           - ucp-llm
           - ucp-agent
           - ucp-cli
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Publish to crates.io
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify version sync (tag push)
+        run: python scripts/check_version_sync.py --quiet --require-tag
+
+      - name: Publish ${{ matrix.crate }} to crates.io
         uses: katyo/publish-crates@v2
         with:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           path: './crates'
           ignore-unpublished-changes: true
           crates: ${{ matrix.crate }}
-
-  # Alternative: Use OIDC for trusted publishing (requires setup on crates.io)
-  # Uncomment this section once you've added GitHub as a trusted publisher on crates.io
-  #
-  # publish-oidc:
-  #   needs: verify
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     id-token: write
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       crate:
-  #         - ucm-core
-  #         - ucp-observe
-  #         - ucp-translator-markdown
-  #         - ucp-translator-html
-  #         - ucm-engine
-  #         - ucl-parser
-  #         - ucp-llm
-  #         - ucp-agent
-  #         - ucp-cli
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Install Rust toolchain
-  #       uses: dtolnay/rust-toolchain@stable
-  #
-  #     - name: Get OIDC token
-  #       id: get-token
-  #       run: |
-  #         # Request OIDC token from GitHub
-  #         TOKEN=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-  #           "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r '.value')
-  #         echo "token=$TOKEN" >> $GITHUB_OUTPUT
-  #
-  #     - name: Publish with OIDC
-  #       run: |
-  #         # Use the OIDC token to authenticate with crates.io
-  #         cargo publish -p ${{ matrix.crate }}
-  #       env:
-  #         CARGO_REGISTRY_TOKEN: ${{ steps.get-token.outputs.token }}
