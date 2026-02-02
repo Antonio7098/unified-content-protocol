@@ -44,6 +44,10 @@ jobs:
         working-directory: crates/ucp-wasm/pkg
         run: npm pkg set name=ucp-content
 
+      - name: Fix repository URL for OIDC
+        working-directory: crates/ucp-wasm/pkg
+        run: npm pkg set repository.url="https://github.com/Antonio7098/unified-content-protocol"
+
       - name: Install dependencies
         working-directory: crates/ucp-wasm/pkg
         run: npm install
@@ -89,6 +93,10 @@ jobs:
       - name: Ensure npm package name is ucp-content
         working-directory: crates/ucp-wasm/pkg
         run: npm pkg set name=ucp-content
+
+      - name: Fix repository URL for OIDC
+        working-directory: crates/ucp-wasm/pkg
+        run: npm pkg set repository.url="https://github.com/Antonio7098/unified-content-protocol"
 
       - name: Install dependencies
         working-directory: crates/ucp-wasm/pkg
