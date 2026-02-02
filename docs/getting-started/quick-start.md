@@ -1,8 +1,77 @@
 # Quick Start Guide
 
-This guide walks you through creating your first UCP application, from basic document creation to advanced operations.
+This guide walks you through creating your first UCP application, from CLI usage to advanced operations.
 
-## Your First Document
+## CLI Quick Start (Recommended for New Users)
+
+The fastest way to get started with UCP is using the command-line interface:
+
+```bash
+# Install the CLI
+cargo install ucp-cli
+
+# Create a new document
+ucp create --title "My First Document" --output doc.json
+
+# View the document
+cat doc.json | jq
+
+# Get help
+ucp --help
+```
+
+### CLI Workflow Example
+
+```bash
+# 1. Create a document
+ucp create --title "Hello UCP" --output doc.json
+
+# 2. Add a text block
+ucp block add \
+  --input doc.json \
+  --output doc.json \
+  --parent blk_root \
+  --content-type text \
+  --content "Welcome to the Unified Content Protocol!" \
+  --role intro
+
+# 3. View document structure
+ucp tree --input doc.json --format text
+
+# 4. Export to Markdown
+ucp export markdown --input doc.json --output doc.md
+
+# 5. Validate the document
+ucp validate --input doc.json
+```
+
+### Import Content
+
+```bash
+# Import from Markdown
+ucp import markdown README.md --output doc.json
+
+# Import from HTML (with image extraction)
+ucp import html article.html --output doc.json --extract-images --extract-links
+```
+
+### Search and Navigation
+
+```bash
+# Find blocks by tag
+ucp find --input doc.json --tag intro --limit 10
+
+# Find orphaned blocks
+ucp orphans --input doc.json
+
+# Navigate document structure
+ucp nav children --input doc.json --id blk_root
+
+# View as tree
+ucp tree --input doc.json --depth 3 --ids
+```
+
+## Rust Library Quick Start
 
 === "Rust"
     ```rust

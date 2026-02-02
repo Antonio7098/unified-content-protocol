@@ -4,8 +4,12 @@ This guide covers how to install and configure UCP for your project.
 
 ## Requirements
 
-=== "Rust"
-    - **Rust**: 1.70 or later
+=== "Rust (Library)"
+    - **Rust**: 1.75 or later
+    - **Cargo**: Latest stable version
+
+=== "Rust (CLI)"
+    - **Rust**: 1.75 or later
     - **Cargo**: Latest stable version
 
 === "Python"
@@ -16,10 +20,50 @@ This guide covers how to install and configure UCP for your project.
     - **Node.js**: 16 or later
     - **npm**: Latest stable version
 
-## Adding UCP to Your Project
+## Installing the CLI
 
-=== "Rust"
-    ### Using the High-Level API (Recommended)
+The **ucp-cli** is the fastest way to get started with UCP. It provides a command-line interface for all UCP operations.
+
+### Option 1: Install from crates.io (Recommended)
+
+```bash
+# Install the latest version from crates.io
+cargo install ucp-cli
+
+# Verify installation
+ucp --version
+
+# Get help
+ucp --help
+```
+
+### Option 2: Install from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/Antonio7098/unified-content-protocol.git
+cd unified-content-protocol
+
+# Install from local source
+cargo install --path crates/ucp-cli
+
+# Or run without installing
+cargo run -p ucp-cli -- --help
+```
+
+### Option 3: Build for Distribution
+
+```bash
+# Build release binary
+cargo build --release -p ucp-cli
+
+# Binary located at: target/release/ucp
+./target/release/ucp --version
+```
+
+## Adding UCP to Your Rust Project
+
+=== "Using the High-Level API (Recommended)"
 
     For most use cases, add `ucp-api` which re-exports everything you need:
 
@@ -28,7 +72,9 @@ This guide covers how to install and configure UCP for your project.
     ucp-api = "0.1.10"
     ```
 
-    ### Individual Crates
+    [View ucp-api on crates.io](https://crates.io/crates/ucp-api)
+
+=== "Individual Crates"
 
     For fine-grained control, you can depend on specific crates:
 
@@ -46,9 +92,33 @@ This guide covers how to install and configure UCP for your project.
     # Markdown conversion
     ucp-translator-markdown = "0.1.10"
 
+    # HTML conversion
+    ucp-translator-html = "0.1.10"
+
     # Observability utilities
     ucp-observe = "0.1.10"
+
+    # LLM utilities
+    ucp-llm = "0.1.10"
+
+    # Agent graph traversal
+    ucp-agent = "0.1.10"
     ```
+
+    **All crates on crates.io:**
+
+    | Crate | Description | crates.io Link |
+    |-------|-------------|----------------|
+    | ucm-core | Core types | [Link](https://crates.io/crates/ucm-core) |
+    | ucm-engine | Transformation engine | [Link](https://crates.io/crates/ucm-engine) |
+    | ucl-parser | UCL parser | [Link](https://crates.io/crates/ucl-parser) |
+    | ucp-api | High-level API | [Link](https://crates.io/crates/ucp-api) |
+    | ucp-cli | CLI tool | [Link](https://crates.io/crates/ucp-cli) |
+    | ucp-translator-markdown | Markdown translator | [Link](https://crates.io/crates/ucp-translator-markdown) |
+    | ucp-translator-html | HTML translator | [Link](https://crates.io/crates/ucp-translator-html) |
+    | ucp-llm | LLM utilities | [Link](https://crates.io/crates/ucp-llm) |
+    | ucp-observe | Observability | [Link](https://crates.io/crates/ucp-observe) |
+    | ucp-agent | Agent traversal | [Link](https://crates.io/crates/ucp-agent) |
 
 === "Python"
     Install the `ucp-content` package from PyPI:

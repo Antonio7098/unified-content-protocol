@@ -4,21 +4,46 @@ Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major a
 
 ## Quick Install
 
-=== "Rust"
+=== "CLI (Recommended)"
+    ```bash
+    # Install the command-line tool
+    cargo install ucp-cli
+
+    # Verify installation
+    ucp --version
+
+    # Create your first document
+    ucp create --title "My First Document" --output doc.json
+    ```
+
+    **Or from source:**
+    ```bash
+    cargo install --path crates/ucp-cli
+    ```
+
+    [CLI Documentation](./ucp-cli/README.md) | [Getting Started Guide](./getting-started/quick-start.md)
+
+=== "Rust Library"
     ```toml
     [dependencies]
-    ucp-api = "0.1.9"
+    ucp-api = "0.1.10"
     ```
+
+    [Rust API Docs](./ucp-api/README.md) | [Installation Guide](./getting-started/installation.md)
 
 === "Python"
     ```bash
     pip install ucp-content
     ```
 
+    [Python SDK Reference](./ucp-js/README.md)
+
 === "JavaScript"
     ```bash
     npm install ucp-content
     ```
+
+    [JavaScript SDK Reference](./ucp-js/README.md)
 
 ## Getting Started
 
@@ -62,13 +87,24 @@ Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major a
 
 ## Command-Line Interface (ucp-cli)
 
-- [Overview & Command Reference](./ucp-cli/README.md)
+- [CLI Overview & Installation](./ucp-cli/README.md)
 - [Hands-on Usage Guide](./getting-started/cli-guide.md)
 
 ```bash
-cargo run -p ucp-cli -- --help
-cargo run -p ucp-cli -- create --title "My Document"
+# Install from crates.io
+cargo install ucp-cli
+
+# Or install from source
+cargo install --path crates/ucp-cli
+
+# Get help
+ucp --help
+
+# Create a document
+ucp create --title "My Document" --output doc.json
 ```
+
+**crates.io:** [ucp-cli](https://crates.io/crates/ucp-cli)
 
 ## Translators
 
