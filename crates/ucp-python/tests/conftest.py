@@ -4,14 +4,21 @@ import pytest
 import sys
 import os
 
-# Add the built module to path for testing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
+# Try to import from pip package first, fall back to local path for development
+try:
+    import ucp_content
+
+    print("✓ Using ucp-content from pip package")
+except ImportError:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "python"))
+    print("✓ Using ucp from local build")
 
 
 @pytest.fixture
 def empty_doc():
     """Create an empty document."""
     import ucp
+
     return ucp.create()
 
 
@@ -19,6 +26,7 @@ def empty_doc():
 def doc_with_title():
     """Create a document with a title."""
     import ucp
+
     return ucp.create("Test Document")
 
 
@@ -26,6 +34,7 @@ def doc_with_title():
 def doc_with_blocks():
     """Create a document with several blocks."""
     import ucp
+
     doc = ucp.create("Test Document")
     root = doc.root_id
 
