@@ -74,6 +74,8 @@ cargo build --release -p ucp-cli
 
     [View ucp-api on crates.io](https://crates.io/crates/ucp-api)
 
+=== "Individual Crates"
+
     For fine-grained control, you can depend on specific crates:
 
     ```toml
