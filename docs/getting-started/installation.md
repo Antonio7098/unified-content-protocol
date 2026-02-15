@@ -61,9 +61,9 @@ cargo build --release -p ucp-cli
 ./target/release/ucp --version
 ```
 
-## Adding UCP to Your Rust Project
+## Adding UCP to Your Project
 
-=== "Using the High-Level API (Recommended)"
+=== "Rust"
 
     For most use cases, add `ucp-api` which re-exports everything you need:
 
@@ -121,17 +121,47 @@ cargo build --release -p ucp-cli
     | ucp-agent | Agent traversal | [Link](https://crates.io/crates/ucp-agent) |
 
 === "Python"
+
     Install the `ucp-content` package from PyPI:
 
     ```bash
     pip install ucp-content
     ```
 
+    Add to your requirements.txt:
+
+    ```txt
+    ucp-content>=0.1.0
+    ```
+
+    For development with the latest features:
+
+    ```bash
+    pip install git+https://github.com/Antonio7098/unified-content-protocol.git#subdirectory=packages/ucp-python
+    ```
+
 === "JavaScript"
+
     Install the `ucp-content` package from npm:
 
     ```bash
     npm install ucp-content
+    ```
+
+    Add to your package.json:
+
+    ```json
+    {
+      "dependencies": {
+        "ucp-content": "^0.1.0"
+      }
+    }
+    ```
+
+    For development with the latest features:
+
+    ```bash
+    npm install https://github.com/Antonio7098/unified-content-protocol.git#main --packages=packages/ucp-js
     ```
 
 ## Feature Flags (Rust only)
