@@ -24,6 +24,7 @@ ucl-parser.workspace = true
 ucp-observe.workspace = true
 ucp-llm.workspace = true
 ucp-agent.workspace = true
+ucp-api.workspace = true
 ucp-translator-markdown.workspace = true
 ucp-translator-html.workspace = true
 

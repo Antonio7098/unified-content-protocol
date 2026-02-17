@@ -6,6 +6,16 @@ use ucl_parser::{parse, parse_commands, UclDocument};
 use ucm_core::{Block, BlockId, Content, Document, EdgeType, Error, Result};
 use ucm_engine::{Engine, Operation, OperationResult};
 
+pub mod codegraph;
+
+pub use codegraph::{
+    build_code_graph, canonical_codegraph_json, canonical_fingerprint, codegraph_prompt_projection,
+    validate_code_graph_profile, CodeGraphBuildInput, CodeGraphBuildResult, CodeGraphBuildStatus,
+    CodeGraphDiagnostic, CodeGraphExtractorConfig, CodeGraphSeverity, CodeGraphStats,
+    CodeGraphValidationResult, PortableDocument, CODEGRAPH_EXTRACTOR_VERSION,
+    CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
+};
+
 /// UCP client for document manipulation
 pub struct UcpClient {
     engine: Engine,

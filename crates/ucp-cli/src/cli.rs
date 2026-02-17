@@ -3,8 +3,8 @@
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    agent, block, document, edge, export, find, import, llm, nav, prune, snapshot, tree, tx, ucl,
-    validate,
+    agent, block, codegraph, document, edge, export, find, import, llm, nav, prune, snapshot, tree,
+    tx, ucl, validate,
 };
 
 /// UCP - Unified Content Protocol CLI
@@ -182,6 +182,11 @@ pub enum Commands {
     /// LLM integration utilities
     #[command(subcommand)]
     Llm(LlmCommands),
+
+    // ===== CodeGraph =====
+    /// Codebase to UCM CodeGraph extraction and inspection
+    #[command(subcommand)]
+    Codegraph(CodegraphCommands),
 }
 
 // ===== Block Subcommands =====
@@ -959,6 +964,67 @@ pub enum LlmCommands {
     },
 }
 
+// ===== CodeGraph Subcommands =====
+
+#[derive(Subcommand)]
+pub enum CodegraphCommands {
+    /// Build a CodeGraphProfile v1 document from a repository
+    Build {
+        /// Repository root path
+        repo: String,
+
+        /// Commit hash to embed in extractor metadata
+        #[arg(long)]
+        commit: Option<String>,
+
+        /// Output document path (prints to stdout if omitted)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Comma-separated file extensions to include (e.g. rs,py,ts,tsx)
+        #[arg(long)]
+        extensions: Option<String>,
+
+        /// Include hidden files/directories
+        #[arg(long)]
+        include_hidden: bool,
+
+        /// Skip export edge emission
+        #[arg(long)]
+        no_export_edges: bool,
+
+        /// Fail entire build on first parse/read failure
+        #[arg(long)]
+        fail_on_parse_error: bool,
+
+        /// Maximum source file size in bytes
+        #[arg(long, default_value = "2097152")]
+        max_file_bytes: usize,
+
+        /// Allow partial/failed-validation outputs without non-zero exit
+        #[arg(long)]
+        allow_partial: bool,
+    },
+
+    /// Inspect and validate an existing CodeGraph document
+    Inspect {
+        /// Input document path (reads stdin if omitted)
+        #[arg(short, long)]
+        input: Option<String>,
+    },
+
+    /// Render structure+blocks prompt projection for a CodeGraph document
+    Prompt {
+        /// Input document path (reads stdin if omitted)
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Output file path (prints to stdout if omitted)
+        #[arg(short, long)]
+        output: Option<String>,
+    },
+}
+
 impl Cli {
     pub fn run(self) -> anyhow::Result<()> {
         match self.command {
@@ -1008,6 +1074,9 @@ impl Cli {
 
             // LLM
             Commands::Llm(cmd) => llm::handle(cmd, self.format),
+
+            // CodeGraph
+            Commands::Codegraph(cmd) => codegraph::handle(cmd, self.format),
         }
     }
 }

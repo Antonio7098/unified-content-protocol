@@ -180,6 +180,16 @@ fn test_llm_subcommands() {
 }
 
 #[test]
+fn test_codegraph_subcommands() {
+    let output = run_cli(&["codegraph", "--help"]);
+    let out = stdout(&output);
+
+    assert!(out.contains("build"));
+    assert!(out.contains("inspect"));
+    assert!(out.contains("prompt"));
+}
+
+#[test]
 fn test_json_output_format() {
     // Create a document with JSON output
     let output = run_cli(&["create", "--format", "json"]);
@@ -523,6 +533,85 @@ mod workflow_tests {
 
         let caps = result.get("capabilities").and_then(|c| c.as_array());
         assert!(caps.is_some());
+    }
+
+    #[test]
+    fn test_codegraph_build_inspect_prompt_workflow() {
+        use tempfile::tempdir;
+
+        let repo = tempdir().expect("temp repo");
+        let src = repo.path().join("src");
+        std::fs::create_dir_all(&src).expect("create src");
+        std::fs::write(src.join("lib.rs"), "pub fn add(a:i32,b:i32)->i32{a+b}\n")
+            .expect("write lib.rs");
+        std::fs::write(src.join("util.rs"), "pub fn util() {}\n").expect("write util.rs");
+
+        let doc_out = tempfile::NamedTempFile::new().expect("doc output");
+        let doc_path = doc_out.path().to_str().unwrap().to_string();
+        let repo_path = repo.path().to_str().unwrap().to_string();
+
+        let output = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "test-commit",
+            "--output",
+            doc_path.as_str(),
+            "--format",
+            "json",
+            "--allow-partial",
+        ]);
+        assert!(
+            output.status.success(),
+            "codegraph build failed: {}",
+            stderr(&output)
+        );
+
+        let build_json: serde_json::Value =
+            serde_json::from_str(&stdout(&output)).expect("build output should be valid JSON");
+        assert!(build_json.get("canonical_fingerprint").is_some());
+        assert!(build_json.get("document").is_some());
+
+        let inspect = run_cli(&[
+            "codegraph",
+            "inspect",
+            "--input",
+            doc_path.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(
+            inspect.status.success(),
+            "codegraph inspect failed: {}",
+            stderr(&inspect)
+        );
+        let inspect_json: serde_json::Value =
+            serde_json::from_str(&stdout(&inspect)).expect("inspect output json");
+        assert!(inspect_json.get("canonical_fingerprint").is_some());
+        assert!(inspect_json.get("diagnostics").is_some());
+
+        let prompt = run_cli(&[
+            "codegraph",
+            "prompt",
+            "--input",
+            doc_path.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(
+            prompt.status.success(),
+            "codegraph prompt failed: {}",
+            stderr(&prompt)
+        );
+        let prompt_json: serde_json::Value =
+            serde_json::from_str(&stdout(&prompt)).expect("prompt output json");
+        let projection = prompt_json
+            .get("projection")
+            .and_then(|v| v.as_str())
+            .expect("projection string");
+        assert!(projection.contains("Document structure:"));
+        assert!(projection.contains("Blocks:"));
     }
 }
 

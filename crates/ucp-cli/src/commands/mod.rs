@@ -2,6 +2,7 @@
 
 pub mod agent;
 pub mod block;
+pub mod codegraph;
 pub mod document;
 pub mod edge;
 pub mod export;

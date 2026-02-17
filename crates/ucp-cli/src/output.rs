@@ -34,6 +34,10 @@ pub struct DocumentMetadataJson {
     pub created_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modified_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub custom: HashMap<String, serde_json::Value>,
 }
 
 impl DocumentJson {
@@ -62,6 +66,8 @@ impl DocumentJson {
                 authors: doc.metadata.authors.clone(),
                 created_at: Some(doc.metadata.created_at.to_rfc3339()),
                 modified_at: Some(doc.metadata.modified_at.to_rfc3339()),
+                language: doc.metadata.language.clone(),
+                custom: doc.metadata.custom.clone(),
             },
             version: doc.version.counter,
         }
@@ -115,11 +121,11 @@ impl DocumentJson {
                 .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                 .map(|dt| dt.with_timezone(&chrono::Utc))
                 .unwrap_or(now),
-            language: None,
-            custom: HashMap::new(),
+            language: self.metadata.language.clone(),
+            custom: self.metadata.custom.clone(),
         };
 
-        Ok(Document {
+        let mut doc = Document {
             id: DocumentId::new(&self.id),
             root,
             structure,
@@ -132,7 +138,9 @@ impl DocumentJson {
                 timestamp: chrono::Utc::now(),
                 state_hash: [0u8; 8],
             },
-        })
+        };
+        doc.rebuild_indices();
+        Ok(doc)
     }
 }
 
@@ -569,6 +577,10 @@ mod tests {
         let mut doc = Document::create();
         doc.metadata.title = Some("Test Title".to_string());
         doc.metadata.description = Some("Test Description".to_string());
+        doc.metadata.language = Some("en".to_string());
+        doc.metadata
+            .custom
+            .insert("profile".to_string(), serde_json::json!("codegraph"));
 
         let json = DocumentJson::from_document(&doc);
         let restored = json.to_document().expect("Should restore document");
@@ -577,6 +589,15 @@ mod tests {
         assert_eq!(
             restored.metadata.description,
             Some("Test Description".to_string())
+        );
+        assert_eq!(restored.metadata.language, Some("en".to_string()));
+        assert_eq!(
+            restored
+                .metadata
+                .custom
+                .get("profile")
+                .and_then(|v| v.as_str()),
+            Some("codegraph")
         );
     }
 
