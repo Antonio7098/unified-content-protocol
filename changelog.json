@@ -19,6 +19,72 @@
   },
   "entries": [
     {
+      "version": "v0.1.13",
+      "date": "2026-02-17",
+      "changes": [
+        {
+          "type": "fixed",
+          "area": "ci.publish-crates",
+          "description": "Fixed publish-crates workflow to use correct crate paths instead of non-existent crates/Cargo.toml",
+          "commit": "fe083605",
+          "files_affected": [
+            ".github/workflows/publish-crates.yml"
+          ],
+          "issues": []
+        },
+        {
+          "type": "fixed",
+          "area": "ci.publish-crates",
+          "description": "Added publish = false to ucp-python and ucp-wasm to prevent cargo from validating them during workspace publishes",
+          "commit": "cf745b5e",
+          "files_affected": [
+            "crates/ucp-python/Cargo.toml",
+            "crates/ucp-wasm/Cargo.toml"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "docs.crates-io",
+          "description": "Updated each crate to use its own README instead of the repo root README for crates.io documentation",
+          "commit": "a6957776",
+          "files_affected": [
+            "crates/*/Cargo.toml",
+            "crates/translators/*/Cargo.toml",
+            "crates/translators/html/README.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "docs.rs",
+          "description": "Added crate-level documentation to ucp-llm (was missing) and enhanced ucp-api docs with examples",
+          "commit": "d224ddc3",
+          "files_affected": [
+            "crates/ucp-llm/src/lib.rs",
+            "crates/ucp-api/src/lib.rs",
+            "crates/ucp-llm/src/id_mapper.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped workspace and public package versions to 0.1.13 and updated release/install references",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "crates/ucp-wasm/Cargo.toml",
+            "crates/ucp-python/pyproject.toml",
+            "README.md",
+            "docs/getting-started/installation.md",
+            "changelog.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.12",
       "date": "2026-02-17",
       "changes": [
