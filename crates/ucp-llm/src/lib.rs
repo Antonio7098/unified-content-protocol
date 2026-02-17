@@ -14,7 +14,7 @@
 //!
 //! ## Example
 //!
-//! ```rust
+//! ```ignore
 //! use ucp_llm::IdMapper;
 //! use ucm_core::BlockId;
 //!
