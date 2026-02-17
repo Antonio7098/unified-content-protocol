@@ -19,6 +19,68 @@
   },
   "entries": [
     {
+      "version": "v0.1.12",
+      "date": "2026-02-17",
+      "changes": [
+        {
+          "type": "added",
+          "area": "codegraph.treesitter",
+          "description": "Implemented Tree-sitter-backed codebase extraction for Rust, Python, TypeScript, and JavaScript with symbol/import analysis and UCM CodeGraph emission.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-api/src/codegraph.rs",
+            "crates/ucp-api/src/lib.rs",
+            "crates/ucp-api/Cargo.toml",
+            "crates/ucp-api/tests/**"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "cli.codegraph",
+          "description": "Added `ucp codegraph build|inspect|prompt` commands with profile validation, canonical fingerprint output, diagnostics, and projection generation.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-cli/src/cli.rs",
+            "crates/ucp-cli/src/commands/codegraph.rs",
+            "crates/ucp-cli/src/commands/mod.rs",
+            "crates/ucp-cli/src/output.rs",
+            "crates/ucp-cli/tests/integration_tests.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "docs.codegraph",
+          "description": "Expanded API/CLI/LLM docs with end-to-end codegraph and LLM utility examples, including manual large-repo validation workflow references.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/README.md",
+            "docs/index.md",
+            "docs/ucp-api/README.md",
+            "docs/ucp-cli/README.md",
+            "docs/ucp-llm/README.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped workspace and public package versions to 0.1.12 and updated release/install references.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "crates/ucp-wasm/Cargo.toml",
+            "crates/ucp-python/pyproject.toml",
+            "README.md",
+            "docs/getting-started/installation.md",
+            "changelog.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.11",
       "date": "2026-02-02",
       "changes": [

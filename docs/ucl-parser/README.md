@@ -15,7 +15,7 @@ UCL is designed for:
 === "Rust"
     ```toml
     [dependencies]
-    ucl-parser = "0.1.11"
+    ucl-parser = "0.1.12"
     ```
 
 === "Python"

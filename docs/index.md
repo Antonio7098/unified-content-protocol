@@ -1,134 +1,64 @@
 # Unified Content Protocol Documentation Index
 
-Welcome to the Unified Content Protocol (UCP) docs. Jump directly to any major area below.
+Welcome to the Unified Content Protocol (UCP) docs.
 
 ## Quick Install
 
-=== "CLI (Recommended)"
-    ```bash
-    # Install the command-line tool
-    cargo install ucp-cli
+### CLI (Recommended)
 
-    # Verify installation
-    ucp --version
+```bash
+cargo install ucp-cli
+ucp --version
+```
 
-    # Create your first document
-    ucp create --title "My First Document" --output doc.json
-    ```
+### Rust Library
 
-    **Or from source:**
-    ```bash
-    cargo install --path crates/ucp-cli
-    ```
-
-    [CLI Documentation](./ucp-cli/README.md) | [Getting Started Guide](./getting-started/quick-start.md)
-
-=== "Rust Library"
-    ```toml
-    [dependencies]
-    ucp-api = "0.1.10"
-    ```
-
-    [Rust API Docs](./ucp-api/README.md) | [Installation Guide](./getting-started/installation.md)
-
-=== "Python"
-    ```bash
-    pip install ucp-content
-    ```
-
-    [Python SDK Reference](./ucp-js/README.md)
-
-=== "JavaScript"
-    ```bash
-    npm install ucp-content
-    ```
-
-    [JavaScript SDK Reference](./ucp-js/README.md)
+```toml
+[dependencies]
+ucp-api = "0.1.12"
+```
 
 ## Getting Started
 
 - [Installation](./getting-started/installation.md)
 - [Quick Start Guide](./getting-started/quick-start.md)
 - [Core Concepts](./getting-started/concepts.md)
-- [CLI Usage Guide](./getting-started/cli-guide.md)
 
-## Core Model (ucm-core)
+## API and Tools
 
-- [Overview](./ucm-core/README.md)
-- [Blocks](./ucm-core/blocks.md)
-- [Content Types](./ucm-core/content-types.md)
-- [Documents](./ucm-core/documents.md)
-- [Edges & Relationships](./ucm-core/edges.md)
-- [Metadata & Semantic Roles](./ucm-core/metadata.md)
-- [ID Generation](./ucm-core/id-generation.md)
+- [UCP API](./ucp-api/README.md)
+- [UCP CLI](./ucp-cli/README.md)
+- [UCP LLM Utilities](./ucp-llm/README.md)
+- [UCP Agent](./ucp-agent/index.md)
+- [UCP Observe](./ucp-observe/README.md)
 
-## Transformation Engine (ucm-engine)
+## CodeGraph (Tree-sitter)
 
-- [Overview](./ucm-engine/README.md)
-- [Operations](./ucm-engine/operations.md)
-- [Transactions](./ucm-engine/transactions.md)
-- [Snapshots](./ucm-engine/snapshots.md)
-- [Validation](./ucm-engine/validation.md)
+- Build graph: `ucp codegraph build`
+- Validate graph profile + fingerprint: `ucp codegraph inspect`
+- Create projection for LLM context: `ucp codegraph prompt`
 
-## Unified Content Language (ucl-parser)
-
-- [Overview](./ucl-parser/README.md)
-- [Syntax Reference](./ucl-parser/syntax.md)
-- [Command Reference](./ucl-parser/commands.md)
-- [Expressions](./ucl-parser/expressions.md)
-
-## High-Level API (ucp-api)
-
-- [Client Overview](./ucp-api/README.md)
-
-## JavaScript SDK (@ucp-core/core)
-
-- [SDK Reference & Installation](./ucp-js/README.md)
-
-## Command-Line Interface (ucp-cli)
-
-- [CLI Overview & Installation](./ucp-cli/README.md)
-- [Hands-on Usage Guide](./getting-started/cli-guide.md)
+Example:
 
 ```bash
-# Install from crates.io
-cargo install ucp-cli
-
-# Or install from source
-cargo install --path crates/ucp-cli
-
-# Get help
-ucp --help
-
-# Create a document
-ucp create --title "My Document" --output doc.json
+ucp codegraph build --repo /path/to/repo --output graph.json --format json
+ucp codegraph inspect --input graph.json --format json
+ucp codegraph prompt --input graph.json --output graph-projection.txt
 ```
 
-**crates.io:** [ucp-cli](https://crates.io/crates/ucp-cli)
+## Core Model
+
+- [ucm-core](./ucm-core/README.md)
+- [ucm-engine](./ucm-engine/README.md)
+- [ucl-parser](./ucl-parser/README.md)
 
 ## Translators
 
-- [Markdown Translator](./translators/markdown/README.md)
-- [HTML Translator](./translators/html/README.md)
-
-## LLM Utilities (ucp-llm)
-
-- [Overview & Context Management](./ucp-llm/README.md)
-
-## Agent Graph Traversal (ucp-agent)
-
-- [Overview](./ucp-agent/index.md)
-- [API Reference](./ucp-agent/api.md)
-- [UCL Commands](./ucp-agent/ucl-commands.md)
-- [Usage Examples](./ucp-agent/examples.md)
-- [Architecture](./ucp-agent/architecture.md)
-
-## Observability (ucp-observe)
-
-- [Tracing, Audit, Metrics](./ucp-observe/README.md)
+- [Markdown](./translators/markdown/README.md)
+- [HTML](./translators/html/README.md)
 
 ## Examples
 
-- [Basic Examples](./examples/basic.md)
-- [Intermediate Examples](./examples/intermediate.md)
-- [Advanced Examples](./examples/advanced.md)
+- [Basic](./examples/basic.md)
+- [Intermediate](./examples/intermediate.md)
+- [Advanced](./examples/advanced.md)

@@ -61,46 +61,48 @@ cargo build --release -p ucp-cli
 ./target/release/ucp --version
 ```
 
-## Adding UCP to Your Project
+## Adding UCP to Your Rust Project
 
-=== "Rust"
+=== "Using the High-Level API (Recommended)"
 
     For most use cases, add `ucp-api` which re-exports everything you need:
 
     ```toml
     [dependencies]
-    ucp-api = "0.1.11"
+    ucp-api = "0.1.12"
     ```
 
     [View ucp-api on crates.io](https://crates.io/crates/ucp-api)
+
+=== "Individual Crates"
 
     For fine-grained control, you can depend on specific crates:
 
     ```toml
     [dependencies]
     # Core types only
-    ucm-core = "0.1.11"
+    ucm-core = "0.1.12"
 
     # Core + transformation engine
-    ucm-engine = "0.1.11"
+    ucm-engine = "0.1.12"
 
     # UCL command parsing
-    ucl-parser = "0.1.11"
+    ucl-parser = "0.1.12"
 
     # Markdown conversion
-    ucp-translator-markdown = "0.1.11"
+    ucp-translator-markdown = "0.1.12"
 
     # HTML conversion
-    ucp-translator-html = "0.1.11"
+    ucp-translator-html = "0.1.12"
 
     # Observability utilities
-    ucp-observe = "0.1.11"
+    ucp-observe = "0.1.12"
 
     # LLM utilities
-    ucp-llm = "0.1.11"
+    ucp-llm = "0.1.12"
 
     # Agent graph traversal
-    ucp-agent = "0.1.11"
+    ucp-agent = "0.1.12"
     ```
 
     **All crates on crates.io:**
@@ -119,47 +121,17 @@ cargo build --release -p ucp-cli
     | ucp-agent | Agent traversal | [Link](https://crates.io/crates/ucp-agent) |
 
 === "Python"
-
     Install the `ucp-content` package from PyPI:
 
     ```bash
     pip install ucp-content
     ```
 
-    Add to your requirements.txt:
-
-    ```txt
-    ucp-content>=0.1.0
-    ```
-
-    For development with the latest features:
-
-    ```bash
-    pip install git+https://github.com/Antonio7098/unified-content-protocol.git#subdirectory=packages/ucp-python
-    ```
-
 === "JavaScript"
-
     Install the `ucp-content` package from npm:
 
     ```bash
     npm install ucp-content
-    ```
-
-    Add to your package.json:
-
-    ```json
-    {
-      "dependencies": {
-        "ucp-content": "^0.1.0"
-      }
-    }
-    ```
-
-    For development with the latest features:
-
-    ```bash
-    npm install https://github.com/Antonio7098/unified-content-protocol.git#main --packages=packages/ucp-js
     ```
 
 ## Feature Flags (Rust only)
@@ -282,7 +254,7 @@ If you're using multiple UCP crates, ensure they're all from the same version:
 
 ```toml
 [dependencies]
-ucm-core = "0.1.11"
+ucm-core = "0.1.12"
 ucm-engine = "0.1.9"  # Must match ucm-core version
 ```
 
