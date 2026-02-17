@@ -33,16 +33,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate:
-          - ucm-core
-          - ucp-observe
-          - ucp-translator-markdown
-          - ucp-translator-html
-          - ucm-engine
-          - ucl-parser
-          - ucp-llm
-          - ucp-agent
-          - ucp-cli
+        include:
+          - crate: ucm-core
+            path: ./crates/ucm-core
+          - crate: ucp-observe
+            path: ./crates/ucp-observe
+          - crate: ucp-translator-markdown
+            path: ./crates/translators/markdown
+          - crate: ucp-translator-html
+            path: ./crates/translators/html
+          - crate: ucm-engine
+            path: ./crates/ucm-engine
+          - crate: ucl-parser
+            path: ./crates/ucl-parser
+          - crate: ucp-llm
+            path: ./crates/ucp-llm
+          - crate: ucp-agent
+            path: ./crates/ucp-agent
+          - crate: ucp-cli
+            path: ./crates/ucp-cli
 
     steps:
       - name: Checkout repository
@@ -66,6 +75,5 @@ jobs:
         uses: katyo/publish-crates@v2
         with:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          path: './crates'
+          path: ${{ matrix.path }}
           ignore-unpublished-changes: true
-          crates: ${{ matrix.crate }}
