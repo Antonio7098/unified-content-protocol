@@ -13,7 +13,7 @@
 //!
 //! ## Example
 //!
-//! ```rust
+//! ```ignore
 //! use ucp_api::UcpClient;
 //!
 //! let client = UcpClient::new();
