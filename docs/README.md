@@ -21,7 +21,7 @@ cargo install ucp-cli
 
 ```toml
 [dependencies]
-ucp-api = "0.1.12"
+ucp-api = "0.1.13"
 ```
 
 ## CodeGraph Pipeline (Source Code -> UCM)

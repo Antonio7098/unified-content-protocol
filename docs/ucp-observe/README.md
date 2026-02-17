@@ -15,7 +15,7 @@ UCP Observe helps you:
 === "Rust"
     ```toml
     [dependencies]
-    ucp-observe = "0.1.12"
+    ucp-observe = "0.1.13"
     ```
 
 === "Python"

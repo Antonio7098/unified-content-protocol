@@ -15,7 +15,7 @@ ucp --version
 
 ```toml
 [dependencies]
-ucp-api = "0.1.12"
+ucp-api = "0.1.13"
 ```
 
 ## Getting Started
