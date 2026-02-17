@@ -8,7 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 keywords = ["ucp", "ucm", "content", "document", "core"]
 categories = ["data-structures"]
-readme = "../../README.md"
+readme = "README.md"
 
 [dependencies]
 serde = { workspace = true }

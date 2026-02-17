@@ -8,7 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 keywords = ["ucp", "llm", "ai", "tokens", "context"]
 categories = ["text-processing", "command-line-utilities"]
-readme = "../../README.md"
+readme = "README.md"
 
 [dependencies]
 ucm-core = { workspace = true }
