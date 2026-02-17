@@ -20,6 +20,8 @@ regex = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
 chrono = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tree-sitter = "0.20"
 tree-sitter-rust = "0.20"
 tree-sitter-python = "0.20"

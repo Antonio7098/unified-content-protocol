@@ -6,8 +6,10 @@ use ucl_parser::{parse, parse_commands, UclDocument};
 use ucm_core::{Block, BlockId, Content, Document, EdgeType, Error, Result};
 use ucm_engine::{Engine, Operation, OperationResult};
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod codegraph;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub use codegraph::{
     build_code_graph, canonical_codegraph_json, canonical_fingerprint, codegraph_prompt_projection,
     validate_code_graph_profile, CodeGraphBuildInput, CodeGraphBuildResult, CodeGraphBuildStatus,
