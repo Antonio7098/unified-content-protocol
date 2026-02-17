@@ -8,7 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 keywords = ["ucp", "observability", "metrics", "tracing"]
 categories = ["development-tools::debugging"]
-readme = "../../README.md"
+readme = "README.md"
 
 [dependencies]
 tracing = { workspace = true }

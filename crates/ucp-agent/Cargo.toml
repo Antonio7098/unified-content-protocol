@@ -8,7 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 keywords = ["ucp", "agent", "traversal", "knowledge-graph", "llm"]
 categories = ["data-structures", "algorithms"]
-readme = "../../README.md"
+readme = "README.md"
 
 [dependencies]
 # Core UCP crates
