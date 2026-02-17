@@ -47,6 +47,7 @@ pub struct IdMapper {
 }
 
 impl IdMapper {
+    /// Create a new empty ID mapper
     pub fn new() -> Self {
         Self {
             to_short: HashMap::new(),

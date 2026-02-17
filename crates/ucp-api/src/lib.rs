@@ -1,4 +1,27 @@
-//! High-level API for UCP.
+//! # UCP API
+//!
+//! High-level API for the Unified Content Protocol.
+//!
+//! This crate provides a convenient interface for working with UCP documents,
+//! combining the core types, engine operations, and UCL parsing into a
+//! unified API.
+//!
+//! ## Key Types
+//!
+//! - [`UcpClient`] - Main entry point for document manipulation
+//! - [`CodeGraphBuildResult`] - Code analysis for repositories
+//!
+//! ## Example
+//!
+//! ```rust
+//! use ucp_api::UcpClient;
+//!
+//! let client = UcpClient::new();
+//! let mut doc = client.create_document();
+//!
+//! // Execute UCL commands
+//! let results = client.execute_ucl(&mut doc, "APPEND root text :: \"Hello!\"").unwrap();
+//! ```
 
 use std::str::FromStr;
 
@@ -24,6 +47,7 @@ pub struct UcpClient {
 }
 
 impl UcpClient {
+    /// Create a new UCP client with a fresh engine instance
     pub fn new() -> Self {
         Self {
             engine: Engine::new(),
