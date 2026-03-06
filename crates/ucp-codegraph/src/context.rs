@@ -183,6 +183,51 @@ pub struct CodeGraphRenderConfig {
     pub max_source_lines: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CodeGraphExportMode {
+    #[default]
+    Full,
+    Compact,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphExportConfig {
+    #[serde(default)]
+    pub mode: CodeGraphExportMode,
+    #[serde(default = "default_true")]
+    pub include_rendered: bool,
+    #[serde(default = "default_true")]
+    pub dedupe_edges: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visible_levels: Option<usize>,
+    pub max_frontier_actions: usize,
+}
+
+impl Default for CodeGraphExportConfig {
+    fn default() -> Self {
+        Self {
+            mode: CodeGraphExportMode::Full,
+            include_rendered: true,
+            dedupe_edges: true,
+            visible_levels: None,
+            max_frontier_actions: 12,
+        }
+    }
+}
+
+impl CodeGraphExportConfig {
+    pub fn compact() -> Self {
+        Self {
+            mode: CodeGraphExportMode::Compact,
+            include_rendered: false,
+            dedupe_edges: true,
+            visible_levels: None,
+            max_frontier_actions: 6,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeGraphCoderef {
     pub path: String,
@@ -201,6 +246,9 @@ pub struct CodeGraphContextNodeExport {
     pub label: String,
     pub detail_level: CodeGraphDetailLevel,
     pub pinned: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub distance_from_focus: Option<usize>,
+    pub relevance_score: u16,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logical_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -222,6 +270,8 @@ pub struct CodeGraphContextEdgeExport {
     pub target: BlockId,
     pub target_short_id: String,
     pub relation: String,
+    #[serde(default = "default_one")]
+    pub multiplicity: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -234,22 +284,53 @@ pub struct CodeGraphContextFrontierAction {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub direction: Option<String>,
     pub candidate_count: usize,
+    pub priority: u16,
     pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphContextHeuristics {
+    pub should_stop: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasons: Vec<String>,
+    pub hidden_candidate_count: usize,
+    pub low_value_candidate_count: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommended_next_action: Option<CodeGraphContextFrontierAction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recommended_actions: Vec<CodeGraphContextFrontierAction>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphHiddenLevelSummary {
+    pub level: usize,
+    pub count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeGraphContextExport {
     pub summary: CodeGraphContextSummary,
+    #[serde(default)]
+    pub export_mode: CodeGraphExportMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visible_levels: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus: Option<BlockId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus_short_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus_label: Option<String>,
+    pub visible_node_count: usize,
+    pub hidden_unreachable_count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_levels: Vec<CodeGraphHiddenLevelSummary>,
+    pub frontier: Vec<CodeGraphContextFrontierAction>,
+    pub heuristics: CodeGraphContextHeuristics,
     pub nodes: Vec<CodeGraphContextNodeExport>,
     pub edges: Vec<CodeGraphContextEdgeExport>,
-    pub frontier: Vec<CodeGraphContextFrontierAction>,
     pub omitted_symbol_count: usize,
+    pub total_selected_edges: usize,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub rendered: String,
 }
 
@@ -303,6 +384,7 @@ struct CodeGraphQueryIndex {
     incoming: HashMap<BlockId, Vec<IndexedEdge>>,
     file_symbols: HashMap<BlockId, Vec<BlockId>>,
     symbol_children: HashMap<BlockId, Vec<BlockId>>,
+    structure_parent: HashMap<BlockId, BlockId>,
 }
 
 impl CodeGraphContextSession {
@@ -441,6 +523,14 @@ impl CodeGraphContextSession {
     }
 
     pub fn seed_overview(&mut self, doc: &Document) -> CodeGraphContextUpdate {
+        self.seed_overview_with_depth(doc, None)
+    }
+
+    pub fn seed_overview_with_depth(
+        &mut self,
+        doc: &Document,
+        max_depth: Option<usize>,
+    ) -> CodeGraphContextUpdate {
         let index = CodeGraphQueryIndex::new(doc);
         let previous: HashSet<_> = self.selected.keys().copied().collect();
         self.selected.clear();
@@ -448,7 +538,7 @@ impl CodeGraphContextSession {
 
         let mut update = CodeGraphContextUpdate::default();
         let mut selected = Vec::new();
-        for block_id in index.overview_nodes() {
+        for block_id in index.overview_nodes(doc, max_depth) {
             self.ensure_selected_with_origin(
                 block_id,
                 CodeGraphDetailLevel::Skeleton,
@@ -468,11 +558,23 @@ impl CodeGraphContextSession {
             .filter(|block_id| !self.selected.contains_key(block_id))
             .collect();
         update.removed.sort_by_key(BlockId::to_string);
-        self.history.push("seed:overview".to_string());
+        self.history.push(match max_depth {
+            Some(depth) => format!("seed:overview:{}", depth),
+            None => "seed:overview:all".to_string(),
+        });
         update
     }
 
     pub fn expand_file(&mut self, doc: &Document, file_id: BlockId) -> CodeGraphContextUpdate {
+        self.expand_file_with_depth(doc, file_id, 1)
+    }
+
+    pub fn expand_file_with_depth(
+        &mut self,
+        doc: &Document,
+        file_id: BlockId,
+        depth: usize,
+    ) -> CodeGraphContextUpdate {
         let index = CodeGraphQueryIndex::new(doc);
         let mut update = CodeGraphContextUpdate::default();
         self.ensure_selected_with_origin(
@@ -481,18 +583,32 @@ impl CodeGraphContextSession {
             selection_origin(CodeGraphSelectionOriginKind::Manual, None, None),
             &mut update,
         );
-        for symbol_id in index.file_symbols(&file_id) {
-            self.ensure_selected_with_origin(
-                symbol_id,
-                CodeGraphDetailLevel::SymbolCard,
-                selection_origin(CodeGraphSelectionOriginKind::FileSymbols, None, Some(file_id)),
-                &mut update,
-            );
+        if depth > 0 {
+            let mut queue: VecDeque<(BlockId, usize)> = index
+                .file_symbols(&file_id)
+                .into_iter()
+                .map(|symbol_id| (symbol_id, 1usize))
+                .collect();
+            while let Some((symbol_id, symbol_depth)) = queue.pop_front() {
+                self.ensure_selected_with_origin(
+                    symbol_id,
+                    CodeGraphDetailLevel::SymbolCard,
+                    selection_origin(CodeGraphSelectionOriginKind::FileSymbols, None, Some(file_id)),
+                    &mut update,
+                );
+                if symbol_depth >= depth {
+                    continue;
+                }
+                for child in index.symbol_children(&symbol_id) {
+                    queue.push_back((child, symbol_depth + 1));
+                }
+            }
         }
         self.focus = Some(file_id);
         self.apply_prune_policy(doc, &mut update);
         update.focus = self.focus;
-        self.history.push(format!("expand:file:{}", file_id));
+        self.history
+            .push(format!("expand:file:{}:{}", file_id, depth));
         update
     }
 
@@ -502,7 +618,19 @@ impl CodeGraphContextSession {
         block_id: BlockId,
         relation_filter: Option<&str>,
     ) -> CodeGraphContextUpdate {
-        self.expand_neighbors(doc, block_id, relation_filter, TraversalKind::Outgoing)
+        let relation_filters = relation_filter
+            .map(|relation| HashSet::from([relation.to_string()]));
+        self.expand_dependencies_with_filters(doc, block_id, relation_filters.as_ref(), 1)
+    }
+
+    pub fn expand_dependencies_with_filters(
+        &mut self,
+        doc: &Document,
+        block_id: BlockId,
+        relation_filters: Option<&HashSet<String>>,
+        depth: usize,
+    ) -> CodeGraphContextUpdate {
+        self.expand_neighbors(doc, block_id, relation_filters, depth, TraversalKind::Outgoing)
     }
 
     pub fn expand_dependents(
@@ -511,7 +639,19 @@ impl CodeGraphContextSession {
         block_id: BlockId,
         relation_filter: Option<&str>,
     ) -> CodeGraphContextUpdate {
-        self.expand_neighbors(doc, block_id, relation_filter, TraversalKind::Incoming)
+        let relation_filters = relation_filter
+            .map(|relation| HashSet::from([relation.to_string()]));
+        self.expand_dependents_with_filters(doc, block_id, relation_filters.as_ref(), 1)
+    }
+
+    pub fn expand_dependents_with_filters(
+        &mut self,
+        doc: &Document,
+        block_id: BlockId,
+        relation_filters: Option<&HashSet<String>>,
+        depth: usize,
+    ) -> CodeGraphContextUpdate {
+        self.expand_neighbors(doc, block_id, relation_filters, depth, TraversalKind::Incoming)
     }
 
     pub fn collapse(
@@ -791,14 +931,49 @@ impl CodeGraphContextSession {
     }
 
     pub fn export(&self, doc: &Document, config: &CodeGraphRenderConfig) -> CodeGraphContextExport {
+        self.export_with_config(doc, config, &CodeGraphExportConfig::default())
+    }
+
+    pub fn export_with_config(
+        &self,
+        doc: &Document,
+        config: &CodeGraphRenderConfig,
+        export_config: &CodeGraphExportConfig,
+    ) -> CodeGraphContextExport {
         let index = CodeGraphQueryIndex::new(doc);
         let summary = self.summary(doc);
         let short_ids = make_short_ids(self, &index);
         let selected_ids: HashSet<_> = self.selected.keys().copied().collect();
-        let rendered = self.render_for_prompt(doc, config);
+        let distances = focus_distances(doc, self.focus, &selected_ids, &index);
+        let visible_selected_ids = visible_selected_ids(
+            self.focus,
+            &selected_ids,
+            &distances,
+            export_config.visible_levels,
+        );
+        let hidden_levels = hidden_level_summaries(
+            &selected_ids,
+            &visible_selected_ids,
+            &distances,
+            export_config.visible_levels,
+        );
+        let hidden_unreachable_count = selected_ids
+            .iter()
+            .filter(|block_id| {
+                !visible_selected_ids.contains(block_id) && !distances.contains_key(block_id)
+            })
+            .count();
+        let rendered = if export_config.include_rendered {
+            self.render_for_prompt(doc, config)
+        } else {
+            String::new()
+        };
 
         let mut nodes = Vec::new();
         for block_id in self.selected_block_ids() {
+            if !visible_selected_ids.contains(&block_id) {
+                continue;
+            }
             let Some(block) = doc.get_block(&block_id) else {
                 continue;
             };
@@ -810,6 +985,13 @@ impl CodeGraphContextSession {
                 .display_label(doc, &block_id)
                 .unwrap_or_else(|| block_id.to_string());
             let logical_key = block_logical_key(block);
+            let distance_from_focus = distances.get(&block_id).copied();
+            let relevance_score = relevance_score_for_node(
+                self,
+                &index,
+                block_id,
+                distance_from_focus,
+            );
             let signature = if node_class == "symbol" {
                 Some(format!(
                     "{}{}",
@@ -819,13 +1001,28 @@ impl CodeGraphContextSession {
             } else {
                 None
             };
-            let docs = content_string(block, "description").or_else(|| block.metadata.summary.clone());
+            let docs = if should_include_docs(export_config, self.focus, block_id, node, distance_from_focus) {
+                content_string(block, "description").or_else(|| block.metadata.summary.clone())
+            } else {
+                None
+            };
             let coderef = block_coderef(block).map(|coderef| CodeGraphCoderef {
                 path: coderef.path,
                 display: coderef.display,
                 start_line: coderef.start_line,
                 end_line: coderef.end_line,
             });
+            let hydrated_source = if should_include_hydrated_source(
+                export_config,
+                self.focus,
+                block_id,
+                node,
+                distance_from_focus,
+            ) {
+                node.hydrated_source.clone()
+            } else {
+                None
+            };
 
             nodes.push(CodeGraphContextNodeExport {
                 block_id,
@@ -837,58 +1034,52 @@ impl CodeGraphContextSession {
                 label,
                 detail_level: node.detail_level,
                 pinned: node.pinned,
+                distance_from_focus,
+                relevance_score,
                 logical_key,
                 signature,
                 docs,
                 origin: node.origin.clone(),
                 coderef,
-                hydrated_source: node.hydrated_source.clone(),
+                hydrated_source,
             });
         }
-
-        let mut edges = Vec::new();
-        for source in self.selected_block_ids() {
-            for edge in index.outgoing_edges(&source) {
-                if !selected_ids.contains(&edge.other) {
-                    continue;
-                }
-                edges.push(CodeGraphContextEdgeExport {
-                    source,
-                    source_short_id: short_ids
-                        .get(&source)
-                        .cloned()
-                        .unwrap_or_else(|| source.to_string()),
-                    target: edge.other,
-                    target_short_id: short_ids
-                        .get(&edge.other)
-                        .cloned()
-                        .unwrap_or_else(|| edge.other.to_string()),
-                    relation: edge.relation,
-                });
-            }
-        }
-        edges.sort_by_key(|edge| {
+        nodes.sort_by_key(|node| {
             (
-                edge.source_short_id.clone(),
-                edge.relation.clone(),
-                edge.target_short_id.clone(),
+                std::cmp::Reverse(node.relevance_score),
+                node.distance_from_focus.unwrap_or(usize::MAX),
+                node.short_id.clone(),
             )
         });
 
+        let (edges, total_selected_edges) =
+            export_edges(&index, &visible_selected_ids, &short_ids, export_config);
+
         let frontier = self.export_frontier(doc, &index, &short_ids, &selected_ids);
+        let heuristics = self.compute_heuristics(&index, &frontier);
         let omitted_symbol_count = index.total_symbols().saturating_sub(summary.symbols);
 
         CodeGraphContextExport {
             summary,
+            export_mode: export_config.mode,
+            visible_levels: export_config.visible_levels,
             focus: self.focus,
             focus_short_id: self
                 .focus
                 .and_then(|id| short_ids.get(&id).cloned()),
             focus_label: self.focus.and_then(|id| index.display_label(doc, &id)),
+            visible_node_count: nodes.len(),
+            hidden_unreachable_count,
+            hidden_levels,
             nodes,
             edges,
-            frontier,
+            frontier: frontier
+                .into_iter()
+                .take(export_config.max_frontier_actions.max(1))
+                .collect(),
+            heuristics,
             omitted_symbol_count,
+            total_selected_edges,
             rendered,
         }
     }
@@ -917,15 +1108,49 @@ impl CodeGraphContextSession {
                     .into_iter()
                     .filter(|id| !selected_ids.contains(id))
                     .count();
-                vec![CodeGraphContextFrontierAction {
+                let mut actions = vec![CodeGraphContextFrontierAction {
                     block_id: focus_id,
                     short_id,
                     action: "expand_file".to_string(),
                     relation: None,
                     direction: None,
                     candidate_count: hidden,
+                    priority: frontier_priority("expand_file", None, hidden, false),
                     description: format!("Expand file symbols for {}", label),
-                }]
+                }];
+                actions.push(CodeGraphContextFrontierAction {
+                    block_id: focus_id,
+                    short_id: actions[0].short_id.clone(),
+                    action: "hydrate_source".to_string(),
+                    relation: None,
+                    direction: None,
+                    candidate_count: usize::from(
+                        self.selected
+                            .get(&focus_id)
+                            .and_then(|node| node.hydrated_source.as_ref())
+                            .is_none(),
+                    ),
+                    priority: frontier_priority(
+                        "hydrate_source",
+                        None,
+                        usize::from(
+                            self.selected
+                                .get(&focus_id)
+                                .and_then(|node| node.hydrated_source.as_ref())
+                                .is_none(),
+                        ),
+                        false,
+                    ),
+                    description: format!("Hydrate source for file {}", label),
+                });
+                actions.sort_by_key(|action| {
+                    (
+                        std::cmp::Reverse(action.priority),
+                        action.action.clone(),
+                        action.relation.clone(),
+                    )
+                });
+                actions
             }
             "symbol" => {
                 let mut actions = Vec::new();
@@ -961,6 +1186,17 @@ impl CodeGraphContextSession {
                             .and_then(|node| node.hydrated_source.as_ref())
                             .is_none(),
                     ),
+                    priority: frontier_priority(
+                        "hydrate_source",
+                        None,
+                        usize::from(
+                            self.selected
+                                .get(&focus_id)
+                                .and_then(|node| node.hydrated_source.as_ref())
+                                .is_none(),
+                        ),
+                        false,
+                    ),
                     description: format!("Hydrate source for {}", label),
                 });
                 actions.push(CodeGraphContextFrontierAction {
@@ -970,11 +1206,100 @@ impl CodeGraphContextSession {
                     relation: None,
                     direction: None,
                     candidate_count: 1,
+                    priority: frontier_priority("collapse", None, 1, false),
                     description: format!("Collapse {} from working set", label),
+                });
+                actions.sort_by_key(|action| {
+                    (
+                        std::cmp::Reverse(action.priority),
+                        action.action.clone(),
+                        action.relation.clone(),
+                    )
                 });
                 actions
             }
             _ => Vec::new(),
+        }
+    }
+
+    fn compute_heuristics(
+        &self,
+        index: &CodeGraphQueryIndex,
+        frontier: &[CodeGraphContextFrontierAction],
+    ) -> CodeGraphContextHeuristics {
+        let focus_node = self.focus.and_then(|id| self.selected.get(&id));
+        let focus_hydrated = focus_node
+            .and_then(|node| node.hydrated_source.as_ref())
+            .is_some();
+        let hidden_candidate_count = frontier
+            .iter()
+            .filter(|action| action.action.starts_with("expand_") && action.candidate_count > 0)
+            .map(|action| action.candidate_count)
+            .sum();
+        let low_value_candidate_count = frontier
+            .iter()
+            .filter(|action| action.action.starts_with("expand_") && action.priority <= 30)
+            .map(|action| action.candidate_count)
+            .sum();
+        let recommended_actions: Vec<_> = frontier
+            .iter()
+            .filter(|action| action.candidate_count > 0)
+            .take(3)
+            .cloned()
+            .collect();
+        let recommended_next_action = recommended_actions.first().cloned();
+
+        let mut reasons = Vec::new();
+        let should_stop = match self.focus {
+            None => {
+                reasons.push("set focus to a file or symbol before continuing expansion".to_string());
+                false
+            }
+            Some(focus_id) => match index.node_class(&focus_id).unwrap_or("unknown") {
+                "file" => {
+                    if hidden_candidate_count == 0 && focus_hydrated {
+                        reasons.push(
+                            "focus file is hydrated and no unselected file symbols remain".to_string(),
+                        );
+                        true
+                    } else if hidden_candidate_count == 0 {
+                        reasons.push("all file symbols for the focused file are already selected".to_string());
+                        false
+                    } else {
+                        false
+                    }
+                }
+                "symbol" => {
+                    if hidden_candidate_count == 0 && focus_hydrated {
+                        reasons.push(
+                            "focus symbol is hydrated and no unselected dependency frontier remains"
+                                .to_string(),
+                        );
+                        true
+                    } else if focus_hydrated
+                        && hidden_candidate_count > 0
+                        && hidden_candidate_count == low_value_candidate_count
+                    {
+                        reasons.push(
+                            "remaining frontier is low-value compared to the hydrated focus symbol"
+                                .to_string(),
+                        );
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => frontier.iter().all(|action| action.candidate_count == 0),
+            },
+        };
+
+        CodeGraphContextHeuristics {
+            should_stop,
+            reasons,
+            hidden_candidate_count,
+            low_value_candidate_count,
+            recommended_next_action,
+            recommended_actions,
         }
     }
 
@@ -1017,7 +1342,8 @@ impl CodeGraphContextSession {
         &mut self,
         doc: &Document,
         block_id: BlockId,
-        relation_filter: Option<&str>,
+        relation_filters: Option<&HashSet<String>>,
+        depth: usize,
         traversal: TraversalKind,
     ) -> CodeGraphContextUpdate {
         let index = CodeGraphQueryIndex::new(doc);
@@ -1025,51 +1351,68 @@ impl CodeGraphContextSession {
         self.ensure_selected_with_origin(
             block_id,
             CodeGraphDetailLevel::Neighborhood,
-            selection_origin(CodeGraphSelectionOriginKind::Manual, relation_filter, None),
+            selection_origin(
+                CodeGraphSelectionOriginKind::Manual,
+                relation_filters.and_then(|filters| join_relation_filters(filters)),
+                None,
+            ),
             &mut update,
         );
 
-        let edges = match traversal {
-            TraversalKind::Outgoing => index.outgoing_edges(&block_id),
-            TraversalKind::Incoming => index.incoming_edges(&block_id),
-        };
-
-        for edge in edges {
-            if relation_filter.map(|filter| filter != edge.relation).unwrap_or(false) {
+        let mut queue = VecDeque::from([(block_id, 0usize)]);
+        let mut visited = HashSet::from([block_id]);
+        while let Some((current, current_depth)) = queue.pop_front() {
+            if current_depth >= depth.max(1) {
                 continue;
             }
-            let class = index.node_class(&edge.other).unwrap_or("unknown");
-            let level = if class == "symbol" {
-                CodeGraphDetailLevel::SymbolCard
-            } else {
-                CodeGraphDetailLevel::Skeleton
+            let edges = match traversal {
+                TraversalKind::Outgoing => index.outgoing_edges(&current),
+                TraversalKind::Incoming => index.incoming_edges(&current),
             };
-            self.ensure_selected_with_origin(
-                edge.other,
-                level,
-                selection_origin(
-                    match traversal {
-                        TraversalKind::Outgoing => CodeGraphSelectionOriginKind::Dependencies,
-                        TraversalKind::Incoming => CodeGraphSelectionOriginKind::Dependents,
-                    },
-                    Some(edge.relation.as_str()),
-                    Some(block_id),
-                ),
-                &mut update,
-            );
+
+            for edge in edges {
+                if !relation_matches(relation_filters, edge.relation.as_str()) {
+                    continue;
+                }
+                let class = index.node_class(&edge.other).unwrap_or("unknown");
+                let level = if class == "symbol" {
+                    CodeGraphDetailLevel::SymbolCard
+                } else {
+                    CodeGraphDetailLevel::Skeleton
+                };
+                self.ensure_selected_with_origin(
+                    edge.other,
+                    level,
+                    selection_origin(
+                        match traversal {
+                            TraversalKind::Outgoing => CodeGraphSelectionOriginKind::Dependencies,
+                            TraversalKind::Incoming => CodeGraphSelectionOriginKind::Dependents,
+                        },
+                        Some(edge.relation.as_str()),
+                        Some(current),
+                    ),
+                    &mut update,
+                );
+                if visited.insert(edge.other) {
+                    queue.push_back((edge.other, current_depth + 1));
+                }
+            }
         }
 
         self.focus = Some(block_id);
         self.apply_prune_policy(doc, &mut update);
         update.focus = self.focus;
         self.history.push(format!(
-            "expand:{}:{}:{}",
+            "expand:{}:{}:{}:{}",
             match traversal {
                 TraversalKind::Outgoing => "dependencies",
                 TraversalKind::Incoming => "dependents",
             },
             block_id,
-            relation_filter.unwrap_or("*")
+            relation_filters
+                .map(join_relation_filter_string)
+                .unwrap_or_else(|| "*".to_string()),
+            depth.max(1)
         ));
         update
     }
@@ -1201,6 +1544,7 @@ impl CodeGraphQueryIndex {
         let mut incoming: HashMap<BlockId, Vec<IndexedEdge>> = HashMap::new();
         let mut file_symbols: HashMap<BlockId, Vec<BlockId>> = HashMap::new();
         let mut symbol_children: HashMap<BlockId, Vec<BlockId>> = HashMap::new();
+        let mut structure_parent: HashMap<BlockId, BlockId> = HashMap::new();
 
         for (block_id, block) in &doc.blocks {
             if let Some(key) = block_logical_key(block) {
@@ -1269,6 +1613,7 @@ impl CodeGraphQueryIndex {
                 if parent_class == "symbol" && child_class == "symbol" {
                     symbol_children.entry(*parent).or_default().push(*child);
                 }
+                structure_parent.insert(*child, *parent);
             }
         }
 
@@ -1283,6 +1628,7 @@ impl CodeGraphQueryIndex {
             incoming,
             file_symbols,
             symbol_children,
+            structure_parent,
         }
     }
 
@@ -1303,15 +1649,29 @@ impl CodeGraphQueryIndex {
             })
     }
 
-    fn overview_nodes(&self) -> Vec<BlockId> {
-        let mut nodes: Vec<_> = self
-            .node_classes
-            .iter()
-            .filter_map(|(block_id, class)| match class.as_str() {
-                "repository" | "directory" | "file" => Some(*block_id),
-                _ => None,
-            })
-            .collect();
+    fn overview_nodes(&self, doc: &Document, max_depth: Option<usize>) -> Vec<BlockId> {
+        let mut nodes = Vec::new();
+        let limit = max_depth.unwrap_or(usize::MAX);
+        let mut queue = VecDeque::from([(doc.root, 0usize)]);
+        let mut visited = HashSet::new();
+        while let Some((block_id, depth)) = queue.pop_front() {
+            if !visited.insert(block_id) {
+                continue;
+            }
+            let class = self.node_classes.get(&block_id).map(String::as_str).unwrap_or("unknown");
+            if matches!(class, "repository" | "directory" | "file") {
+                nodes.push(block_id);
+            }
+            if depth >= limit {
+                continue;
+            }
+            for child in doc.children(&block_id) {
+                let child_class = self.node_classes.get(&child).map(String::as_str).unwrap_or("unknown");
+                if matches!(child_class, "repository" | "directory" | "file") {
+                    queue.push_back((*child, depth + 1));
+                }
+            }
+        }
         nodes.sort_by_key(|block_id| {
             self.logical_keys
                 .get(block_id)
@@ -1340,6 +1700,17 @@ impl CodeGraphQueryIndex {
         symbols
     }
 
+    fn symbol_children(&self, block_id: &BlockId) -> Vec<BlockId> {
+        let mut children = self.symbol_children.get(block_id).cloned().unwrap_or_default();
+        children.sort_by_key(|id| {
+            self.logical_keys
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| id.to_string())
+        });
+        children
+    }
+
     fn descendants(&self, block_id: BlockId) -> Vec<BlockId> {
         let mut out = Vec::new();
         let mut queue: VecDeque<BlockId> = self
@@ -1361,6 +1732,10 @@ impl CodeGraphQueryIndex {
 
     fn node_class(&self, block_id: &BlockId) -> Option<&str> {
         self.node_classes.get(block_id).map(String::as_str)
+    }
+
+    fn structure_parent(&self, block_id: &BlockId) -> Option<BlockId> {
+        self.structure_parent.get(block_id).copied()
     }
 
     fn total_symbols(&self) -> usize {
@@ -1419,6 +1794,15 @@ pub fn export_codegraph_context(
     session.export(doc, config)
 }
 
+pub fn export_codegraph_context_with_config(
+    doc: &Document,
+    session: &CodeGraphContextSession,
+    render_config: &CodeGraphRenderConfig,
+    export_config: &CodeGraphExportConfig,
+) -> CodeGraphContextExport {
+    session.export_with_config(doc, render_config, export_config)
+}
+
 pub fn approximate_prompt_tokens(rendered: &str) -> u32 {
     ((rendered.len() as f32) / 4.0).ceil() as u32
 }
@@ -1469,6 +1853,10 @@ fn push_unique(ids: &mut Vec<BlockId>, block_id: BlockId) {
     }
 }
 
+fn default_one() -> usize {
+    1
+}
+
 fn prune_removal_rank(node_class: &str) -> u8 {
     match node_class {
         "symbol" => 4,
@@ -1509,17 +1897,14 @@ fn render_edge_section(
     index: &CodeGraphQueryIndex,
     limit: usize,
 ) {
-    let visible: Vec<_> = edges
-        .into_iter()
-        .filter(|edge| selected_ids.contains(&edge.other))
-        .collect();
+    let visible = dedupe_visible_edges(edges, selected_ids);
 
     if visible.is_empty() {
         return;
     }
 
     let _ = writeln!(out, "  {}:", label);
-    for edge in visible.iter().take(limit) {
+    for (edge, multiplicity) in visible.iter().take(limit) {
         let short = short_ids
             .get(&edge.other)
             .cloned()
@@ -1527,7 +1912,12 @@ fn render_edge_section(
         let target = index
             .display_label(doc, &edge.other)
             .unwrap_or_else(|| edge.other.to_string());
-        let _ = writeln!(out, "    - {} -> [{}] {}", edge.relation, short, target);
+        let suffix = if *multiplicity > 1 {
+            format!(" (x{})", multiplicity)
+        } else {
+            String::new()
+        };
+        let _ = writeln!(out, "    - {} -> [{}] {}{}", edge.relation, short, target, suffix);
     }
 
     if visible.len() > limit {
@@ -1553,6 +1943,10 @@ fn append_relation_frontier(
         *counts.entry(edge.relation).or_default() += 1;
     }
     for (relation, candidate_count) in counts {
+        let low_value = matches!(action, "expand_dependents")
+            || relation == "references"
+            || relation == "cited_by"
+            || relation == "links_to";
         out.push(CodeGraphContextFrontierAction {
             block_id,
             short_id: short_id.to_string(),
@@ -1560,9 +1954,310 @@ fn append_relation_frontier(
             relation: Some(relation.clone()),
             direction: Some(direction.to_string()),
             candidate_count,
+            priority: frontier_priority(action, Some(relation.as_str()), candidate_count, low_value),
             description: format!("{} {} neighbors via {} for {}", action, direction, relation, label),
         });
     }
+}
+
+fn dedupe_visible_edges(
+    edges: Vec<IndexedEdge>,
+    selected_ids: &HashSet<BlockId>,
+) -> Vec<(IndexedEdge, usize)> {
+    let mut counts: HashMap<(BlockId, String), usize> = HashMap::new();
+    for edge in edges {
+        if !selected_ids.contains(&edge.other) {
+            continue;
+        }
+        *counts.entry((edge.other, edge.relation)).or_default() += 1;
+    }
+    let mut deduped: Vec<_> = counts
+        .into_iter()
+        .map(|((other, relation), multiplicity)| (IndexedEdge { other, relation }, multiplicity))
+        .collect();
+    deduped.sort_by_key(|(edge, _)| (edge.relation.clone(), edge.other.to_string()));
+    deduped
+}
+
+fn export_edges(
+    index: &CodeGraphQueryIndex,
+    selected_ids: &HashSet<BlockId>,
+    short_ids: &HashMap<BlockId, String>,
+    export_config: &CodeGraphExportConfig,
+) -> (Vec<CodeGraphContextEdgeExport>, usize) {
+    let mut edges = Vec::new();
+    let mut total_selected_edges = 0;
+
+    if export_config.dedupe_edges {
+        let mut counts: HashMap<(BlockId, String, BlockId), usize> = HashMap::new();
+        for source in selected_ids.iter().copied() {
+            for edge in index.outgoing_edges(&source) {
+                if !selected_ids.contains(&edge.other) {
+                    continue;
+                }
+                total_selected_edges += 1;
+                *counts.entry((source, edge.relation, edge.other)).or_default() += 1;
+            }
+        }
+        for ((source, relation, target), multiplicity) in counts {
+            edges.push(CodeGraphContextEdgeExport {
+                source,
+                source_short_id: short_ids
+                    .get(&source)
+                    .cloned()
+                    .unwrap_or_else(|| source.to_string()),
+                target,
+                target_short_id: short_ids
+                    .get(&target)
+                    .cloned()
+                    .unwrap_or_else(|| target.to_string()),
+                relation,
+                multiplicity,
+            });
+        }
+    } else {
+        for source in selected_ids.iter().copied() {
+            for edge in index.outgoing_edges(&source) {
+                if !selected_ids.contains(&edge.other) {
+                    continue;
+                }
+                total_selected_edges += 1;
+                edges.push(CodeGraphContextEdgeExport {
+                    source,
+                    source_short_id: short_ids
+                        .get(&source)
+                        .cloned()
+                        .unwrap_or_else(|| source.to_string()),
+                    target: edge.other,
+                    target_short_id: short_ids
+                        .get(&edge.other)
+                        .cloned()
+                        .unwrap_or_else(|| edge.other.to_string()),
+                    relation: edge.relation,
+                    multiplicity: 1,
+                });
+            }
+        }
+    }
+
+    edges.sort_by_key(|edge| {
+        (
+            edge.source_short_id.clone(),
+            edge.relation.clone(),
+            edge.target_short_id.clone(),
+        )
+    });
+    (edges, total_selected_edges)
+}
+
+fn focus_distances(
+    doc: &Document,
+    focus: Option<BlockId>,
+    selected_ids: &HashSet<BlockId>,
+    index: &CodeGraphQueryIndex,
+) -> HashMap<BlockId, usize> {
+    let mut distances = HashMap::new();
+    let Some(focus) = focus else {
+        return distances;
+    };
+    if !selected_ids.contains(&focus) {
+        return distances;
+    }
+
+    let mut queue = VecDeque::from([(focus, 0usize)]);
+    distances.insert(focus, 0);
+    while let Some((block_id, distance)) = queue.pop_front() {
+        let mut neighbors: Vec<BlockId> = index
+            .outgoing_edges(&block_id)
+            .into_iter()
+            .chain(index.incoming_edges(&block_id).into_iter())
+            .map(|edge| edge.other)
+            .collect();
+        neighbors.extend(doc.children(&block_id));
+        if let Some(parent) = index.structure_parent(&block_id) {
+            neighbors.push(parent);
+        }
+        for neighbor in neighbors {
+            if !selected_ids.contains(&neighbor) || distances.contains_key(&neighbor) {
+                continue;
+            }
+            distances.insert(neighbor, distance + 1);
+            queue.push_back((neighbor, distance + 1));
+        }
+    }
+    distances
+}
+
+fn visible_selected_ids(
+    focus: Option<BlockId>,
+    selected_ids: &HashSet<BlockId>,
+    distances: &HashMap<BlockId, usize>,
+    visible_levels: Option<usize>,
+) -> HashSet<BlockId> {
+    match (focus, visible_levels) {
+        (Some(_), Some(levels)) => selected_ids
+            .iter()
+            .copied()
+            .filter(|block_id| distances.get(block_id).copied().unwrap_or(usize::MAX) <= levels)
+            .collect(),
+        _ => selected_ids.clone(),
+    }
+}
+
+fn hidden_level_summaries(
+    selected_ids: &HashSet<BlockId>,
+    visible_selected_ids: &HashSet<BlockId>,
+    distances: &HashMap<BlockId, usize>,
+    visible_levels: Option<usize>,
+) -> Vec<CodeGraphHiddenLevelSummary> {
+    let Some(levels) = visible_levels else {
+        return Vec::new();
+    };
+    let mut counts: BTreeMap<usize, usize> = BTreeMap::new();
+    for block_id in selected_ids {
+        if visible_selected_ids.contains(block_id) {
+            continue;
+        }
+        let Some(distance) = distances.get(block_id).copied() else {
+            continue;
+        };
+        if distance > levels {
+            *counts.entry(distance).or_default() += 1;
+        }
+    }
+    counts
+        .into_iter()
+        .map(|(level, count)| CodeGraphHiddenLevelSummary { level, count })
+        .collect()
+}
+
+fn relation_matches(relation_filters: Option<&HashSet<String>>, relation: &str) -> bool {
+    relation_filters
+        .map(|filters| filters.contains(relation))
+        .unwrap_or(true)
+}
+
+fn join_relation_filters(relation_filters: &HashSet<String>) -> Option<&str> {
+    if relation_filters.len() == 1 {
+        relation_filters.iter().next().map(String::as_str)
+    } else {
+        None
+    }
+}
+
+fn join_relation_filter_string(relation_filters: &HashSet<String>) -> String {
+    let mut filters: Vec<_> = relation_filters.iter().cloned().collect();
+    filters.sort();
+    filters.join(",")
+}
+
+fn relevance_score_for_node(
+    session: &CodeGraphContextSession,
+    index: &CodeGraphQueryIndex,
+    block_id: BlockId,
+    distance_from_focus: Option<usize>,
+) -> u16 {
+    let Some(node) = session.selected.get(&block_id) else {
+        return 0;
+    };
+    let mut score = 0u16;
+    if session.focus == Some(block_id) {
+        score += 100;
+    }
+    if node.pinned {
+        score += 40;
+    }
+    score += match index.node_class(&block_id).unwrap_or("unknown") {
+        "symbol" => 40,
+        "file" => 28,
+        "directory" => 16,
+        "repository" => 10,
+        _ => 6,
+    };
+    score += match node.detail_level {
+        CodeGraphDetailLevel::Source => 30,
+        CodeGraphDetailLevel::Neighborhood => 20,
+        CodeGraphDetailLevel::SymbolCard => 12,
+        CodeGraphDetailLevel::Skeleton => 4,
+    };
+    score += match node.origin.as_ref().map(|origin| origin.kind) {
+        Some(CodeGraphSelectionOriginKind::Manual) => 24,
+        Some(CodeGraphSelectionOriginKind::Overview) => 18,
+        Some(CodeGraphSelectionOriginKind::FileSymbols) => 16,
+        Some(CodeGraphSelectionOriginKind::Dependencies) => 12,
+        Some(CodeGraphSelectionOriginKind::Dependents) => 8,
+        None => 0,
+    };
+    score += match distance_from_focus {
+        Some(0) => 30,
+        Some(1) => 20,
+        Some(2) => 10,
+        Some(3) => 4,
+        Some(_) => 1,
+        None => 0,
+    };
+    score
+}
+
+fn should_include_docs(
+    export_config: &CodeGraphExportConfig,
+    focus: Option<BlockId>,
+    block_id: BlockId,
+    node: &CodeGraphContextNode,
+    distance_from_focus: Option<usize>,
+) -> bool {
+    match export_config.mode {
+        CodeGraphExportMode::Full => true,
+        CodeGraphExportMode::Compact => {
+            focus == Some(block_id) || node.pinned || distance_from_focus.unwrap_or(usize::MAX) <= 1
+        }
+    }
+}
+
+fn should_include_hydrated_source(
+    export_config: &CodeGraphExportConfig,
+    focus: Option<BlockId>,
+    block_id: BlockId,
+    node: &CodeGraphContextNode,
+    distance_from_focus: Option<usize>,
+) -> bool {
+    if node.hydrated_source.is_none() {
+        return false;
+    }
+    match export_config.mode {
+        CodeGraphExportMode::Full => true,
+        CodeGraphExportMode::Compact => {
+            focus == Some(block_id) || (node.pinned && distance_from_focus.unwrap_or(usize::MAX) <= 1)
+        }
+    }
+}
+
+fn frontier_priority(
+    action: &str,
+    relation: Option<&str>,
+    candidate_count: usize,
+    low_value: bool,
+) -> u16 {
+    let base = match action {
+        "hydrate_source" => 120,
+        "expand_file" => 100,
+        "expand_dependencies" => 85,
+        "expand_dependents" => 70,
+        "collapse" => 5,
+        _ => 20,
+    };
+    let relation_adjust = match relation {
+        Some("references") | Some("cited_by") => -20,
+        Some("links_to") => -12,
+        Some("uses_symbol") => 8,
+        Some("imports_symbol") => 6,
+        Some("reexports_symbol") => 4,
+        Some("calls") => 6,
+        _ => 0,
+    };
+    let low_value_adjust = if low_value { -10 } else { 0 };
+    let count_bonus = candidate_count.min(12) as i32;
+    (base + relation_adjust + low_value_adjust + count_bonus).max(0) as u16
 }
 
 fn make_short_ids(
@@ -2029,9 +2724,145 @@ mod tests {
             .frontier
             .iter()
             .any(|action| action.action == "hydrate_source"));
+        assert!(export.heuristics.recommended_next_action.is_some());
+        assert!(!export.heuristics.should_stop);
         assert!(export
             .frontier
             .iter()
             .any(|action| action.action == "expand_dependencies" && action.relation.as_deref() == Some("uses_symbol")));
+    }
+
+    #[test]
+    fn overview_seed_depth_limits_structural_selection() {
+        let doc = build_test_graph();
+        let mut shallow = CodeGraphContextSession::new();
+        shallow.seed_overview_with_depth(&doc, Some(1));
+        let shallow_summary = shallow.summary(&doc);
+        assert!(shallow_summary.repositories + shallow_summary.directories >= 1);
+        assert_eq!(shallow_summary.files, 0);
+
+        let mut deeper = CodeGraphContextSession::new();
+        deeper.seed_overview_with_depth(&doc, Some(3));
+        let deeper_summary = deeper.summary(&doc);
+        assert!(deeper_summary.files >= 2);
+    }
+
+    #[test]
+    fn export_with_visible_levels_summarizes_hidden_nodes() {
+        let doc = build_test_graph();
+        let mut session = CodeGraphContextSession::new();
+        let file_id = resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
+        let add_id = resolve_codegraph_selector(&doc, "symbol:src/lib.rs::add").unwrap();
+
+        session.seed_overview(&doc);
+        session.expand_file(&doc, file_id);
+        session.expand_dependencies(&doc, add_id, Some("uses_symbol"));
+        session.focus = Some(add_id);
+
+        let mut export_config = CodeGraphExportConfig::compact();
+        export_config.visible_levels = Some(1);
+        let export = session.export_with_config(&doc, &CodeGraphRenderConfig::default(), &export_config);
+
+        assert_eq!(export.visible_levels, Some(1));
+        assert!(export.visible_node_count < export.summary.selected);
+        assert!(export.hidden_levels.iter().any(|hidden| hidden.level >= 2));
+        assert!(export
+            .nodes
+            .iter()
+            .all(|node| node.distance_from_focus.unwrap_or(usize::MAX) <= 1));
+    }
+
+    #[test]
+    fn selective_multi_hop_expansion_follows_only_requested_relations() {
+        let mut doc = build_test_graph();
+        let mut session = CodeGraphContextSession::new();
+        let file_id = resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
+        let add_id = resolve_codegraph_selector(&doc, "symbol:src/lib.rs::add").unwrap();
+        let sub_id = resolve_codegraph_selector(&doc, "symbol:src/lib.rs::sub").unwrap();
+        let util_id = resolve_codegraph_selector(&doc, "symbol:src/util.rs::util").unwrap();
+
+        doc.add_edge(&add_id, ucm_core::EdgeType::References, sub_id);
+
+        session.seed_overview(&doc);
+        session.expand_file(&doc, file_id);
+
+        let relation_filters = HashSet::from(["references".to_string()]);
+        session.expand_dependencies_with_filters(&doc, add_id, Some(&relation_filters), 2);
+        assert!(session.selected.contains_key(&sub_id));
+        assert!(!session.selected.contains_key(&util_id));
+
+        let mut session = CodeGraphContextSession::new();
+        session.seed_overview(&doc);
+        session.expand_file(&doc, file_id);
+        let relation_filters = HashSet::from(["references".to_string(), "uses_symbol".to_string()]);
+        session.expand_dependencies_with_filters(&doc, add_id, Some(&relation_filters), 2);
+        assert!(session.selected.contains_key(&sub_id));
+        assert!(session.selected.contains_key(&util_id));
+    }
+
+    #[test]
+    fn compact_export_dedupes_edges_and_omits_rendered_text() {
+        let mut doc = build_test_graph();
+        let mut session = CodeGraphContextSession::new();
+        let file_id = resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
+        let add_id = resolve_codegraph_selector(&doc, "symbol:src/lib.rs::add").unwrap();
+        let util_id = resolve_codegraph_selector(&doc, "symbol:src/util.rs::util").unwrap();
+
+        doc.add_edge(&add_id, ucm_core::EdgeType::References, util_id);
+
+        session.seed_overview(&doc);
+        session.expand_file(&doc, file_id);
+        session.expand_dependencies(&doc, add_id, Some("uses_symbol"));
+        session.hydrate_source(&doc, add_id, 1);
+        session.focus = Some(add_id);
+
+        let export = session.export_with_config(
+            &doc,
+            &CodeGraphRenderConfig::default(),
+            &CodeGraphExportConfig::compact(),
+        );
+
+        assert_eq!(export.export_mode, CodeGraphExportMode::Compact);
+        assert!(export.rendered.is_empty());
+        assert!(export.total_selected_edges >= export.edges.len());
+        assert!(export.edges.iter().all(|edge| edge.multiplicity >= 1));
+        assert!(export
+            .nodes
+            .iter()
+            .find(|node| node.block_id == add_id)
+            .and_then(|node| node.hydrated_source.as_ref())
+            .is_some());
+    }
+
+    #[test]
+    fn heuristics_stop_when_focus_is_hydrated_and_frontier_is_exhausted() {
+        let doc = build_test_graph();
+        let mut session = CodeGraphContextSession::new();
+        let file_id = resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
+        let add_id = resolve_codegraph_selector(&doc, "symbol:src/lib.rs::add").unwrap();
+
+        session.seed_overview(&doc);
+        session.expand_file(&doc, file_id);
+        session.expand_dependencies(&doc, add_id, Some("uses_symbol"));
+        session.focus = Some(add_id);
+        let pre_hydrate = session.export(&doc, &CodeGraphRenderConfig::default());
+        assert!(!pre_hydrate.heuristics.should_stop);
+        assert_eq!(
+            pre_hydrate
+                .heuristics
+                .recommended_next_action
+                .as_ref()
+                .map(|action| action.action.as_str()),
+            Some("hydrate_source")
+        );
+
+        session.hydrate_source(&doc, add_id, 1);
+        let exhausted = session.export(&doc, &CodeGraphRenderConfig::default());
+        assert!(exhausted.heuristics.should_stop);
+        assert!(exhausted
+            .heuristics
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("hydrated")));
     }
 }

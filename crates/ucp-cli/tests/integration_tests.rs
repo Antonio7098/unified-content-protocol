@@ -804,11 +804,21 @@ mod workflow_tests {
             doc_path.as_str(),
             "--max-selected",
             "10",
+            "--initial-depth",
+            "1",
             "--format",
             "json",
         ]);
         assert!(init.status.success(), "context init failed: {}", stderr(&init));
         let init_json: serde_json::Value = serde_json::from_str(&stdout(&init)).unwrap();
+        assert_eq!(init_json.get("initial_depth").and_then(|v| v.as_u64()), Some(1));
+        assert_eq!(
+            init_json
+                .get("summary")
+                .and_then(|v| v.get("files"))
+                .and_then(|v| v.as_u64()),
+            Some(0)
+        );
         let session_id = init_json
             .get("session_id")
             .and_then(|v| v.as_str())
@@ -827,6 +837,8 @@ mod workflow_tests {
                 "src/lib.rs",
                 "--mode",
                 "file",
+                "--depth",
+                "1",
                 "--format",
                 "json",
             ],
@@ -841,8 +853,10 @@ mod workflow_tests {
                 "symbol:src/lib.rs::add",
                 "--mode",
                 "dependencies",
-                "--relation",
-                "uses_symbol",
+                "--relations",
+                "uses_symbol,links_to",
+                "--depth",
+                "2",
                 "--format",
                 "json",
             ],
@@ -896,6 +910,10 @@ mod workflow_tests {
             doc_path.as_str(),
             "--session",
             session_id.as_str(),
+            "--compact",
+            "--no-rendered",
+            "--levels",
+            "0",
             "--format",
             "json",
         ]);
@@ -908,12 +926,26 @@ mod workflow_tests {
                 .and_then(|v| v.as_u64()),
             Some(4)
         );
-        let rendered = show_json.get("rendered").and_then(|v| v.as_str()).unwrap();
-        assert!(rendered.contains("selected=4/4"));
-        assert!(rendered.contains("prune policy: max_selected=4"));
-        assert!(!rendered.contains("source:"));
+        assert_eq!(show_json.get("export_mode").and_then(|v| v.as_str()), Some("compact"));
+        assert_eq!(show_json.get("visible_levels").and_then(|v| v.as_u64()), Some(0));
+        assert!(show_json.get("rendered").is_none());
         assert!(show_json.get("nodes").and_then(|v| v.as_array()).is_some());
         assert!(show_json.get("frontier").and_then(|v| v.as_array()).is_some());
+        assert!(show_json.get("heuristics").is_some());
+        assert!(show_json
+            .get("visible_node_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            < show_json
+                .get("summary")
+                .and_then(|v| v.get("selected"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0));
+        assert!(show_json
+            .get("hidden_levels")
+            .and_then(|v| v.as_array())
+            .map(|items| !items.is_empty())
+            .unwrap_or(false));
 
         let export = run_cli(&[
             "codegraph",
@@ -923,6 +955,10 @@ mod workflow_tests {
             doc_path.as_str(),
             "--session",
             session_id.as_str(),
+            "--compact",
+            "--no-rendered",
+            "--levels",
+            "0",
             "--format",
             "json",
         ]);
@@ -938,6 +974,18 @@ mod workflow_tests {
             .and_then(|v| v.as_array())
             .map(|nodes| nodes.iter().any(|node| node.get("origin").is_some()))
             .unwrap_or(false));
+        assert!(export_json
+            .get("heuristics")
+            .and_then(|v| v.get("recommended_actions"))
+            .and_then(|v| v.as_array())
+            .map(|actions| !actions.is_empty())
+            .unwrap_or(false));
+        assert!(export_json
+            .get("edges")
+            .and_then(|v| v.as_array())
+            .map(|edges| edges.iter().all(|edge| edge.get("multiplicity").is_some()))
+            .unwrap_or(false));
+        assert_eq!(export_json.get("visible_levels").and_then(|v| v.as_u64()), Some(0));
     }
 }
 

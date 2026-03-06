@@ -1163,6 +1163,10 @@ pub enum CodegraphContextCommands {
         /// Maximum selected nodes before automatic prune/demotion
         #[arg(long, default_value = "48")]
         max_selected: usize,
+
+        /// Limit initial overview seeding to this many structural levels from the root
+        #[arg(long)]
+        initial_depth: Option<usize>,
     },
 
     /// Show the current codegraph working set
@@ -1178,6 +1182,18 @@ pub enum CodegraphContextCommands {
         /// Maximum tokens to target in rendered output
         #[arg(long, default_value = "4000")]
         max_tokens: usize,
+
+        /// Emit a compact machine-oriented export shape
+        #[arg(long)]
+        compact: bool,
+
+        /// Omit the rendered prompt text from JSON output
+        #[arg(long)]
+        no_rendered: bool,
+
+        /// Show only nodes within N levels of the current focus
+        #[arg(long)]
+        levels: Option<usize>,
     },
 
     /// Export the current working set as structured JSON with frontier metadata
@@ -1193,6 +1209,18 @@ pub enum CodegraphContextCommands {
         /// Maximum tokens to target in rendered output
         #[arg(long, default_value = "4000")]
         max_tokens: usize,
+
+        /// Emit a compact machine-oriented export shape
+        #[arg(long)]
+        compact: bool,
+
+        /// Omit the rendered prompt text from the export payload
+        #[arg(long)]
+        no_rendered: bool,
+
+        /// Export only nodes within N levels of the current focus
+        #[arg(long)]
+        levels: Option<usize>,
     },
 
     /// Add one or more blocks/selectors into the working set
@@ -1243,6 +1271,14 @@ pub enum CodegraphContextCommands {
         /// Optional relation filter
         #[arg(long)]
         relation: Option<String>,
+
+        /// Optional comma-separated relation filters
+        #[arg(long)]
+        relations: Option<String>,
+
+        /// Expand outward for N hops
+        #[arg(long, default_value = "1")]
+        depth: usize,
     },
 
     /// Hydrate source from coderef for a selected block

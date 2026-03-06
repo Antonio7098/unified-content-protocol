@@ -15,6 +15,7 @@ TARGET_FILES = [
 TARGET_SUFFIXES = {"::context_show", "::resolve_selector", "::get_session_mut", "::print_context_update"}
 QUEUE_FILES = set(TARGET_FILES + ["crates/ucp-codegraph/src/context.rs"])
 MAX_OUTPUT_LINES = 80
+MAX_SYMBOL_STEPS = 8
 
 
 def write(text: str = "") -> None:
@@ -87,6 +88,20 @@ def queueable_symbols(export: dict, seen: set[str], queued: set[str]) -> list[st
     return sorted(discovered)
 
 
+def pick_relations(frontier: list[dict], action: str, limit: int = 2) -> list[str]:
+    relations: list[str] = []
+    for item in frontier:
+        if item.get("action") != action or item.get("candidate_count", 0) == 0:
+            continue
+        relation = item.get("relation")
+        if not relation or relation in relations:
+            continue
+        relations.append(relation)
+        if len(relations) >= limit:
+            break
+    return relations
+
+
 def main() -> None:
     if TRANSCRIPT.exists():
         TRANSCRIPT.unlink()
@@ -94,7 +109,7 @@ def main() -> None:
         ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True, capture_output=True
     ).stdout.strip() or "demo"
     write("## Codegraph context demo transcript\n\n")
-    write("Chosen refactor candidate: deduplicate codegraph context/session helper logic across `agent.rs` and `codegraph.rs`.\n")
+    write("Chosen refactor candidate: deduplicate codegraph context/session helper logic across `agent.rs` and `codegraph.rs`, using bounded depth and selected-edge traversal.\n")
     with tempfile.TemporaryDirectory(prefix="ucp-codegraph-demo-") as tmp:
         doc = Path(tmp) / "ucp-codegraph.json"
         build_out = run_step(
@@ -103,19 +118,78 @@ def main() -> None:
         )
         _ = parse_json(build_out)
         init_out = run_step(
-            "Initialize a stateful codegraph context session from the root overview",
-            *cli("codegraph", "context", "init", "--input", str(doc), "--name", "demo_context_walk", "--max-selected", "512", "--format", "json"),
+            "Initialize a stateful codegraph context session from a shallow structural overview",
+            *cli(
+                "codegraph",
+                "context",
+                "init",
+                "--input",
+                str(doc),
+                "--name",
+                "demo_context_walk",
+                "--max-selected",
+                "512",
+                "--initial-depth",
+                "1",
+                "--format",
+                "json",
+            ),
         )
         session_id = parse_json(init_out)["session_id"]
         write(f"\nSession: `{session_id}`\n")
-        run_step("Show the initial root working set", *cli("codegraph", "context", "show", "--input", str(doc), "--session", session_id, "--format", "json"))
+        run_step(
+            "Show the compact initial working set",
+            *cli(
+                "codegraph",
+                "context",
+                "show",
+                "--input",
+                str(doc),
+                "--session",
+                session_id,
+                "--compact",
+                "--no-rendered",
+                "--format",
+                "json",
+            ),
+        )
         for path in TARGET_FILES:
             run_step(
-                f"Expand file symbols for {path}",
-                *cli("codegraph", "context", "expand", "--input", str(doc), "--session", session_id, path, "--mode", "file", "--format", "json"),
+                f"Expand file symbols for {path} with nested depth",
+                *cli(
+                    "codegraph",
+                    "context",
+                    "expand",
+                    "--input",
+                    str(doc),
+                    "--session",
+                    session_id,
+                    path,
+                    "--mode",
+                    "file",
+                    "--depth",
+                    "2",
+                    "--format",
+                    "json",
+                ),
             )
         export = parse_json(
-            run_step("Export the structured working set after file expansion", *cli("codegraph", "context", "export", "--input", str(doc), "--session", session_id, "--format", "json"))
+            run_step(
+                "Export the structured working set after file expansion",
+                *cli(
+                    "codegraph",
+                    "context",
+                    "export",
+                    "--input",
+                    str(doc),
+                    "--session",
+                    session_id,
+                    "--compact",
+                    "--no-rendered",
+                    "--format",
+                    "json",
+                ),
+            )
         )
         seeds = seed_symbols(export)
         write("\n### Seed symbols\n\n")
@@ -125,6 +199,8 @@ def main() -> None:
         queue = list(seeds)
         seen: set[str] = set()
         while queue:
+            if len(seen) >= MAX_SYMBOL_STEPS:
+                break
             symbol = queue.pop(0)
             if symbol in seen:
                 continue
@@ -133,34 +209,134 @@ def main() -> None:
                 f"Focus {symbol}",
                 *cli("codegraph", "context", "focus", "--input", str(doc), "--session", session_id, symbol, "--format", "json"),
             )
+            if len(seen) == 1:
+                run_step(
+                    f"Show +1 levels around {symbol}",
+                    *cli(
+                        "codegraph",
+                        "context",
+                        "show",
+                        "--input",
+                        str(doc),
+                        "--session",
+                        session_id,
+                        "--compact",
+                        "--no-rendered",
+                        "--levels",
+                        "1",
+                        "--format",
+                        "text",
+                    ),
+                )
             frontier_export = parse_json(
-                run_step(f"Export frontier for {symbol}", *cli("codegraph", "context", "export", "--input", str(doc), "--session", session_id, "--format", "json"))
+                run_step(
+                    f"Export frontier for {symbol} (+1 visible level)",
+                    *cli(
+                        "codegraph",
+                        "context",
+                        "export",
+                        "--input",
+                        str(doc),
+                        "--session",
+                        session_id,
+                        "--compact",
+                        "--no-rendered",
+                        "--levels",
+                        "1",
+                        "--format",
+                        "json",
+                    ),
+                )
             )
-            for action in frontier_export.get("frontier", []):
-                if action.get("candidate_count", 0) == 0:
-                    continue
-                if action["action"] == "expand_dependencies":
-                    run_step(
-                        f"Expand dependencies for {symbol} via {action['relation']}",
-                        *cli("codegraph", "context", "expand", "--input", str(doc), "--session", session_id, symbol, "--mode", "dependencies", "--relation", action["relation"], "--format", "json"),
-                    )
-                elif action["action"] == "expand_dependents":
-                    run_step(
-                        f"Expand dependents for {symbol} via {action['relation']}",
-                        *cli("codegraph", "context", "expand", "--input", str(doc), "--session", session_id, symbol, "--mode", "dependents", "--relation", action["relation"], "--format", "json"),
-                    )
+            frontier = frontier_export.get("frontier", [])
+            dependency_relations = pick_relations(frontier, "expand_dependencies", limit=2)
+            if dependency_relations:
+                run_step(
+                    f"Expand dependencies for {symbol} via {','.join(dependency_relations)} (+2 hops)",
+                    *cli(
+                        "codegraph",
+                        "context",
+                        "expand",
+                        "--input",
+                        str(doc),
+                        "--session",
+                        session_id,
+                        symbol,
+                        "--mode",
+                        "dependencies",
+                        "--relations",
+                        ",".join(dependency_relations),
+                        "--depth",
+                        "2",
+                        "--format",
+                        "json",
+                    ),
+                )
+            dependent_relations = pick_relations(frontier, "expand_dependents", limit=1)
+            if dependent_relations:
+                run_step(
+                    f"Expand dependents for {symbol} via {dependent_relations[0]} (+1 hop)",
+                    *cli(
+                        "codegraph",
+                        "context",
+                        "expand",
+                        "--input",
+                        str(doc),
+                        "--session",
+                        session_id,
+                        symbol,
+                        "--mode",
+                        "dependents",
+                        "--relation",
+                        dependent_relations[0],
+                        "--depth",
+                        "1",
+                        "--format",
+                        "json",
+                    ),
+                )
             run_step(
                 f"Hydrate source for {symbol}",
                 *cli("codegraph", "context", "hydrate", "--input", str(doc), "--session", session_id, symbol, "--padding", "2", "--format", "json"),
             )
             updated = parse_json(
-                run_step(f"Export updated working set for {symbol}", *cli("codegraph", "context", "export", "--input", str(doc), "--session", session_id, "--format", "json"))
+                run_step(
+                    f"Export updated working set for {symbol}",
+                    *cli(
+                        "codegraph",
+                        "context",
+                        "export",
+                        "--input",
+                        str(doc),
+                        "--session",
+                        session_id,
+                        "--compact",
+                        "--no-rendered",
+                        "--format",
+                        "json",
+                    ),
+                )
             )
             queued = set(queue)
             queue.extend(queueable_symbols(updated, seen, queued))
 
         final_export = parse_json(
-            run_step("Export the final structured context", *cli("codegraph", "context", "export", "--input", str(doc), "--session", session_id, "--format", "json"))
+            run_step(
+                "Export the final structured context",
+                *cli(
+                    "codegraph",
+                    "context",
+                    "export",
+                    "--input",
+                    str(doc),
+                    "--session",
+                    session_id,
+                    "--compact",
+                    "--no-rendered",
+                    "--format",
+                    "json",
+                ),
+            )
         )
         write("\n## Read coderef-backed excerpts from the final working set\n\n")
         seen_refs: set[tuple[str, int | None, int | None, str]] = set()

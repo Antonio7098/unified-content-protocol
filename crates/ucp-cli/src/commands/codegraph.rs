@@ -1,16 +1,17 @@
 use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str::FromStr;
 use ucp_api::{
     build_code_graph, canonical_fingerprint, codegraph_prompt_projection,
-    export_codegraph_context, is_codegraph_document, render_codegraph_context_prompt,
+    export_codegraph_context_with_config, is_codegraph_document, render_codegraph_context_prompt,
     resolve_codegraph_selector,
     validate_code_graph_profile, CodeGraphBuildInput, CodeGraphBuildStatus,
-    CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphExtractorConfig,
-    CodeGraphPrunePolicy, CodeGraphRenderConfig, CodeGraphSeverity,
+    CodeGraphContextExport, CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphExportConfig,
+    CodeGraphExtractorConfig, CodeGraphPrunePolicy, CodeGraphRenderConfig, CodeGraphSeverity,
 };
 use ucm_core::{BlockId, Document};
 
@@ -276,17 +277,24 @@ fn context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> {
             input,
             name,
             max_selected,
-        } => context_init(input, name, max_selected, format),
+            initial_depth,
+        } => context_init(input, name, max_selected, initial_depth, format),
         CodegraphContextCommands::Show {
             input,
             session,
             max_tokens,
-        } => context_show(input, session, max_tokens, format),
+            compact,
+            no_rendered,
+            levels,
+        } => context_show(input, session, max_tokens, compact, no_rendered, levels, format),
         CodegraphContextCommands::Export {
             input,
             session,
             max_tokens,
-        } => context_export(input, session, max_tokens, format),
+            compact,
+            no_rendered,
+            levels,
+        } => context_export(input, session, max_tokens, compact, no_rendered, levels, format),
         CodegraphContextCommands::Add {
             input,
             session,
@@ -303,7 +311,9 @@ fn context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> {
             target,
             mode,
             relation,
-        } => context_expand(input, session, target, mode, relation, format),
+            relations,
+            depth,
+        } => context_expand(input, session, target, mode, relation, relations, depth, format),
         CodegraphContextCommands::Hydrate {
             input,
             session,
@@ -338,6 +348,7 @@ fn context_init(
     input: Option<String>,
     name: Option<String>,
     max_selected: usize,
+    initial_depth: Option<usize>,
     format: OutputFormat,
 ) -> Result<()> {
     let mut stateful = read_stateful_document(input.clone())?;
@@ -351,7 +362,7 @@ fn context_init(
             max_selected: max_selected.max(1),
             ..CodeGraphPrunePolicy::default()
         });
-        let update = context.seed_overview(&stateful.document);
+        let update = context.seed_overview_with_depth(&stateful.document, initial_depth);
         session.current_block = update.focus.map(|id| id.to_string());
         session.sync_context_blocks_from_codegraph();
     }
@@ -373,6 +384,7 @@ fn context_init(
                     "success": true,
                     "session_id": session_id,
                     "name": name,
+                    "initial_depth": initial_depth,
                     "summary": session.codegraph_context.as_ref().map(|ctx| ctx.summary(&stateful.document)),
                     "rendered": rendered,
                 }))?
@@ -391,6 +403,9 @@ fn context_show(
     input: Option<String>,
     session: String,
     max_tokens: usize,
+    compact: bool,
+    no_rendered: bool,
+    levels: Option<usize>,
     format: OutputFormat,
 ) -> Result<()> {
     let stateful = read_stateful_document(input)?;
@@ -401,7 +416,8 @@ fn context_show(
         .as_ref()
         .ok_or_else(|| anyhow!("Session has no codegraph context: {}", session))?;
     let config = CodeGraphRenderConfig::for_max_tokens(max_tokens);
-    let export = export_codegraph_context(&stateful.document, context, &config);
+    let export_config = make_export_config(compact, no_rendered, levels);
+    let export = export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
 
     match format {
         OutputFormat::Json => {
@@ -411,7 +427,7 @@ fn context_show(
             }
             println!("{}", serde_json::to_string_pretty(&value)?);
         }
-        OutputFormat::Text => println!("{}", export.rendered),
+        OutputFormat::Text => println!("{}", render_context_show_text(&stateful.document, context, &config, &export)),
     }
 
     Ok(())
@@ -421,6 +437,9 @@ fn context_export(
     input: Option<String>,
     session: String,
     max_tokens: usize,
+    compact: bool,
+    no_rendered: bool,
+    levels: Option<usize>,
     format: OutputFormat,
 ) -> Result<()> {
     let stateful = read_stateful_document(input)?;
@@ -431,7 +450,8 @@ fn context_export(
         .as_ref()
         .ok_or_else(|| anyhow!("Session has no codegraph context: {}", session))?;
     let config = CodeGraphRenderConfig::for_max_tokens(max_tokens);
-    let export = export_codegraph_context(&stateful.document, context, &config);
+    let export_config = make_export_config(compact, no_rendered, levels);
+    let export = export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
 
     match format {
         OutputFormat::Json => {
@@ -445,6 +465,81 @@ fn context_export(
     }
 
     Ok(())
+}
+
+fn make_export_config(compact: bool, no_rendered: bool, levels: Option<usize>) -> CodeGraphExportConfig {
+    let mut export_config = if compact {
+        CodeGraphExportConfig::compact()
+    } else {
+        CodeGraphExportConfig::default()
+    };
+    if no_rendered {
+        export_config.include_rendered = false;
+    }
+    export_config.visible_levels = levels;
+    export_config
+}
+
+fn render_context_show_text(
+    document: &Document,
+    context: &ucp_api::CodeGraphContextSession,
+    config: &CodeGraphRenderConfig,
+    export: &CodeGraphContextExport,
+) -> String {
+    if export.visible_levels.is_none() {
+        return render_codegraph_context_prompt(document, context, config);
+    }
+
+    let mut lines = vec![format!(
+        "visible nodes: {} of {} selected",
+        export.visible_node_count, export.summary.selected
+    )];
+    if let Some(levels) = export.visible_levels {
+        lines.push(format!("focus window: +{} levels", levels));
+    }
+    if !export.hidden_levels.is_empty() {
+        for hidden in &export.hidden_levels {
+            lines.push(format!("+ {} nodes at level {}", hidden.count, hidden.level));
+        }
+    }
+    if export.hidden_unreachable_count > 0 {
+        lines.push(format!(
+            "+ {} selected nodes disconnected from focus",
+            export.hidden_unreachable_count
+        ));
+    }
+    if let Some(action) = &export.heuristics.recommended_next_action {
+        lines.push(format!(
+            "next: {} {}",
+            action.action,
+            action.relation.as_deref().unwrap_or("*")
+        ));
+    }
+    lines.join("\n")
+}
+
+fn parse_relation_filters(
+    relation: Option<String>,
+    relations: Option<String>,
+) -> Result<Option<HashSet<String>>> {
+    if relation.is_some() && relations.is_some() {
+        return Err(anyhow!("Use either --relation or --relations, not both"));
+    }
+    let raw = relation.or(relations);
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let filters: HashSet<String> = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .collect();
+    if filters.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(filters))
+    }
 }
 
 fn context_add(
@@ -507,22 +602,27 @@ fn context_expand(
     target: String,
     mode: String,
     relation: Option<String>,
+    relations: Option<String>,
+    depth: usize,
     format: OutputFormat,
 ) -> Result<()> {
     let mut stateful = read_stateful_document(input.clone())?;
     ensure_codegraph_document(&stateful.document)?;
     let document = stateful.document.clone();
     let block_id = resolve_selector(&document, &target)?;
+    let relation_filters = parse_relation_filters(relation, relations)?;
 
     let sess = get_session_mut(&mut stateful, &session)?;
     let update = match mode.as_str() {
-        "file" => sess.ensure_codegraph_context().expand_file(&document, block_id),
+        "file" => sess
+            .ensure_codegraph_context()
+            .expand_file_with_depth(&document, block_id, depth),
         "dependencies" => sess
             .ensure_codegraph_context()
-            .expand_dependencies(&document, block_id, relation.as_deref()),
+            .expand_dependencies_with_filters(&document, block_id, relation_filters.as_ref(), depth),
         "dependents" => sess
             .ensure_codegraph_context()
-            .expand_dependents(&document, block_id, relation.as_deref()),
+            .expand_dependents_with_filters(&document, block_id, relation_filters.as_ref(), depth),
         other => return Err(anyhow!("Unsupported expand mode: {}", other)),
     };
     sess.sync_context_blocks_from_codegraph();
