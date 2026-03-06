@@ -590,6 +590,25 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                         }
                     }
 
+                if matches!(record.language, CodeLanguage::Rust | CodeLanguage::Python)
+                    && import.wildcard
+                {
+                    if let Some(exports) = exported_symbol_targets_by_file.get(&target) {
+                        let entry = imported_symbol_targets_by_file
+                            .entry(record.file.clone())
+                            .or_default();
+                        for (export_name, target_symbol_ids) in exports {
+                            if export_name == "default" {
+                                continue;
+                            }
+                            entry
+                                .entry(export_name.clone())
+                                .or_default()
+                                .extend(target_symbol_ids.iter().copied());
+                        }
+                    }
+                }
+
                     if !import.bindings.is_empty() {
                         let entry = imported_symbol_targets_by_file
                             .entry(record.file.clone())
@@ -2612,6 +2631,9 @@ fn analyze_ts_node(
             return;
         }
         "lexical_declaration" | "variable_statement" => {
+            analysis
+                .imports
+                .extend(ts_require_imports_from_variable_statement(node, source));
             analysis.symbols.extend(ts_variable_symbols(
                 node,
                 source,
@@ -2625,6 +2647,11 @@ fn analyze_ts_node(
                     .extend(ts_aliases_from_variable_statement(node, source, parent_identity));
             }
             return;
+        }
+        "expression_statement" => {
+            if scope.is_empty() && parent_identity.is_none() {
+                collect_ts_commonjs_exports(node, source, analysis);
+            }
         }
         _ => {}
     }
@@ -2718,6 +2745,9 @@ fn ts_variable_symbols(
     let mut stack = vec![node];
     while let Some(current) = stack.pop() {
         if current.kind() == "variable_declarator" {
+            if ts_is_require_declarator(current, source) {
+                continue;
+            }
             if let Some(name_node) = current.child_by_field_name("name") {
                 let name = node_text(source, name_node).trim().to_string();
                 if !name.is_empty() {
@@ -2873,6 +2903,256 @@ fn ts_call_target(node: Node<'_>, source: &str) -> Option<(String, String)> {
     }
 }
 
+fn ts_require_imports_from_variable_statement(node: Node<'_>, source: &str) -> Vec<ExtractedImport> {
+    let mut imports = Vec::new();
+    let mut stack = vec![node];
+
+    while let Some(current) = stack.pop() {
+        if current.kind() == "variable_declarator" {
+            let Some(name_node) = current.child_by_field_name("name") else {
+                continue;
+            };
+            let Some(value_node) = current.child_by_field_name("value") else {
+                continue;
+            };
+            let Some(module) = ts_require_module_from_value(value_node, source) else {
+                continue;
+            };
+
+            match name_node.kind() {
+                "identifier" => {
+                    let local_name = node_text(source, name_node).trim().to_string();
+                    if !local_name.is_empty() {
+                        imports.push(
+                            ExtractedImport::bindings(
+                                module.clone(),
+                                vec![ImportBinding::new("default", local_name.clone())],
+                            )
+                            .with_module_alias(local_name),
+                        );
+                    }
+                }
+                "object_pattern" => {
+                    let bindings = ts_object_pattern_bindings(name_node, source);
+                    if !bindings.is_empty() {
+                        imports.push(ExtractedImport::bindings(module.clone(), bindings));
+                    }
+                }
+                _ => {}
+            }
+            continue;
+        }
+
+        let mut cursor = current.walk();
+        for child in current.named_children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    imports
+}
+
+fn ts_require_module_from_value(node: Node<'_>, source: &str) -> Option<String> {
+    if node.kind() != "call_expression" {
+        return None;
+    }
+    let function = node.child_by_field_name("function")?;
+    if function.kind() != "identifier" || node_text(source, function).trim() != "require" {
+        return None;
+    }
+    let arguments = node.child_by_field_name("arguments")?;
+    let mut cursor = arguments.walk();
+    let argument = arguments.named_children(&mut cursor).next()?;
+    if argument.kind() != "string" {
+        return None;
+    }
+    let module = node_text(source, argument)
+        .trim()
+        .trim_matches(|c| c == '\'' || c == '"')
+        .to_string();
+    if module.is_empty() {
+        None
+    } else {
+        Some(module)
+    }
+}
+
+fn ts_is_require_declarator(node: Node<'_>, source: &str) -> bool {
+    node.child_by_field_name("value")
+        .and_then(|value| ts_require_module_from_value(value, source))
+        .is_some()
+}
+
+fn ts_object_pattern_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
+    let text = node_text(source, node).trim();
+    let Some(inner) = text.strip_prefix('{').and_then(|rest| rest.strip_suffix('}')) else {
+        return Vec::new();
+    };
+
+    let mut bindings = Vec::new();
+    for part in inner.split(',') {
+        let binding = part.trim();
+        if binding.is_empty() || binding.starts_with("...") {
+            continue;
+        }
+        let binding = binding.split('=').next().unwrap_or(binding).trim();
+        let mut pieces = binding.split(':').map(str::trim);
+        let Some(source_name) = pieces.next() else {
+            continue;
+        };
+        let local_name = pieces.next().unwrap_or(source_name);
+        if !source_name.is_empty()
+            && !local_name.is_empty()
+            && leading_js_identifier(source_name).as_deref() == Some(source_name)
+            && leading_js_identifier(local_name).as_deref() == Some(local_name)
+        {
+            bindings.push(ImportBinding::new(source_name, local_name));
+        }
+    }
+
+    bindings.sort();
+    bindings.dedup();
+    bindings
+}
+
+fn collect_ts_commonjs_exports(node: Node<'_>, source: &str, analysis: &mut FileAnalysis) {
+    let Some(assignment) = node.named_child(0).filter(|child| child.kind() == "assignment_expression")
+    else {
+        return;
+    };
+    let Some(left) = assignment.child_by_field_name("left") else {
+        return;
+    };
+    let Some(right) = assignment.child_by_field_name("right") else {
+        return;
+    };
+    let Some(export_name) = ts_commonjs_export_name(left, source) else {
+        return;
+    };
+
+    if export_name == "default" {
+        let object_export_names = ts_commonjs_object_export_names(right, source);
+        if !object_export_names.is_empty() {
+            analysis.exported_symbol_names.extend(object_export_names);
+            return;
+        }
+    }
+
+    let target_name = if right.kind() == "identifier" {
+        let name = node_text(source, right).trim().to_string();
+        if name.is_empty() { None } else { Some(name) }
+    } else if let Some(symbol) = ts_commonjs_symbol_from_expression(right, source, &export_name) {
+        let name = symbol.name.clone();
+        analysis.symbols.push(symbol);
+        Some(name)
+    } else {
+        None
+    };
+
+    if let Some(target_name) = target_name {
+        analysis.exported_symbol_names.insert(target_name.clone());
+        if export_name == "default" {
+            analysis.default_exported_symbol_names.insert(target_name);
+        }
+    }
+}
+
+fn ts_commonjs_object_export_names(node: Node<'_>, source: &str) -> Vec<String> {
+    if node.kind() != "object" {
+        return Vec::new();
+    }
+
+    let text = node_text(source, node).trim();
+    let Some(inner) = text.strip_prefix('{').and_then(|rest| rest.strip_suffix('}')) else {
+        return Vec::new();
+    };
+
+    let mut names = Vec::new();
+    for part in inner.split(',') {
+        let property = part.trim();
+        if property.is_empty() || property.starts_with("...") {
+            continue;
+        }
+        let property = property.split('=').next().unwrap_or(property).trim();
+        let mut pieces = property.split(':').map(str::trim);
+        let Some(export_name) = pieces.next() else {
+            continue;
+        };
+        let target_name = pieces.next().unwrap_or(export_name);
+        if !export_name.is_empty()
+            && export_name == target_name
+            && leading_js_identifier(export_name).as_deref() == Some(export_name)
+        {
+            names.push(export_name.to_string());
+        }
+    }
+
+    names.sort();
+    names.dedup();
+    names
+}
+
+fn ts_commonjs_export_name(node: Node<'_>, source: &str) -> Option<String> {
+    if node.kind() != "member_expression" {
+        return None;
+    }
+    let object = node.child_by_field_name("object")?;
+    let property = node.child_by_field_name("property")?;
+    let property_name = node_text(source, property).trim().to_string();
+    if property_name.is_empty() {
+        return None;
+    }
+
+    if object.kind() == "identifier" {
+        let object_name = node_text(source, object).trim();
+        if object_name == "module" && property_name == "exports" {
+            return Some("default".to_string());
+        }
+        if object_name == "exports" {
+            return Some(property_name);
+        }
+    }
+
+    if object.kind() == "member_expression" {
+        let inner_object = object.child_by_field_name("object")?;
+        let inner_property = object.child_by_field_name("property")?;
+        if inner_object.kind() == "identifier"
+            && node_text(source, inner_object).trim() == "module"
+            && node_text(source, inner_property).trim() == "exports"
+        {
+            return Some(property_name);
+        }
+    }
+
+    None
+}
+
+fn ts_commonjs_symbol_from_expression(
+    node: Node<'_>,
+    source: &str,
+    export_name: &str,
+) -> Option<ExtractedSymbol> {
+    let kind = match node.kind() {
+        "function_expression" | "generator_function" => "function",
+        "class" => "class",
+        _ => return None,
+    };
+
+    let name = node
+        .child_by_field_name("name")
+        .map(|name_node| node_text(source, name_node).trim().to_string())
+        .filter(|name| !name.is_empty())
+        .or_else(|| {
+            if export_name != "default" {
+                Some(export_name.to_string())
+            } else {
+                None
+            }
+        })?;
+
+    Some(make_extracted_symbol(name, kind, true, &[], None, node))
+}
+
 fn ts_import_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
     let mut bindings = Vec::new();
     let mut stack = vec![node];
@@ -2962,6 +3242,9 @@ fn ts_aliases_from_variable_statement(
             let Some(value_node) = current.child_by_field_name("value") else {
                 continue;
             };
+            if ts_require_module_from_value(value_node, source).is_some() {
+                continue;
+            }
             if name_node.kind() != "identifier" {
                 continue;
             }
@@ -5682,6 +5965,69 @@ mod tests {
     }
 
     #[test]
+    fn test_js_commonjs_require_calls_resolve_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+
+        fs::write(
+            dir.path().join("web/default_util.js"),
+            "module.exports = function util() { return 42; };\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/named_util.js"),
+            "exports.greet = function greet() { return 42; };\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/object_util.js"),
+            "function greet() { return 42; }\nmodule.exports = { greet };\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.js"),
+            "const util = require('./default_util');\nconst { greet } = require('./named_util');\nconst named = require('./named_util');\nconst { greet: object_greet } = require('./object_util');\nexport function run_default() { return util(); }\nexport function run_named() { return greet(); }\nexport function run_member() { return named.greet(); }\nexport function run_object_named() { return object_greet(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "js-commonjs-require-calls".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::run_default",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/default_util.js::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::run_named",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/named_util.js::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::run_member",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/named_util.js::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::run_object_named",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/object_util.js::greet",
+        ));
+    }
+
+    #[test]
     fn test_python_package_reexported_calls_resolve_to_underlying_symbols() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("py/pkg")).unwrap();
@@ -5737,6 +6083,136 @@ mod tests {
     }
 
     #[test]
+    fn test_python_wildcard_imports_resolve_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("py/pkg")).unwrap();
+
+        fs::write(
+            dir.path().join("py/helper.py"),
+            "def greet():\n    return 1\ndef wave():\n    return 2\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/pkg/helper.py"),
+            "def helper():\n    return 1\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/pkg/__init__.py"),
+            "from .helper import helper\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .helper import *\nfrom .pkg import *\ndef run_module():\n    greet()\n    return wave()\ndef run_package():\n    return helper()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "python-wildcard-imports".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::run_module",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::run_module",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::wave",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::run_package",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/pkg/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_python_wildcard_imports_respect_export_rules() {
+        let underscore_dir = tempdir().unwrap();
+        fs::create_dir_all(underscore_dir.path().join("py")).unwrap();
+
+        fs::write(
+            underscore_dir.path().join("py/helper.py"),
+            "def public():\n    return 1\ndef _hidden():\n    return 2\n",
+        )
+        .unwrap();
+        fs::write(
+            underscore_dir.path().join("py/main.py"),
+            "from .helper import *\ndef run_public():\n    return public()\ndef run_hidden():\n    return _hidden()\n",
+        )
+        .unwrap();
+
+        let underscore_build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: underscore_dir.path().to_path_buf(),
+            commit_hash: "python-wildcard-imports-underscore-rules".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &underscore_build.document,
+            "symbol:py/main.py::run_public",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::public",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &underscore_build.document,
+            "symbol:py/main.py::run_hidden",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::_hidden",
+        ));
+
+        let all_dir = tempdir().unwrap();
+        fs::create_dir_all(all_dir.path().join("py")).unwrap();
+        fs::write(
+            all_dir.path().join("py/helper.py"),
+            "__all__ = ['chosen']\n\ndef chosen():\n    return 1\n\ndef extra():\n    return 2\n",
+        )
+        .unwrap();
+        fs::write(
+            all_dir.path().join("py/main.py"),
+            "from .helper import *\ndef run_chosen():\n    return chosen()\ndef run_extra():\n    return extra()\n",
+        )
+        .unwrap();
+
+        let all_build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: all_dir.path().to_path_buf(),
+            commit_hash: "python-wildcard-imports-all-rules".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &all_build.document,
+            "symbol:py/main.py::run_chosen",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::chosen",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &all_build.document,
+            "symbol:py/main.py::run_extra",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::extra",
+        ));
+    }
+
+    #[test]
     fn test_rust_import_aliases_and_nested_paths_resolve_to_symbols() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src/nested")).unwrap();
@@ -5770,6 +6246,56 @@ mod tests {
             "uses_symbol",
             "uses_symbol",
             "symbol:src/nested/util.rs::wave",
+        ));
+    }
+
+    #[test]
+    fn test_rust_pub_use_reexports_and_wildcards_resolve_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src/nested")).unwrap();
+
+        fs::write(dir.path().join("src/util.rs"), "pub fn greet() {}\npub fn wave() {}\n").unwrap();
+        fs::write(dir.path().join("src/nested/mod.rs"), "pub mod util;\n").unwrap();
+        fs::write(dir.path().join("src/nested/util.rs"), "pub fn ping() {}\n").unwrap();
+        fs::write(dir.path().join("src/barrel1.rs"), "pub use crate::util::greet;\n").unwrap();
+        fs::write(
+            dir.path().join("src/barrel2.rs"),
+            "pub use crate::barrel1::greet as hello;\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod util;\nmod nested;\nmod barrel1;\nmod barrel2;\npub use util::greet;\npub use util::wave as wave_alias;\npub use util::*;\npub use nested::util as util_mod;\npub use nested::{util as util_mod_two};\nuse barrel2::hello;\npub fn run() { greet(); wave(); wave_alias(); util_mod::ping(); util_mod_two::ping(); hello(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "rust-pub-use-reexports-and-wildcards".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/util.rs::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/util.rs::wave",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/nested/util.rs::ping",
         ));
     }
 
