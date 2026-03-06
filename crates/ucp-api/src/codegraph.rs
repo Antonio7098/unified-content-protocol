@@ -1395,12 +1395,29 @@ struct ExtractedSymbol {
     identity: String,
     parent_identity: Option<String>,
     kind: String,
-    helper: Option<String>,
+    description: Option<String>,
+    inputs: Vec<ExtractedInput>,
+    output: Option<String>,
+    type_info: Option<String>,
     exported: bool,
     start_line: usize,
     start_col: usize,
     end_line: usize,
     end_col: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ExtractedInput {
+    name: String,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    type_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ExtractedSignature {
+    inputs: Vec<ExtractedInput>,
+    output: Option<String>,
+    type_info: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1725,8 +1742,17 @@ fn make_symbol_block(
     content.insert("span".to_string(), span.clone());
     content.insert("line_range".to_string(), json!(line_range));
     content.insert("exported".to_string(), json!(symbol.exported));
-    if let Some(helper) = &symbol.helper {
-        content.insert("helper".to_string(), json!(helper));
+    if let Some(description) = &symbol.description {
+        content.insert("description".to_string(), json!(description));
+    }
+    if !symbol.inputs.is_empty() {
+        content.insert("inputs".to_string(), json!(symbol.inputs));
+    }
+    if let Some(output) = &symbol.output {
+        content.insert("output".to_string(), json!(output));
+    }
+    if let Some(type_info) = &symbol.type_info {
+        content.insert("type".to_string(), json!(type_info));
     }
 
     let mut block = Block::new(
@@ -1735,7 +1761,7 @@ fn make_symbol_block(
     );
 
     block.metadata.label = Some(symbol.name.clone());
-    block.metadata.summary = symbol.helper.clone();
+    block.metadata.summary = symbol.description.clone();
     block
         .metadata
         .custom
@@ -1974,6 +2000,7 @@ fn rust_symbol_from_node(
         exported,
         scope,
         parent_identity,
+        CodeLanguage::Rust,
         source,
         node,
     ))
@@ -2238,6 +2265,7 @@ fn python_symbol_from_node(
     let kind = match node.kind() {
         "class_definition" => "class",
         "function_definition" => "function",
+        "async_function_definition" => "function",
         _ => return None,
     };
 
@@ -2255,6 +2283,7 @@ fn python_symbol_from_node(
         scope.is_empty() && !name.starts_with('_'),
         scope,
         parent_identity,
+        CodeLanguage::Python,
         source,
         node,
     ))
@@ -2769,6 +2798,7 @@ fn ts_symbol_from_declaration(
         exported,
         scope,
         parent_identity,
+        CodeLanguage::TypeScript,
         source,
         node,
     ))
@@ -2804,6 +2834,7 @@ fn ts_variable_symbols(
                         exported,
                         scope,
                         parent_identity,
+                        CodeLanguage::TypeScript,
                         source,
                         current,
                     ));
@@ -3230,7 +3261,16 @@ fn ts_commonjs_symbol_from_expression(
             }
         })?;
 
-    Some(make_extracted_symbol(name, kind, true, &[], None, source, node))
+    Some(make_extracted_symbol(
+        name,
+        kind,
+        true,
+        &[],
+        None,
+        CodeLanguage::JavaScript,
+        source,
+        node,
+    ))
 }
 
 fn ts_import_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
@@ -3591,8 +3631,403 @@ fn node_text<'a>(source: &'a str, node: Node<'_>) -> &'a str {
     &source[start..end]
 }
 
-fn extract_symbol_helper(source: &str, node: Node<'_>) -> Option<String> {
-    summarize_code_snippet(node_text(source, node), 160)
+fn extract_symbol_description(source: &str, language: CodeLanguage, node: Node<'_>) -> Option<String> {
+    match language {
+        CodeLanguage::Rust => extract_preceding_symbol_comment(source, node, language),
+        CodeLanguage::Python => extract_python_symbol_description(source, node)
+            .or_else(|| extract_preceding_symbol_comment(source, node, language)),
+        CodeLanguage::TypeScript | CodeLanguage::JavaScript => {
+            extract_preceding_symbol_comment(source, node, language)
+        }
+    }
+}
+
+fn extract_symbol_signature(
+    source: &str,
+    language: CodeLanguage,
+    node: Node<'_>,
+    kind: &str,
+    name: &str,
+) -> ExtractedSignature {
+    match language {
+        CodeLanguage::Rust => extract_rust_symbol_signature(node_text(source, node), node.kind(), name),
+        CodeLanguage::Python => {
+            extract_python_symbol_signature(node_text(source, node), node.kind(), name)
+        }
+        CodeLanguage::TypeScript | CodeLanguage::JavaScript => {
+            extract_ts_js_symbol_signature(source, language, node, kind, name)
+        }
+    }
+}
+
+fn extract_rust_symbol_signature(raw: &str, node_kind: &str, name: &str) -> ExtractedSignature {
+    let header = take_until_top_level(raw, &['{', ';']);
+    match node_kind {
+        "function_item" => extract_function_like_signature(header, CodeLanguage::Rust),
+        "trait_item" => ExtractedSignature {
+            type_info: extract_rust_trait_bounds(header, name),
+            ..Default::default()
+        },
+        "type_item" => ExtractedSignature {
+            type_info: extract_after_top_level_char(header, '='),
+            ..Default::default()
+        },
+        "const_item" => ExtractedSignature {
+            type_info: extract_between_top_level_chars(header, ':', '='),
+            ..Default::default()
+        },
+        "impl_item" => ExtractedSignature {
+            type_info: normalize_signature_fragment(header.trim_start_matches("impl").trim(), 160),
+            ..Default::default()
+        },
+        _ => ExtractedSignature::default(),
+    }
+}
+
+fn extract_python_symbol_signature(raw: &str, node_kind: &str, _name: &str) -> ExtractedSignature {
+    let header = take_until_top_level(raw, &[':']);
+    match node_kind {
+        "function_definition" | "async_function_definition" => {
+            extract_function_like_signature(header, CodeLanguage::Python)
+        }
+        "class_definition" => ExtractedSignature {
+            type_info: extract_parenthesized_clause(header),
+            ..Default::default()
+        },
+        _ => ExtractedSignature::default(),
+    }
+}
+
+fn extract_ts_js_symbol_signature(
+    source: &str,
+    language: CodeLanguage,
+    node: Node<'_>,
+    kind: &str,
+    name: &str,
+) -> ExtractedSignature {
+    let target = if node.kind() == "variable_declarator" {
+        node.child_by_field_name("value").unwrap_or(node)
+    } else {
+        node
+    };
+    let raw = node_text(source, target);
+
+    match kind {
+        "function" | "method" => {
+            extract_function_like_signature_ts_js(take_until_top_level(raw, &['{', ';']), language)
+        }
+        "class" => ExtractedSignature {
+            type_info: extract_ts_js_heritage(take_until_top_level(raw, &['{', ';']), name, "class"),
+            ..Default::default()
+        },
+        "interface" => ExtractedSignature {
+            type_info: extract_ts_js_heritage(
+                take_until_top_level(raw, &['{', ';']),
+                name,
+                "interface",
+            ),
+            ..Default::default()
+        },
+        "type" => ExtractedSignature {
+            type_info: extract_after_top_level_char(take_until_top_level(raw, &[';']), '='),
+            ..Default::default()
+        },
+        "variable" => ExtractedSignature {
+            type_info: extract_ts_js_annotation(take_until_top_level(raw, &[';'])),
+            ..Default::default()
+        },
+        _ => ExtractedSignature::default(),
+    }
+}
+
+fn extract_function_like_signature(header: &str, language: CodeLanguage) -> ExtractedSignature {
+    let mut signature = ExtractedSignature::default();
+    if let Some((params, close_index)) = extract_first_parenthesized_with_end(header) {
+        signature.inputs = parse_parameter_list(&params, language);
+        signature.output = match language {
+            CodeLanguage::Rust => extract_rust_return_type(&header[close_index + 1..]),
+            CodeLanguage::Python => extract_python_return_type(&header[close_index + 1..]),
+            CodeLanguage::TypeScript | CodeLanguage::JavaScript => None,
+        };
+    }
+    signature
+}
+
+fn extract_function_like_signature_ts_js(header: &str, language: CodeLanguage) -> ExtractedSignature {
+    let mut signature = ExtractedSignature::default();
+    if let Some((params, close_index)) = extract_first_parenthesized_with_end(header) {
+        signature.inputs = parse_parameter_list(&params, language);
+        if language == CodeLanguage::TypeScript {
+            signature.output = extract_ts_return_type(&header[close_index + 1..]);
+        }
+        return signature;
+    }
+
+    if let Some((input, output)) = extract_single_param_arrow_signature(header, language) {
+        signature.inputs = vec![input];
+        signature.output = output;
+    }
+    signature
+}
+
+fn extract_single_param_arrow_signature(
+    header: &str,
+    language: CodeLanguage,
+) -> Option<(ExtractedInput, Option<String>)> {
+    let arrow_index = header.find("=>")?;
+    let before_arrow = header[..arrow_index].trim_end();
+    let candidate = before_arrow.rsplit_once('=').map(|(_, value)| value.trim()).unwrap_or(before_arrow);
+    if candidate.contains('(') {
+        return None;
+    }
+
+    let (name_part, type_part) = split_top_level_once(candidate, ':').unwrap_or((candidate.to_string(), String::new()));
+    let input = ExtractedInput {
+        name: normalize_parameter_name(&name_part),
+        type_name: normalize_signature_fragment(type_part.trim(), 120),
+    };
+    let output = if language == CodeLanguage::TypeScript {
+        None
+    } else {
+        None
+    };
+    Some((input, output))
+}
+
+fn extract_rust_trait_bounds(header: &str, name: &str) -> Option<String> {
+    let tail = substring_after_name(header, name)?;
+    let bounds = tail.trim_start().strip_prefix(':')?.trim();
+    normalize_signature_fragment(bounds, 160)
+}
+
+fn extract_rust_return_type(tail: &str) -> Option<String> {
+    let tail = tail.trim();
+    let rest = tail.strip_prefix("->")?.trim();
+    let before_where = rest.split(" where ").next().unwrap_or(rest).trim();
+    normalize_signature_fragment(before_where, 160)
+}
+
+fn extract_python_return_type(tail: &str) -> Option<String> {
+    let tail = tail.trim();
+    let rest = tail.strip_prefix("->")?.trim();
+    normalize_signature_fragment(rest.trim_end_matches(':').trim(), 160)
+}
+
+fn extract_ts_return_type(tail: &str) -> Option<String> {
+    let tail = tail.trim();
+    let rest = tail.strip_prefix(':')?.trim();
+    let before_arrow = rest.split("=>").next().unwrap_or(rest).trim();
+    normalize_signature_fragment(before_arrow, 160)
+}
+
+fn extract_ts_js_annotation(header: &str) -> Option<String> {
+    let before_equals = header.split('=').next().unwrap_or(header).trim();
+    let (_, annotation) = split_top_level_once(before_equals, ':')?;
+    normalize_signature_fragment(annotation.trim(), 160)
+}
+
+fn extract_ts_js_heritage(header: &str, name: &str, keyword: &str) -> Option<String> {
+    let after_keyword = header.trim_start().strip_prefix(keyword)?.trim_start();
+    let tail = if let Some(after_name) = after_keyword.strip_prefix(name) {
+        after_name.trim_start()
+    } else {
+        after_keyword
+    };
+    normalize_signature_fragment(tail, 160)
+}
+
+fn extract_parenthesized_clause(header: &str) -> Option<String> {
+    let (inner, _) = extract_first_parenthesized_with_end(header)?;
+    normalize_signature_fragment(&inner, 160)
+}
+
+fn parse_parameter_list(raw: &str, language: CodeLanguage) -> Vec<ExtractedInput> {
+    split_top_level(raw, ',')
+        .into_iter()
+        .filter_map(|part| parse_parameter(&part, language))
+        .collect()
+}
+
+fn parse_parameter(raw: &str, language: CodeLanguage) -> Option<ExtractedInput> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed == "/" || trimmed == "*" {
+        return None;
+    }
+
+    let without_default = split_top_level_once(trimmed, '=')
+        .map(|(left, _)| left)
+        .unwrap_or_else(|| trimmed.to_string());
+    let without_default = without_default.trim();
+
+    if language == CodeLanguage::Rust && without_default.contains("self") && !without_default.contains(':') {
+        return Some(ExtractedInput {
+            name: "self".to_string(),
+            type_name: None,
+        });
+    }
+
+    let (name_part, type_part) = split_top_level_once(without_default, ':')
+        .unwrap_or((without_default.to_string(), String::new()));
+
+    let name = normalize_parameter_name(&name_part);
+    if name.is_empty() {
+        return None;
+    }
+
+    Some(ExtractedInput {
+        name,
+        type_name: normalize_signature_fragment(type_part.trim(), 120),
+    })
+}
+
+fn normalize_parameter_name(raw: &str) -> String {
+    raw.trim()
+        .trim_start_matches("...")
+        .trim_start_matches("**")
+        .trim_start_matches('*')
+        .trim_start_matches("mut ")
+        .trim_start_matches("ref ")
+        .trim_start_matches("readonly ")
+        .trim_start_matches("public ")
+        .trim_start_matches("private ")
+        .trim_start_matches("protected ")
+        .trim()
+        .to_string()
+}
+
+fn extract_first_parenthesized_with_end(header: &str) -> Option<(String, usize)> {
+    let open = header.find('(')?;
+    let close = find_matching_delimiter(header, open, '(', ')')?;
+    Some((header[open + 1..close].to_string(), close))
+}
+
+fn extract_between_top_level_chars(raw: &str, start_char: char, end_char: char) -> Option<String> {
+    let start = find_top_level_signature_char(raw, start_char)?;
+    let after_start = &raw[start + start_char.len_utf8()..];
+    let end = find_top_level_signature_char(after_start, end_char)?;
+    normalize_signature_fragment(&after_start[..end], 160)
+}
+
+fn extract_after_top_level_char(raw: &str, target: char) -> Option<String> {
+    let start = find_top_level_signature_char(raw, target)?;
+    normalize_signature_fragment(&raw[start + target.len_utf8()..], 160)
+}
+
+fn substring_after_name<'a>(header: &'a str, name: &str) -> Option<&'a str> {
+    let index = header.find(name)?;
+    Some(&header[index + name.len()..])
+}
+
+fn normalize_signature_fragment(raw: &str, max_len: usize) -> Option<String> {
+    truncate_text(raw.trim().trim_end_matches('{').trim_end_matches(';').trim(), max_len)
+}
+
+fn take_until_top_level<'a>(raw: &'a str, stop_chars: &[char]) -> &'a str {
+    let mut paren_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut angle_depth = 0usize;
+
+    for (idx, ch) in raw.char_indices() {
+        if stop_chars.contains(&ch) && paren_depth == 0 && bracket_depth == 0 && angle_depth == 0 {
+            return &raw[..idx];
+        }
+
+        match ch {
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+
+    raw
+}
+
+fn find_top_level_signature_char(raw: &str, target: char) -> Option<usize> {
+    let mut paren_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut angle_depth = 0usize;
+
+    for (idx, ch) in raw.char_indices() {
+        if ch == target && paren_depth == 0 && bracket_depth == 0 && angle_depth == 0 {
+            return Some(idx);
+        }
+
+        match ch {
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn split_top_level_once(raw: &str, delimiter: char) -> Option<(String, String)> {
+    let index = find_top_level_signature_char(raw, delimiter)?;
+    Some((
+        raw[..index].trim().to_string(),
+        raw[index + delimiter.len_utf8()..].trim().to_string(),
+    ))
+}
+
+fn split_top_level(raw: &str, delimiter: char) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut start = 0usize;
+    let mut paren_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut brace_depth = 0usize;
+    let mut angle_depth = 0usize;
+
+    for (idx, ch) in raw.char_indices() {
+        match ch {
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '{' => brace_depth += 1,
+            '}' => brace_depth = brace_depth.saturating_sub(1),
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.saturating_sub(1),
+            _ => {}
+        }
+
+        if ch == delimiter
+            && paren_depth == 0
+            && bracket_depth == 0
+            && brace_depth == 0
+            && angle_depth == 0
+        {
+            parts.push(raw[start..idx].trim().to_string());
+            start = idx + delimiter.len_utf8();
+        }
+    }
+
+    parts.push(raw[start..].trim().to_string());
+    parts
+}
+
+fn find_matching_delimiter(raw: &str, open_index: usize, open: char, close: char) -> Option<usize> {
+    let mut depth = 0usize;
+    for (idx, ch) in raw[open_index..].char_indices() {
+        let absolute = open_index + idx;
+        if ch == open {
+            depth += 1;
+        } else if ch == close {
+            depth = depth.saturating_sub(1);
+            if depth == 0 {
+                return Some(absolute);
+            }
+        }
+    }
+    None
 }
 
 fn extract_file_description(source: &str, language: CodeLanguage) -> Option<String> {
@@ -3731,36 +4166,153 @@ fn normalize_description_text(raw: &str) -> Option<String> {
     truncate_text(&lines.join(" "), 200)
 }
 
-fn summarize_code_snippet(raw: &str, max_len: usize) -> Option<String> {
-    let mut lines = Vec::new();
-    for line in raw.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        lines.push(trimmed);
-        if trimmed.contains('{') || trimmed.ends_with(':') || trimmed.ends_with(';') || lines.len() >= 3 {
-            break;
-        }
+fn extract_python_symbol_description(source: &str, node: Node<'_>) -> Option<String> {
+    let body = node.child_by_field_name("body")?;
+    let mut cursor = body.walk();
+    let first = body.named_children(&mut cursor).next()?;
+    if first.kind() != "expression_statement" {
+        return None;
     }
 
+    extract_python_string_literal_text(node_text(source, first))
+}
+
+fn extract_python_string_literal_text(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    let first_quote = trimmed.find(['"', '\''])?;
+    let quoted = &trimmed[first_quote..];
+
+    let quote = if quoted.starts_with("\"\"\"") {
+        "\"\"\""
+    } else if quoted.starts_with("'''") {
+        "'''"
+    } else if quoted.starts_with('"') {
+        "\""
+    } else if quoted.starts_with('\'') {
+        "'"
+    } else {
+        return None;
+    };
+
+    let rest = &quoted[quote.len()..];
+    let end = rest.rfind(quote)?;
+    normalize_description_text(&rest[..end])
+}
+
+fn extract_preceding_symbol_comment(
+    source: &str,
+    node: Node<'_>,
+    language: CodeLanguage,
+) -> Option<String> {
+    let lines: Vec<&str> = source.lines().collect();
     if lines.is_empty() {
         return None;
     }
 
-    let joined = lines.join(" ");
-    let trimmed = joined
-        .split('{')
-        .next()
-        .unwrap_or(joined.as_str())
-        .trim()
-        .trim_end_matches('{')
-        .trim();
-    if trimmed.is_empty() {
+    let mut index = node.start_position().row.checked_sub(1)?;
+    if language == CodeLanguage::Rust {
+        while let Some(line) = lines.get(index) {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("#[") || trimmed.starts_with("#![") {
+                if index == 0 {
+                    return None;
+                }
+                index -= 1;
+                continue;
+            }
+            break;
+        }
+    }
+
+    extract_preceding_block_comment_before(&lines, index)
+        .or_else(|| extract_preceding_line_comment_block_before(&lines, index, language))
+}
+
+fn extract_preceding_block_comment_before(lines: &[&str], end_index: usize) -> Option<String> {
+    let end_line = lines.get(end_index)?.trim_end();
+    if !end_line.contains("*/") {
         return None;
     }
 
-    truncate_text(trimmed, max_len)
+    let mut start_index = end_index;
+    loop {
+        let line = lines.get(start_index)?.trim_start();
+        if line.contains("/*") {
+            break;
+        }
+        if start_index == 0 {
+            return None;
+        }
+        start_index -= 1;
+    }
+
+    let raw = lines[start_index..=end_index].join("\n");
+    let start = raw.find("/*")? + 2;
+    let end = raw.rfind("*/")?;
+    normalize_description_text(&raw[start..end])
+}
+
+fn extract_preceding_line_comment_block_before(
+    lines: &[&str],
+    end_index: usize,
+    language: CodeLanguage,
+) -> Option<String> {
+    let mut collected = Vec::new();
+    let mut index = end_index;
+
+    loop {
+        let line = lines.get(index)?.trim_start();
+        if language == CodeLanguage::Rust {
+            if let Some(doc_attr) = strip_rust_doc_attribute(line) {
+                collected.push(doc_attr);
+            } else if let Some(rest) = strip_symbol_line_comment_prefix(line, language) {
+                collected.push(rest.trim().to_string());
+            } else if collected.is_empty() && (line.starts_with("#(") || line.starts_with("#[") || line.starts_with("#![")) {
+                // no-op branch retained for symmetry with Rust attribute skipping above
+            } else {
+                break;
+            }
+        } else if let Some(rest) = strip_symbol_line_comment_prefix(line, language) {
+            collected.push(rest.trim().to_string());
+        } else {
+            break;
+        }
+
+        if index == 0 {
+            break;
+        }
+        index -= 1;
+    }
+
+    if collected.is_empty() {
+        None
+    } else {
+        collected.reverse();
+        normalize_description_text(&collected.join("\n"))
+    }
+}
+
+fn strip_symbol_line_comment_prefix<'a>(line: &'a str, language: CodeLanguage) -> Option<&'a str> {
+    match language {
+        CodeLanguage::Rust => line.strip_prefix("///").or_else(|| line.strip_prefix("//")),
+        CodeLanguage::Python => line.strip_prefix('#'),
+        CodeLanguage::TypeScript | CodeLanguage::JavaScript => line.strip_prefix("//"),
+    }
+}
+
+fn strip_rust_doc_attribute(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if !trimmed.starts_with("#[doc") {
+        return None;
+    }
+
+    let start = trimmed.find('"')? + 1;
+    let end = trimmed.rfind('"')?;
+    if end <= start {
+        return None;
+    }
+
+    Some(trimmed[start..end].to_string())
 }
 
 fn truncate_text(raw: &str, max_len: usize) -> Option<String> {
@@ -3821,11 +4373,13 @@ fn make_extracted_symbol(
     exported: bool,
     scope: &[String],
     parent_identity: Option<&str>,
+    language: CodeLanguage,
     source: &str,
     node: Node<'_>,
 ) -> ExtractedSymbol {
     let qualified_name = qualify_symbol_name(scope, &name);
     let (start_line, start_col, end_line, end_col) = node_span(node);
+    let signature = extract_symbol_signature(source, language, node, kind, &name);
 
     ExtractedSymbol {
         name,
@@ -3833,7 +4387,10 @@ fn make_extracted_symbol(
         identity: format!("{}@{}:{}", qualified_name, start_line, start_col),
         parent_identity: parent_identity.map(|s| s.to_string()),
         kind: kind.to_string(),
-        helper: extract_symbol_helper(source, node),
+        description: extract_symbol_description(source, language, node),
+        inputs: signature.inputs,
+        output: signature.output,
+        type_info: signature.type_info,
         exported,
         start_line,
         start_col,
@@ -5379,6 +5936,26 @@ mod tests {
     fn symbol_summary(doc: &Document, prefix: &str) -> Option<String> {
         symbol_block_by_prefix(doc, prefix)
             .and_then(|block| block.metadata.summary.clone())
+    }
+
+    fn symbol_content_string_field(doc: &Document, prefix: &str, field: &str) -> Option<String> {
+        let block = symbol_block_by_prefix(doc, prefix)?;
+        let Content::Json { value, .. } = &block.content else {
+            return None;
+        };
+        value.get(field)?.as_str().map(|value| value.to_string())
+    }
+
+    fn symbol_content_json_field(
+        doc: &Document,
+        prefix: &str,
+        field: &str,
+    ) -> Option<serde_json::Value> {
+        let block = symbol_block_by_prefix(doc, prefix)?;
+        let Content::Json { value, .. } = &block.content else {
+            return None;
+        };
+        value.get(field).cloned()
     }
 
     fn symbol_line_range(doc: &Document, prefix: &str) -> Option<String> {
@@ -7891,7 +8468,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_descriptions_and_symbol_helpers_are_extracted() {
+    fn test_file_descriptions_and_symbol_descriptions_are_extracted() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
         fs::create_dir_all(dir.path().join("py")).unwrap();
@@ -7899,23 +8476,28 @@ mod tests {
 
         fs::write(
             dir.path().join("src/lib.rs"),
-            "//! Rust module summary\npub fn helper(value: i32) -> i32 { value }\npub struct Thing;\n",
+            "//! Rust module summary\n\n/// Rust helper description.\npub fn helper(value: i32) -> i32 { value }\n/// Rust thing description.\npub trait Thing: Send + Sync {}\n",
         )
         .unwrap();
         fs::write(
             dir.path().join("py/mod.py"),
-            "\"\"\"Python module summary.\"\"\"\ndef helper(value: int) -> int:\n    return value\n\nclass Thing:\n    pass\n",
+            "\"\"\"Python module summary.\"\"\"\nfrom typing import Protocol, runtime_checkable\n\ndef helper(value: int) -> int:\n    \"\"\"Python helper description.\"\"\"\n    return value\n\n@runtime_checkable\nclass Thing(Protocol):\n    \"\"\"Python thing description.\"\"\"\n\n    async def generate_answer(self, question: str) -> str:\n        \"\"\"Generate an answer.\"\"\"\n        return question\n",
         )
         .unwrap();
         fs::write(
             dir.path().join("web/mod.ts"),
-            "/** TS module summary */\nexport function helper(value: number): number { return value; }\nexport class Thing {}\n",
+            "/** TS module summary */\n/** TS helper description. */\nexport function helper(value: number, label: string): number { return value; }\n/** TS thing description. */\nexport class Thing extends Base implements Named {}\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/mod.js"),
+            "/** JS helper description. */\nfunction helper(value, label = 'x') { return 1; }\nmodule.exports = { helper };\n",
         )
         .unwrap();
 
         let build = build_code_graph(&CodeGraphBuildInput {
             repository_path: dir.path().to_path_buf(),
-            commit_hash: "file-description-and-symbol-helpers".to_string(),
+            commit_hash: "file-description-and-symbol-descriptions".to_string(),
             config: CodeGraphExtractorConfig::default(),
         })
         .unwrap();
@@ -7935,39 +8517,129 @@ mod tests {
 
         assert_eq!(
             symbol_summary(&build.document, "symbol:src/lib.rs::helper").as_deref(),
-            Some("pub fn helper(value: i32) -> i32")
+            Some("Rust helper description.")
+        );
+        assert_eq!(
+            symbol_content_string_field(&build.document, "symbol:src/lib.rs::helper", "description")
+                .as_deref(),
+            Some("Rust helper description.")
+        );
+        assert_eq!(
+            symbol_content_string_field(&build.document, "symbol:src/lib.rs::helper", "helper")
+                .as_deref(),
+            None
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:src/lib.rs::helper", "inputs"),
+            Some(json!([{"name": "value", "type": "i32"}]))
+        );
+        assert_eq!(
+            symbol_content_string_field(&build.document, "symbol:src/lib.rs::helper", "output")
+                .as_deref(),
+            Some("i32")
         );
         assert_eq!(
             symbol_line_range(&build.document, "symbol:src/lib.rs::helper").as_deref(),
-            Some("L2")
+            Some("L4")
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:src/lib.rs::Thing").as_deref(),
-            Some("pub struct Thing;")
+            Some("Rust thing description.")
+        );
+        assert_eq!(
+            symbol_content_string_field(&build.document, "symbol:src/lib.rs::Thing", "type")
+                .as_deref(),
+            Some("Send + Sync")
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:py/mod.py::helper").as_deref(),
-            Some("def helper(value: int) -> int:")
+            Some("Python helper description.")
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:py/mod.py::helper", "inputs"),
+            Some(json!([{"name": "value", "type": "int"}]))
+        );
+        assert_eq!(
+            symbol_content_string_field(&build.document, "symbol:py/mod.py::helper", "output")
+                .as_deref(),
+            Some("int")
         );
         assert_eq!(
             symbol_line_range(&build.document, "symbol:py/mod.py::helper").as_deref(),
-            Some("L2-L3")
+            Some("L4-L6")
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:py/mod.py::Thing").as_deref(),
-            Some("class Thing:")
+            Some("Python thing description.")
+        );
+        assert_eq!(
+            symbol_content_string_field(&build.document, "symbol:py/mod.py::Thing", "type")
+                .as_deref(),
+            Some("Protocol")
+        );
+        assert_eq!(
+            symbol_summary(&build.document, "symbol:py/mod.py::Thing::generate_answer").as_deref(),
+            Some("Generate an answer.")
+        );
+        assert_eq!(
+            symbol_content_json_field(
+                &build.document,
+                "symbol:py/mod.py::Thing::generate_answer",
+                "inputs"
+            ),
+            Some(json!([
+                {"name": "self"},
+                {"name": "question", "type": "str"}
+            ]))
+        );
+        assert_eq!(
+            symbol_content_string_field(
+                &build.document,
+                "symbol:py/mod.py::Thing::generate_answer",
+                "output"
+            )
+            .as_deref(),
+            Some("str")
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:web/mod.ts::helper").as_deref(),
-            Some("function helper(value: number): number")
+            Some("TS helper description.")
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:web/mod.ts::helper", "inputs"),
+            Some(json!([
+                {"name": "value", "type": "number"},
+                {"name": "label", "type": "string"}
+            ]))
+        );
+        assert_eq!(
+            symbol_content_string_field(&build.document, "symbol:web/mod.ts::helper", "output")
+                .as_deref(),
+            Some("number")
         );
         assert_eq!(
             symbol_line_range(&build.document, "symbol:web/mod.ts::helper").as_deref(),
-            Some("L2")
+            Some("L3")
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:web/mod.ts::Thing").as_deref(),
-            Some("class Thing")
+            Some("TS thing description.")
+        );
+        assert_eq!(
+            symbol_content_string_field(&build.document, "symbol:web/mod.ts::Thing", "type")
+                .as_deref(),
+            Some("extends Base implements Named")
+        );
+        assert_eq!(
+            symbol_summary(&build.document, "symbol:web/mod.js::helper").as_deref(),
+            Some("JS helper description.")
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:web/mod.js::helper", "inputs"),
+            Some(json!([
+                {"name": "value"},
+                {"name": "label"}
+            ]))
         );
     }
 
