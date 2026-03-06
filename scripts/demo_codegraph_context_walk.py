@@ -67,7 +67,10 @@ def seed_symbols(export: dict) -> list[str]:
             continue
         if any(logical_key == f"symbol:{path}{suffix}" for path in TARGET_FILES for suffix in TARGET_SUFFIXES):
             out.append(logical_key)
-    return sorted(set(out))
+    out = sorted(set(out))
+    if out:
+        return out
+    return queueable_symbols(export, set(), set())[:3]
 
 
 def queueable_symbols(export: dict, seen: set[str], queued: set[str]) -> list[str]:
@@ -118,7 +121,7 @@ def main() -> None:
         )
         _ = parse_json(build_out)
         init_out = run_step(
-            "Initialize a stateful codegraph context session from a shallow structural overview",
+            "Initialize a focus-first codegraph context session with preserved defaults",
             *cli(
                 "codegraph",
                 "context",
@@ -129,8 +132,21 @@ def main() -> None:
                 "demo_context_walk",
                 "--max-selected",
                 "512",
+                "--focus",
+                "crates/ucp-cli/src/commands/codegraph.rs",
+                "--focus-mode",
+                "file",
+                "--focus-depth",
+                "2",
                 "--initial-depth",
                 "1",
+                "--default-compact",
+                "--default-levels",
+                "1",
+                "--default-preset",
+                "semantic",
+                "--default-depth",
+                "2",
                 "--format",
                 "json",
             ),
@@ -138,7 +154,7 @@ def main() -> None:
         session_id = parse_json(init_out)["session_id"]
         write(f"\nSession: `{session_id}`\n")
         run_step(
-            "Show the compact initial working set",
+            "Show the initial working set using session defaults",
             *cli(
                 "codegraph",
                 "context",
@@ -147,8 +163,6 @@ def main() -> None:
                 str(doc),
                 "--session",
                 session_id,
-                "--compact",
-                "--no-rendered",
                 "--format",
                 "json",
             ),
@@ -252,7 +266,7 @@ def main() -> None:
             dependency_relations = pick_relations(frontier, "expand_dependencies", limit=2)
             if dependency_relations:
                 run_step(
-                    f"Expand dependencies for {symbol} via {','.join(dependency_relations)} (+2 hops)",
+                    f"Expand dependencies for {symbol} with the semantic preset and a budget",
                     *cli(
                         "codegraph",
                         "context",
@@ -264,37 +278,32 @@ def main() -> None:
                         symbol,
                         "--mode",
                         "dependencies",
-                        "--relations",
-                        ",".join(dependency_relations),
-                        "--depth",
-                        "2",
+                        "--preset",
+                        "semantic",
+                        "--max-add",
+                        "8",
                         "--format",
                         "json",
                     ),
                 )
-            dependent_relations = pick_relations(frontier, "expand_dependents", limit=1)
-            if dependent_relations:
-                run_step(
-                    f"Expand dependents for {symbol} via {dependent_relations[0]} (+1 hop)",
-                    *cli(
-                        "codegraph",
-                        "context",
-                        "expand",
-                        "--input",
-                        str(doc),
-                        "--session",
-                        session_id,
-                        symbol,
-                        "--mode",
-                        "dependents",
-                        "--relation",
-                        dependent_relations[0],
-                        "--depth",
-                        "1",
-                        "--format",
-                        "json",
-                    ),
-                )
+            run_step(
+                f"Apply the top recommended frontier action for {symbol}",
+                *cli(
+                    "codegraph",
+                    "context",
+                    "expand-recommended",
+                    "--input",
+                    str(doc),
+                    "--session",
+                    session_id,
+                    "--top",
+                    "1",
+                    "--priority-threshold",
+                    "60",
+                    "--format",
+                    "json",
+                ),
+            )
             run_step(
                 f"Hydrate source for {symbol}",
                 *cli("codegraph", "context", "hydrate", "--input", str(doc), "--session", session_id, symbol, "--padding", "2", "--format", "json"),

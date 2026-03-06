@@ -987,6 +987,276 @@ mod workflow_tests {
             .unwrap_or(false));
         assert_eq!(export_json.get("visible_levels").and_then(|v| v.as_u64()), Some(0));
     }
+
+    #[test]
+    fn test_codegraph_context_focus_first_defaults_and_recommended_flow() {
+        use tempfile::tempdir;
+
+        let repo = tempdir().expect("temp repo");
+        let src = repo.path().join("src");
+        std::fs::create_dir_all(&src).expect("create src");
+        std::fs::write(src.join("helper.rs"), "pub fn helper() -> i32 { 2 }\n")
+            .expect("write helper.rs");
+        std::fs::write(src.join("util.rs"), "use crate::helper; pub fn util() -> i32 { helper::helper() }\n")
+            .expect("write util.rs");
+        std::fs::write(
+            src.join("lib.rs"),
+            "mod helper; mod util; pub fn add(a:i32,b:i32)->i32{util::util()+a+b}\npub fn sub(a:i32,b:i32)->i32{a-b}\n",
+        )
+        .expect("write lib.rs");
+
+        let doc_out = tempfile::NamedTempFile::new().expect("doc output");
+        let doc_path = doc_out.path().to_str().unwrap().to_string();
+        let repo_path = repo.path().to_str().unwrap().to_string();
+
+        let build = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "focus-first-defaults",
+            "--output",
+            doc_path.as_str(),
+            "--allow-partial",
+            "--format",
+            "json",
+        ]);
+        assert!(build.status.success(), "build failed: {}", stderr(&build));
+
+        let init = run_cli(&[
+            "codegraph",
+            "context",
+            "init",
+            "--input",
+            doc_path.as_str(),
+            "--initial-depth",
+            "3",
+            "--focus",
+            "symbol:src/lib.rs::add",
+            "--focus-mode",
+            "dependencies",
+            "--preset",
+            "semantic",
+            "--focus-depth",
+            "2",
+            "--default-compact",
+            "--default-levels",
+            "1",
+            "--default-preset",
+            "semantic",
+            "--default-depth",
+            "2",
+            "--default-only",
+            "symbol",
+            "--format",
+            "json",
+        ]);
+        assert!(init.status.success(), "context init failed: {}", stderr(&init));
+        let init_json: serde_json::Value = serde_json::from_str(&stdout(&init)).unwrap();
+        assert_eq!(init_json.get("focus").and_then(|v| v.as_str()), Some("symbol:src/lib.rs::add"));
+        assert_eq!(
+            init_json
+                .get("preferences")
+                .and_then(|v| v.get("relation_preset"))
+                .and_then(|v| v.as_str()),
+            Some("semantic")
+        );
+        let session_id = init_json
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+
+        let show = run_cli(&[
+            "codegraph",
+            "context",
+            "show",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(show.status.success(), "context show failed: {}", stderr(&show));
+        let show_json: serde_json::Value = serde_json::from_str(&stdout(&show)).unwrap();
+        assert_eq!(show_json.get("export_mode").and_then(|v| v.as_str()), Some("compact"));
+        assert_eq!(show_json.get("visible_levels").and_then(|v| v.as_u64()), Some(1));
+        assert!(show_json
+            .get("nodes")
+            .and_then(|v| v.as_array())
+            .map(|nodes| nodes.iter().all(|node| node.get("node_class").and_then(|v| v.as_str()) == Some("symbol")))
+            .unwrap_or(false));
+        assert!(show_json
+            .get("hidden_levels")
+            .and_then(|v| v.as_array())
+            .map(|items| items.iter().any(|item| item.get("direction").is_some()))
+            .unwrap_or(false));
+
+        let defaults_show = run_cli(&[
+            "codegraph",
+            "context",
+            "defaults",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(defaults_show.status.success(), "defaults show failed: {}", stderr(&defaults_show));
+        let defaults_show_json: serde_json::Value = serde_json::from_str(&stdout(&defaults_show)).unwrap();
+        assert_eq!(defaults_show_json.get("updated").and_then(|v| v.as_bool()), Some(false));
+        assert_eq!(
+            defaults_show_json
+                .get("preferences")
+                .and_then(|v| v.get("compact"))
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+
+        let defaults_update = run_cli(&[
+            "codegraph",
+            "context",
+            "defaults",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--no-compact",
+            "--clear-levels",
+            "--relations",
+            "uses_symbol",
+            "--depth",
+            "3",
+            "--clear-only",
+            "--exclude",
+            "file",
+            "--format",
+            "json",
+        ]);
+        assert!(defaults_update.status.success(), "defaults update failed: {}", stderr(&defaults_update));
+        let defaults_update_json: serde_json::Value = serde_json::from_str(&stdout(&defaults_update)).unwrap();
+        assert_eq!(defaults_update_json.get("updated").and_then(|v| v.as_bool()), Some(true));
+        assert_eq!(
+            defaults_update_json
+                .get("preferences")
+                .and_then(|v| v.get("compact"))
+                .and_then(|v| v.as_bool()),
+            Some(false)
+        );
+        assert_eq!(
+            defaults_update_json
+                .get("preferences")
+                .and_then(|v| v.get("levels"))
+                .and_then(|v| v.as_u64()),
+            None
+        );
+        assert_eq!(
+            defaults_update_json
+                .get("preferences")
+                .and_then(|v| v.get("relation_preset"))
+                .and_then(|v| v.as_str()),
+            None
+        );
+        assert_eq!(
+            defaults_update_json
+                .get("preferences")
+                .and_then(|v| v.get("relation_filters"))
+                .and_then(|v| v.as_array())
+                .map(|items| items.iter().filter_map(|item| item.as_str()).collect::<Vec<_>>()),
+            Some(vec!["uses_symbol"])
+        );
+
+        let budgeted_expand = run_cli(&[
+            "codegraph",
+            "context",
+            "expand",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "src/lib.rs",
+            "--mode",
+            "file",
+            "--max-add",
+            "1",
+            "--format",
+            "json",
+        ]);
+        assert!(budgeted_expand.status.success(), "expand failed: {}", stderr(&budgeted_expand));
+        let expand_json: serde_json::Value = serde_json::from_str(&stdout(&budgeted_expand)).unwrap();
+        assert!(expand_json
+            .get("warnings")
+            .and_then(|v| v.as_array())
+            .map(|warnings| warnings.iter().any(|warning| warning.as_str().unwrap_or("").contains("max_add")))
+            .unwrap_or(false));
+
+        let updated_show = run_cli(&[
+            "codegraph",
+            "context",
+            "show",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(updated_show.status.success(), "updated show failed: {}", stderr(&updated_show));
+        let updated_show_json: serde_json::Value = serde_json::from_str(&stdout(&updated_show)).unwrap();
+        assert_eq!(updated_show_json.get("export_mode").and_then(|v| v.as_str()), Some("full"));
+        assert_eq!(updated_show_json.get("visible_levels").and_then(|v| v.as_u64()), None);
+        assert!(updated_show_json
+            .get("nodes")
+            .and_then(|v| v.as_array())
+            .map(|nodes| nodes.iter().all(|node| node.get("node_class").and_then(|v| v.as_str()) != Some("file")))
+            .unwrap_or(false));
+
+        let files_only = run_cli(&[
+            "codegraph",
+            "context",
+            "export",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--only",
+            "file",
+            "--format",
+            "json",
+        ]);
+        assert!(files_only.status.success(), "files-only export failed: {}", stderr(&files_only));
+        let files_json: serde_json::Value = serde_json::from_str(&stdout(&files_only)).unwrap();
+        assert!(files_json
+            .get("nodes")
+            .and_then(|v| v.as_array())
+            .map(|nodes| nodes.iter().all(|node| node.get("node_class").and_then(|v| v.as_str()) == Some("file")))
+            .unwrap_or(false));
+
+        let recommended = run_cli(&[
+            "codegraph",
+            "context",
+            "expand-recommended",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--top",
+            "1",
+            "--priority-threshold",
+            "50",
+            "--format",
+            "json",
+        ]);
+        assert!(recommended.status.success(), "expand-recommended failed: {}", stderr(&recommended));
+        let recommended_json: serde_json::Value = serde_json::from_str(&stdout(&recommended)).unwrap();
+        assert!(recommended_json
+            .get("applied_actions")
+            .and_then(|v| v.as_array())
+            .map(|actions| !actions.is_empty())
+            .unwrap_or(false));
+    }
 }
 
 mod error_handling_tests {

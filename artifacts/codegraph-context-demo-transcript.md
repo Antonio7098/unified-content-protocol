@@ -4,22 +4,22 @@ Chosen refactor candidate: deduplicate codegraph context/session helper logic ac
 
 ## Build a codegraph for the current repository
 
-`$ cargo run -q -p ucp-cli -- codegraph build /home/antonio/programming/Hivemind/unified-content-protocol --commit 01fb33c5 --output /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --allow-partial --format json`
+`$ cargo run -q -p ucp-cli -- codegraph build /home/antonio/programming/Hivemind/unified-content-protocol --commit c567b7ad --output /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --allow-partial --format json`
 
 ```text
 {
   "status": "partial_success",
   "profile_version": "codegraph.v1",
-  "canonical_fingerprint": "7e6a75f0dc8ae09718b27237ea121e7f5ce5ec76ad2ff2e802569eb2c6580434",
+  "canonical_fingerprint": "5f60d7709daf90b96af434318006995bb3b762bdc7a43986eb032bb43392a8d5",
   "stats": {
-    "total_nodes": 5085,
+    "total_nodes": 5111,
     "repository_nodes": 1,
     "directory_nodes": 51,
     "file_nodes": 146,
-    "symbol_nodes": 4887,
-    "total_edges": 5286,
-    "reference_edges": 606,
-    "export_edges": 1556,
+    "symbol_nodes": 4913,
+    "total_edges": 5337,
+    "reference_edges": 608,
+    "export_edges": 1561,
     "languages": {
       "javascript": 2,
       "python": 20,
@@ -87,140 +87,150 @@ Chosen refactor candidate: deduplicate codegraph context/session helper logic ac
       "code": "CG2006",
       "message": "unresolved import 'mod:resolve'",
       "path": "crates/ucp-codegraph/src/legacy.rs"
-... clipped 355986 more lines ...
+... clipped 358360 more lines ...
 ```
 
-## Initialize a stateful codegraph context session from a shallow structural overview
+## Initialize a focus-first codegraph context session with preserved defaults
 
-`$ cargo run -q -p ucp-cli -- codegraph context init --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --name demo_context_walk --max-selected 512 --initial-depth 1 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context init --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --name demo_context_walk --max-selected 512 --focus crates/ucp-cli/src/commands/codegraph.rs --focus-mode file --focus-depth 2 --initial-depth 1 --default-compact --default-levels 1 --default-preset semantic --default-depth 2 --format json`
 
 ```text
 {
+  "focus": "crates/ucp-cli/src/commands/codegraph.rs",
+  "focus_mode": "file",
   "initial_depth": 1,
   "name": "demo_context_walk",
-  "rendered": "CodeGraph working set\nfocus: [R1] .\nsummary: selected=1/512 repositories=1 directories=0 files=0 symbols=0 hydrated=0\n\nfilesystem:\n- [R1] .\n\nomissions:\n- symbols omitted from working set: 4887\n- prune policy: max_selected=512 demote_before_remove=true protect_focus=true\n\nfrontier:\n- set focus to a file or symbol to expand the working set",
-  "session_id": "cgctx_2954b48f",
+  "preferences": {
+    "compact": true,
+    "expand_depth": 2,
+    "levels": 1,
+    "relation_preset": "semantic"
+  },
+  "rendered": "CodeGraph working set\nfocus: [F1] crates/ucp-cli/src/commands/codegraph.rs\nsummary: selected=40/512 repositories=1 directories=0 files=1 symbols=38 hydrated=0\n\nfilesystem:\n- [R1] .\n- [F1] crates/ucp-cli/src/commands/codegraph.rs [rust]\n\nopened symbols:\n- [S31] function parse_relation_filters(relation: Option<String>, relations: Option<String>) -> Result<Vec<String>> @ crates/ucp-cli/src/commands/codegraph.rs#L713-L722\n- [S14] function context_init(input: Option<String>, name: Option<String>, max_selected: usize, initial_depth: Option<usize>, focus: Option<String>, focus_mode: String, focus_depth: usize, preset: Option<String>, default_relations: Option<String>, default_compact: bool, default_levels: Option<usize>, default_preset: Option<String>, default_depth: Option<usize>, default_only: Option<String>, default_exclude: Option<String>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L433-L547\n- [S26] struct InspectResult @ crates/ucp-cli/src/commands/codegraph.rs#L209-L213\n- [S13] function context_hydrate(input: Option<String>, session: String, target: String, padding: usize, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L1097-L1119\n- [S28] function merge_updates(into: &mut CodeGraphContextUpdate, next: CodeGraphContextUpdate) @ crates/ucp-cli/src/commands/codegraph.rs#L1227-L1233\n- [S6] function context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L275-L431\n- [S16] function context_prune(input: Option<String>, session: String, max_selected: Option<usize>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L1166-L1184\n- [S20] function expand_relation_preset(name: &str) -> Result<Vec<String>> @ crates/ucp-cli/src/commands/codegraph.rs#L750-L759\n- [S19] function ensure_codegraph_document(doc: &Document) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L1186-L1192\n- [S4] function build_session_preferences(compact: bool, levels: Option<usize>, preset: Option<String>, relation_filters: Vec<String>, expand_depth: Option<usize>, only_node_classes: Vec<String>, exclude_node_classes: Vec<String>) -> Result<CodeGraphSessionPreferences> @ crates/ucp-cli/src/commands/codegraph.rs#L761-L785\n- [S27] function make_export_config(preferences: &CodeGraphSessionPreferences, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<&str>, exclude: Option<&str>) -> Result<CodeGraphExportConfig> @ crates/ucp-cli/src/commands/codegraph.rs#L635-L664\n- [S21] function get_session(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState> @ crates/ucp-cli/src/commands/codegraph.rs#L1208-L1214\n- [S25] function inspect(input: Option<String>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L201-L245\n- [S22] function get_session_mut(stateful: &'a mut StatefulDocument, session: &str) -> Result<&'a mut AgentSessionState> @ crates/ucp-cli/src/commands/codegraph.rs#L1216-L1225\n- [S3] struct JsonBuildOutput @ crates/ucp-cli/src/commands/codegraph.rs#L105-L112\n- [S9] function context_expand(input: Option<String>, session: String, target: String, mode: String, relation: Option<String>, relations: Option<String>, preset: Option<String>, depth: Option<usize>, max_add: Option<usize>, priority_threshold: Option<u16>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L934-L980\n- [S18] function detect_commit_hash(repo: &PathBuf) -> Result<String> @ crates/ucp-cli/src/commands/codegraph.rs#L1283-L1301\n- [S38] function uuid_short() -> String @ crates/ucp-cli/src/commands/codegraph.rs#L1274-L1281\n- [S15] function context_pin(input: Option<String>, session: String, target: String, pinned: bool, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L1145-L1164\n- [S7] function context_add(input: Option<String>, session: String, selectors: String, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L880-L908\n- [S23] function handle(cmd: CodegraphCommands, format: OutputFormat) -> Result<()> [public] @ crates/ucp-cli/src/commands/codegraph.rs#L27-L55\n- [S8] function context_collapse(input: Option<String>, session: String, target: String, descendants: bool, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L1121-L1143\n- [S17] function context_show(input: Option<String>, session: String, max_tokens: usize, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<String>, exclude: Option<String>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L549-L590\n- [S30] function parse_node_classes(raw: Option<&str>) -> Result<Vec<String>> @ crates/ucp-cli/src/commands/codegraph.rs#L739-L748\n- [S37] function resolve_selectors(doc: &Document, selectors: &str) -> Result<Vec<BlockId>> @ crates/ucp-cli/src/commands/codegraph.rs#L1194-L1199\n- [S5] function build_traversal_config(preferences: &CodeGraphSessionPreferences, relation: Option<String>, relations: Option<String>, preset: Option<String>, depth: Option<usize>, max_add: Option<usize>, priority_threshold: Option<u16>) -> Result<CodeGraphTraversalConfig> @ crates/ucp-cli/src/commands/codegraph.rs#L787-L820\n- [S1] function action_summary(action: &CodeGraphContextFrontierAction) -> String @ crates/ucp-cli/src/commands/codegraph.rs#L867-L878\n- [S35] function render_context_show_text(document: &Document, context: &ucp_api::CodeGraphContextSession, config: &CodeGraphRenderConfig, export: &CodeGraphContextExport) -> String @ crates/ucp-cli/src/commands/codegraph.rs#L666-L711\n- [S2] function build(repo: String, commit: Option<String>, output: Option<String>, extensions: Option<String>, include_hidden: bool, no_export_edges: bool, fail_on_parse_error: bool, max_file_bytes: usize, allow_partial: bool, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L58-L199\n- [S32] function print_context_update(format: OutputFormat, session_id: &str, update: &CodeGraphContextUpdate, session: &AgentSessionState) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L1235-L1272\n- [S29] function parse_csv_arg(raw: Option<&str>) -> Result<Vec<String>> @ crates/ucp-cli/src/commands/codegraph.rs#L724-L737\n- [S12] function context_focus(input: Option<String>, session: String, target: Option<String>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L910-L932\n- [S11] function context_export(input: Option<String>, session: String, max_tokens: usize, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<String>, exclude: Option<String>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L592-L633\n- [S34] struct PromptResult @ crates/ucp-cli/src/commands/codegraph.rs#L254-L256\n- [S10] function context_expand_recommended(input: Option<String>, session: String, top: usize, padding: usize, depth: Option<usize>, max_add: Option<usize>, priority_threshold: Option<u16>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L982-L1095\n- [S24] function init_focus_first_context(context: &mut ucp_api::CodeGraphContextSession, document: &Document, block_id: BlockId, focus_mode: &str, traversal: &CodeGraphTraversalConfig) -> Result<CodeGraphContextUpdate> @ crates/ucp-cli/src/commands/codegraph.rs#L822-L865\n- [S36] function resolve_selector(doc: &Document, selector: &str) -> Result<BlockId> @ crates/ucp-cli/src/commands/codegraph.rs#L1201-L1206\n- [S33] function prompt(input: Option<String>, output: Option<String>, format: OutputFormat) -> Result<()> @ crates/ucp-cli/src/commands/codegraph.rs#L247-L273\n\nomissions:\n- symbols omitted from working set: 4875\n- prune policy: max_selected=512 demote_before_remove=true protect_focus=true\n\nfrontier:\n- [F1] expand file symbols\n- [F1] hydrate file source",
+  "session_id": "cgctx_9f3b4e82",
   "success": true,
   "summary": {
     "directories": 0,
-    "files": 0,
+    "files": 1,
     "hydrated_sources": 0,
     "max_selected": 512,
     "repositories": 1,
-    "selected": 1,
-    "symbols": 0
+    "selected": 40,
+    "symbols": 38
   }
 }
 ```
 
-Session: `cgctx_2954b48f`
+Session: `cgctx_9f3b4e82`
 
-## Show the compact initial working set
+## Show the initial working set using session defaults
 
-`$ cargo run -q -p ucp-cli -- codegraph context show --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context show --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --format json`
 
 ```text
 {
-  "edges": [],
-  "export_mode": "compact",
-  "focus": "cc437144455b1eb51ad2b4fb",
-  "focus_label": ".",
-  "focus_short_id": "R1",
-  "frontier": [],
-  "heuristics": {
-    "hidden_candidate_count": 0,
-    "low_value_candidate_count": 0,
-    "should_stop": true
-  },
-  "hidden_unreachable_count": 0,
-  "nodes": [
+  "edges": [
     {
-      "block_id": "cc437144455b1eb51ad2b4fb",
-      "coderef": {
-        "display": "unified-content-protocol",
-        "path": "."
-      },
-      "detail_level": "skeleton",
-      "distance_from_focus": 0,
-      "label": ".",
-      "logical_key": "repository:unified-content-protocol",
-      "node_class": "repository",
-      "origin": {
-        "kind": "overview"
-      },
-      "pinned": false,
-      "relevance_score": 162,
-      "short_id": "R1"
-    }
-  ],
-  "omitted_symbol_count": 4887,
-  "session": "cgctx_2954b48f",
-  "summary": {
-    "directories": 0,
-    "files": 0,
-    "hydrated_sources": 0,
-    "max_selected": 512,
-    "repositories": 1,
-    "selected": 1,
-    "symbols": 0
-  },
-  "total_selected_edges": 0,
-  "visible_node_count": 1
-}
+      "multiplicity": 1,
+      "relation": "exports",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F1",
+      "target": "901076464023033c660b85dd",
+      "target_short_id": "S23"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "dc7c514e09209d15c08ae3ec",
+      "source_short_id": "S10",
+      "target": "b3f11e914fd87b07282a683e",
+      "target_short_id": "S1"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "dc7c514e09209d15c08ae3ec",
+      "source_short_id": "S10",
+      "target": "4450d2707a0b19c1e365db1e",
+      "target_short_id": "S19"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "dc7c514e09209d15c08ae3ec",
+      "source_short_id": "S10",
+      "target": "541d1b88fef0ab934a94d8c4",
+      "target_short_id": "S21"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "dc7c514e09209d15c08ae3ec",
+      "source_short_id": "S10",
+      "target": "60bd974c1a707fae06ae9bff",
+      "target_short_id": "S22"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "dc7c514e09209d15c08ae3ec",
+      "source_short_id": "S10",
+      "target": "32de3bb2f25f16987903cf64",
+      "target_short_id": "S28"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "d0c919f1477fc77181e8f5af",
+      "source_short_id": "S11",
+      "target": "4450d2707a0b19c1e365db1e",
+      "target_short_id": "S19"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "d0c919f1477fc77181e8f5af",
+      "source_short_id": "S11",
+      "target": "541d1b88fef0ab934a94d8c4",
+      "target_short_id": "S21"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "d0c919f1477fc77181e8f5af",
+      "source_short_id": "S11",
+      "target": "5417b6f5770223c411fd533e",
+      "target_short_id": "S27"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "uses_symbol",
+      "source": "cdf346ff059bf7c77c035f1c",
+      "source_short_id": "S12",
+      "target": "4450d2707a0b19c1e365db1e",
+... clipped 1361 more lines ...
 ```
 
 ## Expand file symbols for crates/ucp-cli/src/commands/codegraph.rs with nested depth
 
-`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f crates/ucp-cli/src/commands/codegraph.rs --mode file --depth 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 crates/ucp-cli/src/commands/codegraph.rs --mode file --depth 2 --format json`
 
 ```text
 {
-  "added": [
-    "blk_e4fc6ac96af7e1f5b261fe1f",
-    "blk_01a6bcfd6027e7c8448f86c9",
-    "blk_4eab2a70e654d15901773975",
-    "blk_e7430e47ba61f5d6c6a7d1c4",
-    "blk_51a2efe3948f185fe290a8bf",
-    "blk_aabc66a9e95dbf452d4f4613",
-    "blk_837e09bad6550e46bace4a0c",
-    "blk_b8e7c31e596f118dc2f8d083",
-    "blk_dafefbc02143660b373ee955",
-    "blk_c79890c85fe5faf91c8a7bf7",
-    "blk_cceb4cc74ec1ce320bae469d",
-    "blk_36c6cd2279755163100bf577",
-    "blk_3d83acf3c51e902b8087654d",
-    "blk_1f5ae3e27b5b0f20e0f9b5ee",
-    "blk_4575c49867d0bcbc45988dcd",
-    "blk_b140afd9b657deaf709f6e5d",
-    "blk_e73115ef157f15828c2ebafc",
-    "blk_e9c19d163d3cf8ad8aba5ac5",
-    "blk_b247ea26ba584a905ca58359",
-    "blk_051222f35bcc94c4be0537f6",
-    "blk_1a8b9ab804e1f7020acb63f7",
-    "blk_26ef3c0fa7c9a4a7784f90d6",
-    "blk_27f4ccceeb41ed54a5107271",
-    "blk_a7a2ed9003c74392c2ebf001",
-    "blk_fab7f9f02d8794949b02cdac",
-    "blk_0ca661b39f87b6f1b753c066",
-    "blk_589955bff6b8e0e6b508ec75",
-    "blk_7e87a17494fe023f695509e7",
-    "blk_b8b98240323d547c1b12566b",
-    "blk_ba40fb7f92e5bd19f4e30563",
-    "blk_2996b03d1a9ed53635e7a627"
-  ],
+  "added": [],
   "changed": [],
   "focus": "blk_e4fc6ac96af7e1f5b261fe1f",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 32,
+  "total": 40,
   "warnings": []
 }
 ```
 
 ## Expand file symbols for crates/ucp-cli/src/commands/agent.rs with nested depth
 
-`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f crates/ucp-cli/src/commands/agent.rs --mode file --depth 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 crates/ucp-cli/src/commands/agent.rs --mode file --depth 2 --format json`
 
 ```text
 {
@@ -273,121 +283,114 @@ Session: `cgctx_2954b48f`
   "changed": [],
   "focus": "blk_421333df5881c48ef6b4be16",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 76,
+  "total": 84,
   "warnings": []
 }
 ```
 
 ## Expand file symbols for crates/ucp-cli/src/state.rs with nested depth
 
-`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f crates/ucp-cli/src/state.rs --mode file --depth 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 crates/ucp-cli/src/state.rs --mode file --depth 2 --format json`
 
 ```text
 {
   "added": [
     "blk_b93da718e1d46a0927bc4074",
-    "blk_8200e68767cfb0ef6ab7ba79",
-    "blk_188d0a5a3eecda3b89bd6663",
+    "blk_b2687bfbc0028beb7be3e9e2",
+    "blk_8fa37a9b28fc83a9dd03064a",
     "blk_bff602b27a6fde8e2ffa5c83",
     "blk_8ba9a2e4b16e2822a83ba3ee",
-    "blk_c781cee8feef9b724dc5267b",
-    "blk_701d4a158570aac82367aa83",
-    "blk_e226efa27ee49766852deed2",
-    "blk_e171de84c619ae784f69d034",
-    "blk_3454f118d408655205b7a81f",
-    "blk_94facbc10fc4336f57a1edfa",
-    "blk_6bef18c64e4b48ec6b16199d",
-    "blk_d70999acf47b26fb7b615535",
-    "blk_8812e3cd9c2deda7699c27ff",
-    "blk_935b8bb38a66bb3fea2a47ba",
-    "blk_e91699dcdbeccecf2e3faacc",
-    "blk_70389eb140a9e9e83cee012f",
-    "blk_01b4e5ae4df4fbc19afe29a5",
-    "blk_43ae50f0ee2859a5b67c342f",
-    "blk_76fa95f3966e235ded59deed",
-    "blk_0e56da010393704a8f24cfa0",
-    "blk_3782dd2be141e3c55305983d",
-    "blk_0341e8199fff1053a0ca9a7b",
-    "blk_9299e9547b8d0efa11291bb1",
+    "blk_b8185f6fe13c5fc5fea62f7a",
+    "blk_893f9444f372a00bbb564ddc",
+    "blk_474738725d905374a343b4f2",
+    "blk_04df4e95dd82367359cc7c74",
+    "blk_e935692387960b1285167912",
+    "blk_8c9c75b6fb2bd8c01b77c082",
+    "blk_86f9eb5f6a731caf654cfcfd",
+    "blk_a46d60b85791ed274d33127c",
+    "blk_2649414a6e90f853fdf95d58",
+    "blk_0c6c13995a670d18a116596b",
+    "blk_778fa2de138f69564248f2a6",
+    "blk_ce3da84f4d25148890d96698",
+    "blk_7ea20dd7acaccbccc7ae0908",
+    "blk_b0bc4af0362ef61c14881c4e",
+    "blk_fe1acf1e3e51fd5474b97f2b",
+    "blk_520f075fcd694a0fd58dab95",
+    "blk_4797cf720ffc4759c4487680",
+    "blk_6aa14daf4da988d8e6db3fd4",
+    "blk_00bf01bab39e0d8bfcbee58c",
+    "blk_63507f8f088b182401b16d4e",
     "blk_512af7304477aedf697093ad",
-    "blk_bb9d761faf75e2521a2bed72",
-    "blk_98cecc35fdf3a26f89ae1e7d",
-    "blk_5fdffd711aa011e9e9dd39f5",
-    "blk_4b61c9e588579964859333a2",
-    "blk_12d1227a2646bf2521e28c13",
-    "blk_62e3b255e283d9c6baa7b484",
-    "blk_9361af0ca23f02a772c132a2",
-    "blk_abe9f9fe7bff58e60a927f86",
-    "blk_de8bedf545b1c01ca7b6b53c",
-    "blk_2101ee03c207a0ddda697bad",
-    "blk_49300b9d09e65882cc0d62c2",
-    "blk_be7bebb2d9258b0b192a1428",
-    "blk_7fc9bfbca39635630447d5c3",
-    "blk_185ce4556c9cf59fe54872f7",
-    "blk_22f7c81a012a56168d1cf22c",
-    "blk_170b3ff154cc6352ec177cc3",
-    "blk_8ffe45e5aae6a3fbb5854f5c",
-    "blk_ac4e71d14344917a11ee62d3",
-    "blk_4766ffa34f47f97e704daea8"
+    "blk_c402a2eb38a29780f8e3b2d4",
+    "blk_3f5f26f70abc3a3f93287213",
+    "blk_2bd2ad9d2bb8b0e03ee2dbdd",
+    "blk_4aa934409ab8241ae4ced0f6",
+    "blk_ebb0a31c425a9c20309e7905",
+    "blk_4fa0ff7211cfe8d616905baf",
+    "blk_c5ec9c271d30ea7b81985801",
+    "blk_605f3691b1a46afed17ef87c",
+    "blk_e33cb21ff66ab1035886e032",
+    "blk_b6cdbf01af786b7f3f7914dd",
+    "blk_310eda51a116db9f8773ff3a",
+    "blk_722c7d869ccdb6370317d28c",
+    "blk_4964cf7bc18da2e9c433bdc8",
+    "blk_b30abd1436b1b1fc352c5937",
+    "blk_5592eb870c96664176dcd3d8",
+    "blk_2486dd3a3fcbdad081c13e19",
+    "blk_f55151e975cd9f34166eaba3",
+    "blk_27ae77bff49f32eb424eba84",
+    "blk_43d700d07714cdae962ab70f"
   ],
   "changed": [],
   "focus": "blk_b93da718e1d46a0927bc4074",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 120,
+  "total": 129,
   "warnings": []
 }
 ```
 
 ## Export the structured working set after file expansion
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
 
 ```text
 {
   "edges": [
     {
       "multiplicity": 1,
-      "relation": "exports",
+      "relation": "imports_symbol",
       "source": "421333df5881c48ef6b4be16",
       "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
+      "target": "0c6c13995a670d18a116596b",
+      "target_short_id": "S114"
     },
     {
       "multiplicity": 1,
       "relation": "imports_symbol",
       "source": "421333df5881c48ef6b4be16",
       "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S105"
+      "target": "ce3da84f4d25148890d96698",
+      "target_short_id": "S125"
     },
     {
       "multiplicity": 1,
       "relation": "imports_symbol",
       "source": "421333df5881c48ef6b4be16",
       "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S116"
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
     },
     {
       "multiplicity": 1,
       "relation": "imports_symbol",
       "source": "421333df5881c48ef6b4be16",
       "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S74"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S75"
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
     },
     {
       "multiplicity": 3,
@@ -399,84 +402,86 @@ Session: `cgctx_2954b48f`
     },
     {
       "multiplicity": 1,
-      "relation": "exports",
+      "relation": "imports_symbol",
       "source": "e4fc6ac96af7e1f5b261fe1f",
       "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
+      "target": "e935692387960b1285167912",
+      "target_short_id": "S101"
     },
     {
       "multiplicity": 1,
       "relation": "imports_symbol",
       "source": "e4fc6ac96af7e1f5b261fe1f",
       "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S105"
+      "target": "8c9c75b6fb2bd8c01b77c082",
+      "target_short_id": "S102"
     },
     {
       "multiplicity": 1,
       "relation": "imports_symbol",
       "source": "e4fc6ac96af7e1f5b261fe1f",
       "source_short_id": "F2",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S116"
+      "target": "0c6c13995a670d18a116596b",
+      "target_short_id": "S114"
     },
     {
       "multiplicity": 1,
       "relation": "imports_symbol",
       "source": "e4fc6ac96af7e1f5b261fe1f",
       "source_short_id": "F2",
-      "target": "8200e68767cfb0ef6ab7ba79",
-... clipped 3982 more lines ...
+      "target": "ce3da84f4d25148890d96698",
+      "target_short_id": "S125"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b2687bfbc0028beb7be3e9e2",
+... clipped 636 more lines ...
 ```
 
 ### Seed symbols
 
-- `symbol:crates/ucp-cli/src/commands/agent.rs::context_show`
-- `symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut`
-- `symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update`
-- `symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector`
-- `symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show`
-- `symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut`
-- `symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update`
-- `symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector`
+- `symbol:crates/ucp-cli/src/state.rs::AgentSessionState`
+- `symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69`
+- `symbol:crates/ucp-cli/src/state.rs::CliState`
 
-## Focus symbol:crates/ucp-cli/src/commands/agent.rs::context_show
+## Focus symbol:crates/ucp-cli/src/state.rs::AgentSessionState
 
-`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::context_show --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState --format json`
 
 ```text
 {
   "added": [],
   "changed": [
-    "blk_ea22c75b78e8959e70d7f4cc"
+    "blk_b2687bfbc0028beb7be3e9e2"
   ],
-  "focus": "blk_ea22c75b78e8959e70d7f4cc",
+  "focus": "blk_b2687bfbc0028beb7be3e9e2",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 120,
+  "total": 129,
   "warnings": []
 }
 ```
 
-## Show +1 levels around symbol:crates/ucp-cli/src/commands/agent.rs::context_show
+## Show +1 levels around symbol:crates/ucp-cli/src/state.rs::AgentSessionState
 
-`$ cargo run -q -p ucp-cli -- codegraph context show --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format text`
+`$ cargo run -q -p ucp-cli -- codegraph context show --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format text`
 
 ```text
-visible nodes: 5 of 120 selected
+visible nodes: 5 of 129 selected
 focus window: +1 levels
-+ 41 nodes at level 2
-+ 50 nodes at level 3
-+ 23 nodes at level 4
++ 85 nodes at level 2 via structural contains_symbol
++ 38 nodes at level 3 via structural contains_symbol
 + 1 selected nodes disconnected from focus
 next: hydrate_source *
 ```
 
-## Export frontier for symbol:crates/ucp-cli/src/commands/agent.rs::context_show (+1 visible level)
+## Export frontier for symbol:crates/ucp-cli/src/state.rs::AgentSessionState (+1 visible level)
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format json`
 
 ```text
 {
@@ -486,126 +491,601 @@ next: hydrate_source *
       "relation": "imports_symbol",
       "source": "421333df5881c48ef6b4be16",
       "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S105"
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
     },
     {
       "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "ea22c75b78e8959e70d7f4cc",
-      "source_short_id": "S14",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S105"
+      "relation": "imports_symbol",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
+    },
+    {
+      "multiplicity": 3,
+      "relation": "references",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "b93da718e1d46a0927bc4074",
+      "target_short_id": "F3"
     },
     {
       "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "d26b84666d6b90b00dc8abb9",
-      "source_short_id": "S28",
-      "target": "ea22c75b78e8959e70d7f4cc",
-      "target_short_id": "S14"
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
+    },
+    {
+      "multiplicity": 5,
+      "relation": "references",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b93da718e1d46a0927bc4074",
+      "target_short_id": "F3"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "exports",
+      "source": "b93da718e1d46a0927bc4074",
+      "source_short_id": "F3",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "for_type",
+      "source": "8fa37a9b28fc83a9dd03064a",
+      "source_short_id": "S83",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
     }
   ],
   "export_mode": "compact",
-  "focus": "ea22c75b78e8959e70d7f4cc",
-  "focus_label": "symbol:crates/ucp-cli/src/commands/agent.rs::context_show",
-  "focus_short_id": "S14",
+  "focus": "b2687bfbc0028beb7be3e9e2",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState",
+  "focus_short_id": "S82",
   "frontier": [
     {
       "action": "hydrate_source",
-      "block_id": "ea22c75b78e8959e70d7f4cc",
+      "block_id": "b2687bfbc0028beb7be3e9e2",
       "candidate_count": 1,
-      "description": "Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::context_show",
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState",
       "priority": 121,
-      "short_id": "S14"
+      "short_id": "S82"
+    },
+... clipped 171 more lines ...
+```
+
+## Apply the top recommended frontier action for symbol:crates/ucp-cli/src/state.rs::AgentSessionState
+
+`$ cargo run -q -p ucp-cli -- codegraph context expand-recommended --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --top 1 --priority-threshold 60 --format json`
+
+```text
+{
+  "added": [],
+  "applied_actions": [
+    "hydrate_source S82 (priority 121, 1 candidates)"
+  ],
+  "changed": [
+    "blk_b2687bfbc0028beb7be3e9e2",
+    "blk_b2687bfbc0028beb7be3e9e2"
+  ],
+  "focus": "blk_b2687bfbc0028beb7be3e9e2",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState
+
+`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState --padding 2 --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_b2687bfbc0028beb7be3e9e2"
+  ],
+  "focus": "blk_b2687bfbc0028beb7be3e9e2",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export updated working set for symbol:crates/ucp-cli/src/state.rs::AgentSessionState
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
+
+```text
+{
+  "edges": [
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
     },
     {
-      "action": "expand_dependencies",
-      "block_id": "ea22c75b78e8959e70d7f4cc",
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
+    },
+    {
+      "multiplicity": 3,
+      "relation": "references",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "b93da718e1d46a0927bc4074",
+      "target_short_id": "F3"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
+    },
+    {
+      "multiplicity": 5,
+      "relation": "references",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b93da718e1d46a0927bc4074",
+      "target_short_id": "F3"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "exports",
+      "source": "b93da718e1d46a0927bc4074",
+      "source_short_id": "F3",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "for_type",
+      "source": "8fa37a9b28fc83a9dd03064a",
+      "source_short_id": "S83",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    }
+  ],
+  "export_mode": "compact",
+  "focus": "b2687bfbc0028beb7be3e9e2",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState",
+  "focus_short_id": "S82",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "b2687bfbc0028beb7be3e9e2",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState",
+      "priority": 120,
+      "short_id": "S82"
+    },
+... clipped 173 more lines ...
+```
+
+## Focus symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69
+
+`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69 --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_8fa37a9b28fc83a9dd03064a"
+  ],
+  "focus": "blk_8fa37a9b28fc83a9dd03064a",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export frontier for symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69 (+1 visible level)
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format json`
+
+```text
+{
+  "edges": [
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
+    },
+    {
+      "multiplicity": 3,
+      "relation": "references",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "b93da718e1d46a0927bc4074",
+      "target_short_id": "F3"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
+    },
+    {
+      "multiplicity": 5,
+      "relation": "references",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b93da718e1d46a0927bc4074",
+      "target_short_id": "F3"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "exports",
+      "source": "b93da718e1d46a0927bc4074",
+      "source_short_id": "F3",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "for_type",
+      "source": "8fa37a9b28fc83a9dd03064a",
+      "source_short_id": "S83",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    }
+  ],
+  "export_mode": "compact",
+  "focus": "8fa37a9b28fc83a9dd03064a",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69",
+  "focus_short_id": "S83",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "8fa37a9b28fc83a9dd03064a",
       "candidate_count": 1,
-      "description": "expand_dependencies outgoing neighbors via uses_symbol for symbol:crates/ucp-cli/src/commands/agent.rs::context_show",
-      "direction": "outgoing",
-      "priority": 94,
-      "relation": "uses_symbol",
-      "short_id": "S14"
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69",
+      "priority": 121,
+      "short_id": "S83"
+    },
+... clipped 346 more lines ...
+```
+
+## Apply the top recommended frontier action for symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69
+
+`$ cargo run -q -p ucp-cli -- codegraph context expand-recommended --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --top 1 --priority-threshold 60 --format json`
+
+```text
+{
+  "added": [],
+  "applied_actions": [
+    "hydrate_source S83 (priority 121, 1 candidates)"
+  ],
+  "changed": [
+    "blk_8fa37a9b28fc83a9dd03064a",
+    "blk_8fa37a9b28fc83a9dd03064a"
+  ],
+  "focus": "blk_8fa37a9b28fc83a9dd03064a",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69
+
+`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69 --padding 2 --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_8fa37a9b28fc83a9dd03064a"
+  ],
+  "focus": "blk_8fa37a9b28fc83a9dd03064a",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export updated working set for symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
+
+```text
+{
+  "edges": [
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
+    },
+    {
+      "multiplicity": 3,
+      "relation": "references",
+      "source": "421333df5881c48ef6b4be16",
+      "source_short_id": "F1",
+      "target": "b93da718e1d46a0927bc4074",
+      "target_short_id": "F3"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "imports_symbol",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "8fa37a9b28fc83a9dd03064a",
+      "target_short_id": "S83"
+    },
+    {
+      "multiplicity": 5,
+      "relation": "references",
+      "source": "e4fc6ac96af7e1f5b261fe1f",
+      "source_short_id": "F2",
+      "target": "b93da718e1d46a0927bc4074",
+      "target_short_id": "F3"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "exports",
+      "source": "b93da718e1d46a0927bc4074",
+      "source_short_id": "F3",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "for_type",
+      "source": "8fa37a9b28fc83a9dd03064a",
+      "source_short_id": "S83",
+      "target": "b2687bfbc0028beb7be3e9e2",
+      "target_short_id": "S82"
+    }
+  ],
+  "export_mode": "compact",
+  "focus": "8fa37a9b28fc83a9dd03064a",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69",
+  "focus_short_id": "S83",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "8fa37a9b28fc83a9dd03064a",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69",
+      "priority": 120,
+      "short_id": "S83"
+    },
+... clipped 348 more lines ...
+```
+
+## Focus symbol:crates/ucp-cli/src/state.rs::CliState
+
+`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::CliState --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_bff602b27a6fde8e2ffa5c83"
+  ],
+  "focus": "blk_bff602b27a6fde8e2ffa5c83",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export frontier for symbol:crates/ucp-cli/src/state.rs::CliState (+1 visible level)
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format json`
+
+```text
+{
+  "edges": [
+    {
+      "multiplicity": 1,
+      "relation": "exports",
+      "source": "b93da718e1d46a0927bc4074",
+      "source_short_id": "F3",
+      "target": "bff602b27a6fde8e2ffa5c83",
+      "target_short_id": "S92"
+    },
+    {
+      "multiplicity": 1,
+      "relation": "for_type",
+      "source": "8ba9a2e4b16e2822a83ba3ee",
+      "source_short_id": "S93",
+      "target": "bff602b27a6fde8e2ffa5c83",
+      "target_short_id": "S92"
+    }
+  ],
+  "export_mode": "compact",
+  "focus": "bff602b27a6fde8e2ffa5c83",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::CliState",
+  "focus_short_id": "S92",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "bff602b27a6fde8e2ffa5c83",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::CliState",
+      "priority": 121,
+      "short_id": "S92"
     },
     {
       "action": "collapse",
-      "block_id": "ea22c75b78e8959e70d7f4cc",
+      "block_id": "bff602b27a6fde8e2ffa5c83",
       "candidate_count": 1,
-      "description": "Collapse symbol:crates/ucp-cli/src/commands/agent.rs::context_show from working set",
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::CliState from working set",
       "priority": 6,
-      "short_id": "S14"
+      "short_id": "S92"
     }
   ],
   "heuristics": {
-    "hidden_candidate_count": 1,
+    "hidden_candidate_count": 0,
     "low_value_candidate_count": 0,
     "recommended_actions": [
       {
         "action": "hydrate_source",
-        "block_id": "ea22c75b78e8959e70d7f4cc",
+        "block_id": "bff602b27a6fde8e2ffa5c83",
         "candidate_count": 1,
-        "description": "Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::context_show",
+        "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::CliState",
         "priority": 121,
-        "short_id": "S14"
+        "short_id": "S92"
       },
       {
-        "action": "expand_dependencies",
-        "block_id": "ea22c75b78e8959e70d7f4cc",
+        "action": "collapse",
+        "block_id": "bff602b27a6fde8e2ffa5c83",
         "candidate_count": 1,
-        "description": "expand_dependencies outgoing neighbors via uses_symbol for symbol:crates/ucp-cli/src/commands/agent.rs::context_show",
-        "direction": "outgoing",
-        "priority": 94,
-        "relation": "uses_symbol",
-        "short_id": "S14"
-... clipped 159 more lines ...
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::CliState from working set",
+        "priority": 6,
+        "short_id": "S92"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "hydrate_source",
+      "block_id": "bff602b27a6fde8e2ffa5c83",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::CliState",
+      "priority": 121,
+      "short_id": "S92"
+    },
+    "should_stop": false
+  },
+  "hidden_levels": [
+    {
+      "count": 4,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 13,
+... clipped 98 more lines ...
 ```
 
-## Expand dependencies for symbol:crates/ucp-cli/src/commands/agent.rs::context_show via uses_symbol (+2 hops)
+## Apply the top recommended frontier action for symbol:crates/ucp-cli/src/state.rs::CliState
 
-`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::context_show --mode dependencies --relations uses_symbol --depth 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context expand-recommended --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --top 1 --priority-threshold 60 --format json`
 
 ```text
 {
-  "added": [
-    "blk_6557d3b244263e4971245831"
+  "added": [],
+  "applied_actions": [
+    "hydrate_source S92 (priority 121, 1 candidates)"
   ],
   "changed": [
-    "blk_ea22c75b78e8959e70d7f4cc"
+    "blk_bff602b27a6fde8e2ffa5c83",
+    "blk_bff602b27a6fde8e2ffa5c83"
   ],
-  "focus": "blk_ea22c75b78e8959e70d7f4cc",
+  "focus": "blk_bff602b27a6fde8e2ffa5c83",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 121,
+  "total": 129,
   "warnings": []
 }
 ```
 
-## Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::context_show
+## Hydrate source for symbol:crates/ucp-cli/src/state.rs::CliState
 
-`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::context_show --padding 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::CliState --padding 2 --format json`
 
 ```text
 {
   "added": [],
   "changed": [
-    "blk_ea22c75b78e8959e70d7f4cc",
-    "blk_ea22c75b78e8959e70d7f4cc"
+    "blk_bff602b27a6fde8e2ffa5c83"
   ],
-  "focus": "blk_ea22c75b78e8959e70d7f4cc",
+  "focus": "blk_bff602b27a6fde8e2ffa5c83",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 121,
+  "total": 129,
   "warnings": []
 }
 ```
 
-## Export updated working set for symbol:crates/ucp-cli/src/commands/agent.rs::context_show
+## Export updated working set for symbol:crates/ucp-cli/src/state.rs::CliState
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
 
 ```text
 {
@@ -613,630 +1093,130 @@ next: hydrate_source *
     {
       "multiplicity": 1,
       "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
+      "source": "b93da718e1d46a0927bc4074",
+      "source_short_id": "F3",
+      "target": "bff602b27a6fde8e2ffa5c83",
+      "target_short_id": "S92"
     },
     {
       "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S106"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S117"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S75"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S76"
-    },
-    {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S106"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e91699dcdbeccecf2e3faacc",
-... clipped 4035 more lines ...
-```
-
-## Focus symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut
-
-`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut --format json`
-
-```text
-{
-  "added": [],
-  "changed": [
-    "blk_c9c42d87b5039c025547ddd3"
-  ],
-  "focus": "blk_c9c42d87b5039c025547ddd3",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 121,
-  "warnings": []
-}
-```
-
-## Export frontier for symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut (+1 visible level)
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "4dc709203576a0c9a19d147e",
-      "source_short_id": "S10",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "748c018c0ff255072e8400a4",
-      "source_short_id": "S11",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "6bdfa08751d5a549d77dfeae",
-      "source_short_id": "S13",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "a0f46eea06efb92ade78319a",
-      "source_short_id": "S3",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "68ac17cf0b72cc53bcdd5398",
-      "source_short_id": "S5",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "90c791014a3ff4d7147bc4ae",
-      "source_short_id": "S6",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "999218ae981f6f86a4e6c555",
-      "source_short_id": "S7",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "b7e3d6028d7afb93335e0c0e",
-      "source_short_id": "S8",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "2d14aa6d8516a3c73a19a37b",
-      "source_short_id": "S9",
-      "target": "c9c42d87b5039c025547ddd3",
-      "target_short_id": "S24"
+      "relation": "for_type",
+      "source": "8ba9a2e4b16e2822a83ba3ee",
+      "source_short_id": "S93",
+      "target": "bff602b27a6fde8e2ffa5c83",
+      "target_short_id": "S92"
     }
   ],
   "export_mode": "compact",
-  "focus": "c9c42d87b5039c025547ddd3",
-  "focus_label": "symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut",
-  "focus_short_id": "S24",
-  "frontier": [
-... clipped 322 more lines ...
-```
-
-## Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut
-
-`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut --padding 2 --format json`
-
-```text
-{
-  "added": [],
-  "changed": [
-    "blk_c9c42d87b5039c025547ddd3",
-    "blk_c9c42d87b5039c025547ddd3"
-  ],
-  "focus": "blk_c9c42d87b5039c025547ddd3",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 121,
-  "warnings": []
-}
-```
-
-## Export updated working set for symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S106"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S117"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S75"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S76"
-    },
-    {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S106"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e91699dcdbeccecf2e3faacc",
-... clipped 4032 more lines ...
-```
-
-## Focus symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update
-
-`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update --format json`
-
-```text
-{
-  "added": [],
-  "changed": [
-    "blk_b418c0b106a76e2a816dc89d"
-  ],
-  "focus": "blk_b418c0b106a76e2a816dc89d",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 121,
-  "warnings": []
-}
-```
-
-## Export frontier for symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update (+1 visible level)
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "6bdfa08751d5a549d77dfeae",
-      "source_short_id": "S13",
-      "target": "b418c0b106a76e2a816dc89d",
-      "target_short_id": "S30"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "90c791014a3ff4d7147bc4ae",
-      "source_short_id": "S6",
-      "target": "b418c0b106a76e2a816dc89d",
-      "target_short_id": "S30"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "999218ae981f6f86a4e6c555",
-      "source_short_id": "S7",
-      "target": "b418c0b106a76e2a816dc89d",
-      "target_short_id": "S30"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "b7e3d6028d7afb93335e0c0e",
-      "source_short_id": "S8",
-      "target": "b418c0b106a76e2a816dc89d",
-      "target_short_id": "S30"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "2d14aa6d8516a3c73a19a37b",
-      "source_short_id": "S9",
-      "target": "b418c0b106a76e2a816dc89d",
-      "target_short_id": "S30"
-    }
-  ],
-  "export_mode": "compact",
-  "focus": "b418c0b106a76e2a816dc89d",
-  "focus_label": "symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update",
-  "focus_short_id": "S30",
+  "focus": "bff602b27a6fde8e2ffa5c83",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::CliState",
+  "focus_short_id": "S92",
   "frontier": [
     {
       "action": "hydrate_source",
-      "block_id": "b418c0b106a76e2a816dc89d",
-      "candidate_count": 1,
-      "description": "Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update",
-      "priority": 121,
-      "short_id": "S30"
-    },
-    {
-      "action": "expand_dependencies",
-      "block_id": "b418c0b106a76e2a816dc89d",
-      "candidate_count": 1,
-      "description": "expand_dependencies outgoing neighbors via uses_symbol for symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update",
-      "direction": "outgoing",
-      "priority": 94,
-      "relation": "uses_symbol",
-      "short_id": "S30"
+      "block_id": "bff602b27a6fde8e2ffa5c83",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::CliState",
+      "priority": 120,
+      "short_id": "S92"
     },
     {
       "action": "collapse",
-      "block_id": "b418c0b106a76e2a816dc89d",
+      "block_id": "bff602b27a6fde8e2ffa5c83",
       "candidate_count": 1,
-      "description": "Collapse symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update from working set",
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::CliState from working set",
       "priority": 6,
-      "short_id": "S30"
+      "short_id": "S92"
     }
   ],
   "heuristics": {
-    "hidden_candidate_count": 1,
+    "hidden_candidate_count": 0,
     "low_value_candidate_count": 0,
+    "reasons": [
+      "focus symbol is hydrated and no unselected dependency frontier remains"
+    ],
     "recommended_actions": [
       {
-... clipped 222 more lines ...
+        "action": "collapse",
+        "block_id": "bff602b27a6fde8e2ffa5c83",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::CliState from working set",
+        "priority": 6,
+        "short_id": "S92"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "collapse",
+      "block_id": "bff602b27a6fde8e2ffa5c83",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::CliState from working set",
+      "priority": 6,
+      "short_id": "S92"
+    },
+    "should_stop": true
+  },
+  "hidden_levels": [
+    {
+      "count": 4,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 13,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+... clipped 100 more lines ...
 ```
 
-## Expand dependencies for symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update via uses_symbol (+2 hops)
+## Focus symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context
 
-`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update --mode dependencies --relations uses_symbol --depth 2 --format json`
-
-```text
-{
-  "added": [
-    "blk_298cd57cedbe61b98d446788"
-  ],
-  "changed": [
-    "blk_b418c0b106a76e2a816dc89d"
-  ],
-  "focus": "blk_b418c0b106a76e2a816dc89d",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 122,
-  "warnings": []
-}
-```
-
-## Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update
-
-`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update --padding 2 --format json`
-
-```text
-{
-  "added": [],
-  "changed": [
-    "blk_b418c0b106a76e2a816dc89d",
-    "blk_b418c0b106a76e2a816dc89d"
-  ],
-  "focus": "blk_b418c0b106a76e2a816dc89d",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 122,
-  "warnings": []
-}
-```
-
-## Export updated working set for symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S107"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S118"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S76"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S77"
-    },
-    {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-... clipped 4183 more lines ...
-```
-
-## Focus symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector
-
-`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context --format json`
 
 ```text
 {
   "added": [],
   "changed": [
-    "blk_4ad997efb31de3ed7b077bf8"
+    "blk_7ea20dd7acaccbccc7ae0908"
   ],
-  "focus": "blk_4ad997efb31de3ed7b077bf8",
+  "focus": "blk_7ea20dd7acaccbccc7ae0908",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 122,
+  "total": 129,
   "warnings": []
 }
 ```
 
-## Export frontier for symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector (+1 visible level)
+## Export frontier for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context (+1 visible level)
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format json`
 
 ```text
 {
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "4dc709203576a0c9a19d147e",
-      "source_short_id": "S10",
-      "target": "4ad997efb31de3ed7b077bf8",
-      "target_short_id": "S31"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "97aed61a3a17944ab15efac8",
-      "source_short_id": "S32",
-      "target": "4ad997efb31de3ed7b077bf8",
-      "target_short_id": "S31"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "90c791014a3ff4d7147bc4ae",
-      "source_short_id": "S6",
-      "target": "4ad997efb31de3ed7b077bf8",
-      "target_short_id": "S31"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "999218ae981f6f86a4e6c555",
-      "source_short_id": "S7",
-      "target": "4ad997efb31de3ed7b077bf8",
-      "target_short_id": "S31"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "b7e3d6028d7afb93335e0c0e",
-      "source_short_id": "S8",
-      "target": "4ad997efb31de3ed7b077bf8",
-      "target_short_id": "S31"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "2d14aa6d8516a3c73a19a37b",
-      "source_short_id": "S9",
-      "target": "4ad997efb31de3ed7b077bf8",
-      "target_short_id": "S31"
-    }
-  ],
+  "edges": [],
   "export_mode": "compact",
-  "focus": "4ad997efb31de3ed7b077bf8",
-  "focus_label": "symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector",
-  "focus_short_id": "S31",
+  "focus": "7ea20dd7acaccbccc7ae0908",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context",
+  "focus_short_id": "S84",
   "frontier": [
     {
       "action": "hydrate_source",
-      "block_id": "4ad997efb31de3ed7b077bf8",
+      "block_id": "7ea20dd7acaccbccc7ae0908",
       "candidate_count": 1,
-      "description": "Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector",
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context",
       "priority": 121,
-      "short_id": "S31"
+      "short_id": "S84"
     },
     {
       "action": "collapse",
-      "block_id": "4ad997efb31de3ed7b077bf8",
+      "block_id": "7ea20dd7acaccbccc7ae0908",
       "candidate_count": 1,
-      "description": "Collapse symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector from working set",
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context from working set",
       "priority": 6,
-      "short_id": "S31"
+      "short_id": "S84"
     }
   ],
   "heuristics": {
@@ -1245,213 +1225,235 @@ next: hydrate_source *
     "recommended_actions": [
       {
         "action": "hydrate_source",
-        "block_id": "4ad997efb31de3ed7b077bf8",
-... clipped 232 more lines ...
+        "block_id": "7ea20dd7acaccbccc7ae0908",
+        "candidate_count": 1,
+        "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context",
+        "priority": 121,
+        "short_id": "S84"
+      },
+      {
+        "action": "collapse",
+        "block_id": "7ea20dd7acaccbccc7ae0908",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context from working set",
+        "priority": 6,
+        "short_id": "S84"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "hydrate_source",
+      "block_id": "7ea20dd7acaccbccc7ae0908",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context",
+      "priority": 121,
+      "short_id": "S84"
+    },
+    "should_stop": false
+  },
+  "hidden_levels": [
+    {
+      "count": 4,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 7,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 1,
+      "direction": "manual",
+      "level": 3
+    },
+    {
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+... clipped 65 more lines ...
 ```
 
-## Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector
+## Apply the top recommended frontier action for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context
 
-`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector --padding 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context expand-recommended --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --top 1 --priority-threshold 60 --format json`
+
+```text
+{
+  "added": [],
+  "applied_actions": [
+    "hydrate_source S84 (priority 121, 1 candidates)"
+  ],
+  "changed": [
+    "blk_7ea20dd7acaccbccc7ae0908",
+    "blk_7ea20dd7acaccbccc7ae0908"
+  ],
+  "focus": "blk_7ea20dd7acaccbccc7ae0908",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context
+
+`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context --padding 2 --format json`
 
 ```text
 {
   "added": [],
   "changed": [
-    "blk_4ad997efb31de3ed7b077bf8",
-    "blk_4ad997efb31de3ed7b077bf8"
+    "blk_7ea20dd7acaccbccc7ae0908"
   ],
-  "focus": "blk_4ad997efb31de3ed7b077bf8",
+  "focus": "blk_7ea20dd7acaccbccc7ae0908",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 122,
+  "total": 129,
   "warnings": []
 }
 ```
 
-## Export updated working set for symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector
+## Export updated working set for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S107"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S118"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S76"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S77"
-    },
-    {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-... clipped 4181 more lines ...
-```
-
-## Focus symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show
-
-`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
 
 ```text
 {
-  "added": [],
-  "changed": [
-    "blk_3d83acf3c51e902b8087654d"
-  ],
-  "focus": "blk_3d83acf3c51e902b8087654d",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 122,
-  "warnings": []
-}
-```
-
-## Export frontier for symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show (+1 visible level)
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S107"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "4eab2a70e654d15901773975",
-      "source_short_id": "S46",
-      "target": "3d83acf3c51e902b8087654d",
-      "target_short_id": "S56"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "3d83acf3c51e902b8087654d",
-      "source_short_id": "S56",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S107"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "3d83acf3c51e902b8087654d",
-      "source_short_id": "S56",
-      "target": "4575c49867d0bcbc45988dcd",
-      "target_short_id": "S58"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "3d83acf3c51e902b8087654d",
-      "source_short_id": "S56",
-      "target": "b140afd9b657deaf709f6e5d",
-      "target_short_id": "S59"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "3d83acf3c51e902b8087654d",
-      "source_short_id": "S56",
-      "target": "051222f35bcc94c4be0537f6",
-      "target_short_id": "S64"
-    }
-  ],
+  "edges": [],
   "export_mode": "compact",
-  "focus": "3d83acf3c51e902b8087654d",
-  "focus_label": "symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show",
-  "focus_short_id": "S56",
+  "focus": "7ea20dd7acaccbccc7ae0908",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context",
+  "focus_short_id": "S84",
   "frontier": [
     {
       "action": "hydrate_source",
-      "block_id": "3d83acf3c51e902b8087654d",
-      "candidate_count": 1,
-      "description": "Hydrate source for symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show",
-      "priority": 121,
-      "short_id": "S56"
+      "block_id": "7ea20dd7acaccbccc7ae0908",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context",
+      "priority": 120,
+      "short_id": "S84"
     },
     {
       "action": "collapse",
-      "block_id": "3d83acf3c51e902b8087654d",
+      "block_id": "7ea20dd7acaccbccc7ae0908",
       "candidate_count": 1,
-      "description": "Collapse symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show from working set",
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context from working set",
       "priority": 6,
-      "short_id": "S56"
+      "short_id": "S84"
+    }
+  ],
+  "heuristics": {
+    "hidden_candidate_count": 0,
+    "low_value_candidate_count": 0,
+    "reasons": [
+      "focus symbol is hydrated and no unselected dependency frontier remains"
+    ],
+    "recommended_actions": [
+      {
+        "action": "collapse",
+        "block_id": "7ea20dd7acaccbccc7ae0908",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context from working set",
+        "priority": 6,
+        "short_id": "S84"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "collapse",
+      "block_id": "7ea20dd7acaccbccc7ae0908",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::add_to_context from working set",
+      "priority": 6,
+      "short_id": "S84"
+    },
+    "should_stop": true
+  },
+  "hidden_levels": [
+    {
+      "count": 4,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 7,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 1,
+      "direction": "manual",
+      "level": 3
+    },
+    {
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+      "direction": "structural",
+      "level": 4,
+      "relation": "contains_symbol"
+    }
+  ],
+... clipped 67 more lines ...
+```
+
+## Focus symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back
+
+`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_b0bc4af0362ef61c14881c4e"
+  ],
+  "focus": "blk_b0bc4af0362ef61c14881c4e",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export frontier for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back (+1 visible level)
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format json`
+
+```text
+{
+  "edges": [],
+  "export_mode": "compact",
+  "focus": "b0bc4af0362ef61c14881c4e",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back",
+  "focus_short_id": "S85",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "b0bc4af0362ef61c14881c4e",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back",
+      "priority": 121,
+      "short_id": "S85"
+    },
+    {
+      "action": "collapse",
+      "block_id": "b0bc4af0362ef61c14881c4e",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back from working set",
+      "priority": 6,
+      "short_id": "S85"
     }
   ],
   "heuristics": {
@@ -1460,664 +1462,235 @@ next: hydrate_source *
     "recommended_actions": [
       {
         "action": "hydrate_source",
-        "block_id": "3d83acf3c51e902b8087654d",
-... clipped 206 more lines ...
+        "block_id": "b0bc4af0362ef61c14881c4e",
+        "candidate_count": 1,
+        "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back",
+        "priority": 121,
+        "short_id": "S85"
+      },
+      {
+        "action": "collapse",
+        "block_id": "b0bc4af0362ef61c14881c4e",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back from working set",
+        "priority": 6,
+        "short_id": "S85"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "hydrate_source",
+      "block_id": "b0bc4af0362ef61c14881c4e",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back",
+      "priority": 121,
+      "short_id": "S85"
+    },
+    "should_stop": false
+  },
+  "hidden_levels": [
+    {
+      "count": 5,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 6,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 1,
+      "direction": "manual",
+      "level": 3
+    },
+    {
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+... clipped 65 more lines ...
 ```
 
-## Hydrate source for symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show
+## Apply the top recommended frontier action for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back
 
-`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show --padding 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context expand-recommended --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --top 1 --priority-threshold 60 --format json`
+
+```text
+{
+  "added": [],
+  "applied_actions": [
+    "hydrate_source S85 (priority 121, 1 candidates)"
+  ],
+  "changed": [
+    "blk_b0bc4af0362ef61c14881c4e",
+    "blk_b0bc4af0362ef61c14881c4e"
+  ],
+  "focus": "blk_b0bc4af0362ef61c14881c4e",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back
+
+`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back --padding 2 --format json`
 
 ```text
 {
   "added": [],
   "changed": [
-    "blk_3d83acf3c51e902b8087654d",
-    "blk_3d83acf3c51e902b8087654d"
+    "blk_b0bc4af0362ef61c14881c4e"
   ],
-  "focus": "blk_3d83acf3c51e902b8087654d",
+  "focus": "blk_b0bc4af0362ef61c14881c4e",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 122,
+  "total": 129,
   "warnings": []
 }
 ```
 
-## Export updated working set for symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show
+## Export updated working set for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S107"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S118"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S76"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S77"
-    },
-    {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-... clipped 4180 more lines ...
-```
-
-## Focus symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut
-
-`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
 
 ```text
 {
-  "added": [],
-  "changed": [
-    "blk_e73115ef157f15828c2ebafc"
-  ],
-  "focus": "blk_e73115ef157f15828c2ebafc",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 122,
-  "warnings": []
-}
-```
-
-## Export frontier for symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut (+1 visible level)
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "e7430e47ba61f5d6c6a7d1c4",
-      "source_short_id": "S47",
-      "target": "e73115ef157f15828c2ebafc",
-      "target_short_id": "S60"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "51a2efe3948f185fe290a8bf",
-      "source_short_id": "S48",
-      "target": "e73115ef157f15828c2ebafc",
-      "target_short_id": "S60"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "aabc66a9e95dbf452d4f4613",
-      "source_short_id": "S49",
-      "target": "e73115ef157f15828c2ebafc",
-      "target_short_id": "S60"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "b8e7c31e596f118dc2f8d083",
-      "source_short_id": "S51",
-      "target": "e73115ef157f15828c2ebafc",
-      "target_short_id": "S60"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "dafefbc02143660b373ee955",
-      "source_short_id": "S52",
-      "target": "e73115ef157f15828c2ebafc",
-      "target_short_id": "S60"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "cceb4cc74ec1ce320bae469d",
-      "source_short_id": "S54",
-      "target": "e73115ef157f15828c2ebafc",
-      "target_short_id": "S60"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "36c6cd2279755163100bf577",
-      "source_short_id": "S55",
-      "target": "e73115ef157f15828c2ebafc",
-      "target_short_id": "S60"
-    }
-  ],
+  "edges": [],
   "export_mode": "compact",
-  "focus": "e73115ef157f15828c2ebafc",
-  "focus_label": "symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut",
-  "focus_short_id": "S60",
+  "focus": "b0bc4af0362ef61c14881c4e",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back",
+  "focus_short_id": "S85",
   "frontier": [
     {
       "action": "hydrate_source",
-      "block_id": "e73115ef157f15828c2ebafc",
-      "candidate_count": 1,
-      "description": "Hydrate source for symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut",
-      "priority": 121,
-      "short_id": "S60"
+      "block_id": "b0bc4af0362ef61c14881c4e",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back",
+      "priority": 120,
+      "short_id": "S85"
     },
     {
       "action": "collapse",
-      "block_id": "e73115ef157f15828c2ebafc",
+      "block_id": "b0bc4af0362ef61c14881c4e",
       "candidate_count": 1,
-      "description": "Collapse symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut from working set",
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back from working set",
       "priority": 6,
-      "short_id": "S60"
+      "short_id": "S85"
     }
-... clipped 261 more lines ...
+  ],
+  "heuristics": {
+    "hidden_candidate_count": 0,
+    "low_value_candidate_count": 0,
+    "reasons": [
+      "focus symbol is hydrated and no unselected dependency frontier remains"
+    ],
+    "recommended_actions": [
+      {
+        "action": "collapse",
+        "block_id": "b0bc4af0362ef61c14881c4e",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back from working set",
+        "priority": 6,
+        "short_id": "S85"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "collapse",
+      "block_id": "b0bc4af0362ef61c14881c4e",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::back from working set",
+      "priority": 6,
+      "short_id": "S85"
+    },
+    "should_stop": true
+  },
+  "hidden_levels": [
+    {
+      "count": 5,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 6,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 1,
+      "direction": "manual",
+      "level": 3
+    },
+    {
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+      "direction": "structural",
+      "level": 4,
+      "relation": "contains_symbol"
+    }
+  ],
+... clipped 67 more lines ...
 ```
 
-## Hydrate source for symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut
+## Focus symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context
 
-`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut --padding 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context --format json`
 
 ```text
 {
   "added": [],
   "changed": [
-    "blk_e73115ef157f15828c2ebafc",
-    "blk_e73115ef157f15828c2ebafc"
+    "blk_fe1acf1e3e51fd5474b97f2b"
   ],
-  "focus": "blk_e73115ef157f15828c2ebafc",
+  "focus": "blk_fe1acf1e3e51fd5474b97f2b",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 122,
+  "total": 129,
   "warnings": []
 }
 ```
 
-## Export updated working set for symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut
+## Export frontier for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context (+1 visible level)
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S107"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S118"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S76"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S77"
-    },
-    {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-... clipped 4178 more lines ...
-```
-
-## Focus symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update
-
-`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format json`
 
 ```text
 {
-  "added": [],
-  "changed": [
-    "blk_27f4ccceeb41ed54a5107271"
-  ],
-  "focus": "blk_27f4ccceeb41ed54a5107271",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 122,
-  "warnings": []
-}
-```
-
-## Export frontier for symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update (+1 visible level)
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "e7430e47ba61f5d6c6a7d1c4",
-      "source_short_id": "S47",
-      "target": "27f4ccceeb41ed54a5107271",
-      "target_short_id": "S67"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "51a2efe3948f185fe290a8bf",
-      "source_short_id": "S48",
-      "target": "27f4ccceeb41ed54a5107271",
-      "target_short_id": "S67"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "aabc66a9e95dbf452d4f4613",
-      "source_short_id": "S49",
-      "target": "27f4ccceeb41ed54a5107271",
-      "target_short_id": "S67"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "b8e7c31e596f118dc2f8d083",
-      "source_short_id": "S51",
-      "target": "27f4ccceeb41ed54a5107271",
-      "target_short_id": "S67"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "dafefbc02143660b373ee955",
-      "source_short_id": "S52",
-      "target": "27f4ccceeb41ed54a5107271",
-      "target_short_id": "S67"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "cceb4cc74ec1ce320bae469d",
-      "source_short_id": "S54",
-      "target": "27f4ccceeb41ed54a5107271",
-      "target_short_id": "S67"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "36c6cd2279755163100bf577",
-      "source_short_id": "S55",
-      "target": "27f4ccceeb41ed54a5107271",
-      "target_short_id": "S67"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "27f4ccceeb41ed54a5107271",
-      "source_short_id": "S67",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
-    }
-  ],
+  "edges": [],
   "export_mode": "compact",
-  "focus": "27f4ccceeb41ed54a5107271",
-  "focus_label": "symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update",
-  "focus_short_id": "S67",
-  "frontier": [
-... clipped 317 more lines ...
-```
-
-## Expand dependencies for symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update via uses_symbol (+2 hops)
-
-`$ cargo run -q -p ucp-cli -- codegraph context expand --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update --mode dependencies --relations uses_symbol --depth 2 --format json`
-
-```text
-{
-  "added": [
-    "blk_823f109791f59cbd2455992b"
-  ],
-  "changed": [
-    "blk_27f4ccceeb41ed54a5107271"
-  ],
-  "focus": "blk_27f4ccceeb41ed54a5107271",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 123,
-  "warnings": []
-}
-```
-
-## Hydrate source for symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update
-
-`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update --padding 2 --format json`
-
-```text
-{
-  "added": [],
-  "changed": [
-    "blk_27f4ccceeb41ed54a5107271",
-    "blk_27f4ccceeb41ed54a5107271"
-  ],
-  "focus": "blk_27f4ccceeb41ed54a5107271",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 123,
-  "warnings": []
-}
-```
-
-## Export updated working set for symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S108"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S119"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S77"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S78"
-    },
-    {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-... clipped 4226 more lines ...
-```
-
-## Focus symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector
-
-`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector --format json`
-
-```text
-{
-  "added": [],
-  "changed": [
-    "blk_0ca661b39f87b6f1b753c066"
-  ],
-  "focus": "blk_0ca661b39f87b6f1b753c066",
-  "removed": [],
-  "session": "cgctx_2954b48f",
-  "success": true,
-  "total": 123,
-  "warnings": []
-}
-```
-
-## Export frontier for symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector (+1 visible level)
-
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --levels 1 --format json`
-
-```text
-{
-  "edges": [
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "51a2efe3948f185fe290a8bf",
-      "source_short_id": "S48",
-      "target": "0ca661b39f87b6f1b753c066",
-      "target_short_id": "S71"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "aabc66a9e95dbf452d4f4613",
-      "source_short_id": "S49",
-      "target": "0ca661b39f87b6f1b753c066",
-      "target_short_id": "S71"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "b8e7c31e596f118dc2f8d083",
-      "source_short_id": "S51",
-      "target": "0ca661b39f87b6f1b753c066",
-      "target_short_id": "S71"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "dafefbc02143660b373ee955",
-      "source_short_id": "S52",
-      "target": "0ca661b39f87b6f1b753c066",
-      "target_short_id": "S71"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "cceb4cc74ec1ce320bae469d",
-      "source_short_id": "S54",
-      "target": "0ca661b39f87b6f1b753c066",
-      "target_short_id": "S71"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "uses_symbol",
-      "source": "589955bff6b8e0e6b508ec75",
-      "source_short_id": "S72",
-      "target": "0ca661b39f87b6f1b753c066",
-      "target_short_id": "S71"
-    }
-  ],
-  "export_mode": "compact",
-  "focus": "0ca661b39f87b6f1b753c066",
-  "focus_label": "symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector",
-  "focus_short_id": "S71",
+  "focus": "fe1acf1e3e51fd5474b97f2b",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context",
+  "focus_short_id": "S86",
   "frontier": [
     {
       "action": "hydrate_source",
-      "block_id": "0ca661b39f87b6f1b753c066",
+      "block_id": "fe1acf1e3e51fd5474b97f2b",
       "candidate_count": 1,
-      "description": "Hydrate source for symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector",
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context",
       "priority": 121,
-      "short_id": "S71"
+      "short_id": "S86"
     },
     {
       "action": "collapse",
-      "block_id": "0ca661b39f87b6f1b753c066",
+      "block_id": "fe1acf1e3e51fd5474b97f2b",
       "candidate_count": 1,
-      "description": "Collapse symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector from working set",
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context from working set",
       "priority": 6,
-      "short_id": "S71"
+      "short_id": "S86"
     }
   ],
   "heuristics": {
@@ -2126,536 +1699,851 @@ next: hydrate_source *
     "recommended_actions": [
       {
         "action": "hydrate_source",
-        "block_id": "0ca661b39f87b6f1b753c066",
-... clipped 231 more lines ...
+        "block_id": "fe1acf1e3e51fd5474b97f2b",
+        "candidate_count": 1,
+        "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context",
+        "priority": 121,
+        "short_id": "S86"
+      },
+      {
+        "action": "collapse",
+        "block_id": "fe1acf1e3e51fd5474b97f2b",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context from working set",
+        "priority": 6,
+        "short_id": "S86"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "hydrate_source",
+      "block_id": "fe1acf1e3e51fd5474b97f2b",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context",
+      "priority": 121,
+      "short_id": "S86"
+    },
+    "should_stop": false
+  },
+  "hidden_levels": [
+    {
+      "count": 6,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 5,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 1,
+      "direction": "manual",
+      "level": 3
+    },
+    {
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+... clipped 65 more lines ...
 ```
 
-## Hydrate source for symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector
+## Apply the top recommended frontier action for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context
 
-`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector --padding 2 --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context expand-recommended --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --top 1 --priority-threshold 60 --format json`
+
+```text
+{
+  "added": [],
+  "applied_actions": [
+    "hydrate_source S86 (priority 121, 1 candidates)"
+  ],
+  "changed": [
+    "blk_fe1acf1e3e51fd5474b97f2b",
+    "blk_fe1acf1e3e51fd5474b97f2b"
+  ],
+  "focus": "blk_fe1acf1e3e51fd5474b97f2b",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context
+
+`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context --padding 2 --format json`
 
 ```text
 {
   "added": [],
   "changed": [
-    "blk_0ca661b39f87b6f1b753c066",
-    "blk_0ca661b39f87b6f1b753c066"
+    "blk_fe1acf1e3e51fd5474b97f2b"
   ],
-  "focus": "blk_0ca661b39f87b6f1b753c066",
+  "focus": "blk_fe1acf1e3e51fd5474b97f2b",
   "removed": [],
-  "session": "cgctx_2954b48f",
+  "session": "cgctx_9f3b4e82",
   "success": true,
-  "total": 123,
+  "total": 129,
   "warnings": []
 }
 ```
 
-## Export updated working set for symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector
+## Export updated working set for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
 
 ```text
 {
-  "edges": [
+  "edges": [],
+  "export_mode": "compact",
+  "focus": "fe1acf1e3e51fd5474b97f2b",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context",
+  "focus_short_id": "S86",
+  "frontier": [
     {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
+      "action": "hydrate_source",
+      "block_id": "fe1acf1e3e51fd5474b97f2b",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context",
+      "priority": 120,
+      "short_id": "S86"
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S108"
+      "action": "collapse",
+      "block_id": "fe1acf1e3e51fd5474b97f2b",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context from working set",
+      "priority": 6,
+      "short_id": "S86"
+    }
+  ],
+  "heuristics": {
+    "hidden_candidate_count": 0,
+    "low_value_candidate_count": 0,
+    "reasons": [
+      "focus symbol is hydrated and no unselected dependency frontier remains"
+    ],
+    "recommended_actions": [
+      {
+        "action": "collapse",
+        "block_id": "fe1acf1e3e51fd5474b97f2b",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context from working set",
+        "priority": 6,
+        "short_id": "S86"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "collapse",
+      "block_id": "fe1acf1e3e51fd5474b97f2b",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::clear_context from working set",
+      "priority": 6,
+      "short_id": "S86"
+    },
+    "should_stop": true
+  },
+  "hidden_levels": [
+    {
+      "count": 6,
+      "direction": "manual",
+      "level": 2
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S119"
+      "count": 5,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
+      "count": 1,
+      "direction": "manual",
+      "level": 3
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S77"
+      "count": 38,
+      "direction": "structural",
+      "level": 4,
+      "relation": "contains_symbol"
+    }
+  ],
+... clipped 67 more lines ...
+```
+
+## Focus symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context
+
+`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_520f075fcd694a0fd58dab95"
+  ],
+  "focus": "blk_520f075fcd694a0fd58dab95",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export frontier for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context (+1 visible level)
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format json`
+
+```text
+{
+  "edges": [],
+  "export_mode": "compact",
+  "focus": "520f075fcd694a0fd58dab95",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context",
+  "focus_short_id": "S87",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "520f075fcd694a0fd58dab95",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context",
+      "priority": 121,
+      "short_id": "S87"
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S78"
+      "action": "collapse",
+      "block_id": "520f075fcd694a0fd58dab95",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context from working set",
+      "priority": 6,
+      "short_id": "S87"
+    }
+  ],
+  "heuristics": {
+    "hidden_candidate_count": 0,
+    "low_value_candidate_count": 0,
+    "recommended_actions": [
+      {
+        "action": "hydrate_source",
+        "block_id": "520f075fcd694a0fd58dab95",
+        "candidate_count": 1,
+        "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context",
+        "priority": 121,
+        "short_id": "S87"
+      },
+      {
+        "action": "collapse",
+        "block_id": "520f075fcd694a0fd58dab95",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context from working set",
+        "priority": 6,
+        "short_id": "S87"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "hydrate_source",
+      "block_id": "520f075fcd694a0fd58dab95",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context",
+      "priority": 121,
+      "short_id": "S87"
+    },
+    "should_stop": false
+  },
+  "hidden_levels": [
+    {
+      "count": 7,
+      "direction": "manual",
+      "level": 2
     },
     {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
+      "count": 4,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
     },
     {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
+      "count": 1,
+      "direction": "manual",
+      "level": 3
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-... clipped 4223 more lines ...
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+... clipped 65 more lines ...
+```
+
+## Apply the top recommended frontier action for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context
+
+`$ cargo run -q -p ucp-cli -- codegraph context expand-recommended --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --top 1 --priority-threshold 60 --format json`
+
+```text
+{
+  "added": [],
+  "applied_actions": [
+    "hydrate_source S87 (priority 121, 1 candidates)"
+  ],
+  "changed": [
+    "blk_520f075fcd694a0fd58dab95",
+    "blk_520f075fcd694a0fd58dab95"
+  ],
+  "focus": "blk_520f075fcd694a0fd58dab95",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context
+
+`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context --padding 2 --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_520f075fcd694a0fd58dab95"
+  ],
+  "focus": "blk_520f075fcd694a0fd58dab95",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export updated working set for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
+
+```text
+{
+  "edges": [],
+  "export_mode": "compact",
+  "focus": "520f075fcd694a0fd58dab95",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context",
+  "focus_short_id": "S87",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "520f075fcd694a0fd58dab95",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context",
+      "priority": 120,
+      "short_id": "S87"
+    },
+    {
+      "action": "collapse",
+      "block_id": "520f075fcd694a0fd58dab95",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context from working set",
+      "priority": 6,
+      "short_id": "S87"
+    }
+  ],
+  "heuristics": {
+    "hidden_candidate_count": 0,
+    "low_value_candidate_count": 0,
+    "reasons": [
+      "focus symbol is hydrated and no unselected dependency frontier remains"
+    ],
+    "recommended_actions": [
+      {
+        "action": "collapse",
+        "block_id": "520f075fcd694a0fd58dab95",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context from working set",
+        "priority": 6,
+        "short_id": "S87"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "collapse",
+      "block_id": "520f075fcd694a0fd58dab95",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::ensure_codegraph_context from working set",
+      "priority": 6,
+      "short_id": "S87"
+    },
+    "should_stop": true
+  },
+  "hidden_levels": [
+    {
+      "count": 7,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 4,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 1,
+      "direction": "manual",
+      "level": 3
+    },
+    {
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+      "direction": "structural",
+      "level": 4,
+      "relation": "contains_symbol"
+    }
+  ],
+... clipped 67 more lines ...
+```
+
+## Focus symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto
+
+`$ cargo run -q -p ucp-cli -- codegraph context focus --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_4797cf720ffc4759c4487680"
+  ],
+  "focus": "blk_4797cf720ffc4759c4487680",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export frontier for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto (+1 visible level)
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --levels 1 --format json`
+
+```text
+{
+  "edges": [],
+  "export_mode": "compact",
+  "focus": "4797cf720ffc4759c4487680",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto",
+  "focus_short_id": "S88",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto",
+      "priority": 121,
+      "short_id": "S88"
+    },
+    {
+      "action": "collapse",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto from working set",
+      "priority": 6,
+      "short_id": "S88"
+    }
+  ],
+  "heuristics": {
+    "hidden_candidate_count": 0,
+    "low_value_candidate_count": 0,
+    "recommended_actions": [
+      {
+        "action": "hydrate_source",
+        "block_id": "4797cf720ffc4759c4487680",
+        "candidate_count": 1,
+        "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto",
+        "priority": 121,
+        "short_id": "S88"
+      },
+      {
+        "action": "collapse",
+        "block_id": "4797cf720ffc4759c4487680",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto from working set",
+        "priority": 6,
+        "short_id": "S88"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "hydrate_source",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 1,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto",
+      "priority": 121,
+      "short_id": "S88"
+    },
+    "should_stop": false
+  },
+  "hidden_levels": [
+    {
+      "count": 8,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 3,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 1,
+      "direction": "manual",
+      "level": 3
+    },
+    {
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+... clipped 65 more lines ...
+```
+
+## Apply the top recommended frontier action for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto
+
+`$ cargo run -q -p ucp-cli -- codegraph context expand-recommended --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --top 1 --priority-threshold 60 --format json`
+
+```text
+{
+  "added": [],
+  "applied_actions": [
+    "hydrate_source S88 (priority 121, 1 candidates)"
+  ],
+  "changed": [
+    "blk_4797cf720ffc4759c4487680",
+    "blk_4797cf720ffc4759c4487680"
+  ],
+  "focus": "blk_4797cf720ffc4759c4487680",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto
+
+`$ cargo run -q -p ucp-cli -- codegraph context hydrate --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto --padding 2 --format json`
+
+```text
+{
+  "added": [],
+  "changed": [
+    "blk_4797cf720ffc4759c4487680"
+  ],
+  "focus": "blk_4797cf720ffc4759c4487680",
+  "removed": [],
+  "session": "cgctx_9f3b4e82",
+  "success": true,
+  "total": 129,
+  "warnings": []
+}
+```
+
+## Export updated working set for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto
+
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
+
+```text
+{
+  "edges": [],
+  "export_mode": "compact",
+  "focus": "4797cf720ffc4759c4487680",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto",
+  "focus_short_id": "S88",
+  "frontier": [
+    {
+      "action": "hydrate_source",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto",
+      "priority": 120,
+      "short_id": "S88"
+    },
+    {
+      "action": "collapse",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto from working set",
+      "priority": 6,
+      "short_id": "S88"
+    }
+  ],
+  "heuristics": {
+    "hidden_candidate_count": 0,
+    "low_value_candidate_count": 0,
+    "reasons": [
+      "focus symbol is hydrated and no unselected dependency frontier remains"
+    ],
+    "recommended_actions": [
+      {
+        "action": "collapse",
+        "block_id": "4797cf720ffc4759c4487680",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto from working set",
+        "priority": 6,
+        "short_id": "S88"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "collapse",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto from working set",
+      "priority": 6,
+      "short_id": "S88"
+    },
+    "should_stop": true
+  },
+  "hidden_levels": [
+    {
+      "count": 8,
+      "direction": "manual",
+      "level": 2
+    },
+    {
+      "count": 3,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 1,
+      "direction": "manual",
+      "level": 3
+    },
+    {
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
+    },
+    {
+      "count": 38,
+      "direction": "structural",
+      "level": 4,
+      "relation": "contains_symbol"
+    }
+  ],
+... clipped 67 more lines ...
 ```
 
 ## Export the final structured context
 
-`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-zcwszmuy/ucp-codegraph.json --session cgctx_2954b48f --compact --no-rendered --format json`
+`$ cargo run -q -p ucp-cli -- codegraph context export --input /tmp/ucp-codegraph-demo-6762vu2d/ucp-codegraph.json --session cgctx_9f3b4e82 --compact --no-rendered --format json`
 
 ```text
 {
-  "edges": [
+  "edges": [],
+  "export_mode": "compact",
+  "focus": "4797cf720ffc4759c4487680",
+  "focus_label": "symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto",
+  "focus_short_id": "S88",
+  "frontier": [
     {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "388c43cdf82cf3be4c3a2de3",
-      "target_short_id": "S27"
+      "action": "hydrate_source",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 0,
+      "description": "Hydrate source for symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto",
+      "priority": 120,
+      "short_id": "S88"
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8812e3cd9c2deda7699c27ff",
-      "target_short_id": "S108"
+      "action": "collapse",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto from working set",
+      "priority": 6,
+      "short_id": "S88"
+    }
+  ],
+  "heuristics": {
+    "hidden_candidate_count": 0,
+    "low_value_candidate_count": 0,
+    "reasons": [
+      "focus symbol is hydrated and no unselected dependency frontier remains"
+    ],
+    "recommended_actions": [
+      {
+        "action": "collapse",
+        "block_id": "4797cf720ffc4759c4487680",
+        "candidate_count": 1,
+        "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto from working set",
+        "priority": 6,
+        "short_id": "S88"
+      }
+    ],
+    "recommended_next_action": {
+      "action": "collapse",
+      "block_id": "4797cf720ffc4759c4487680",
+      "candidate_count": 1,
+      "description": "Collapse symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto from working set",
+      "priority": 6,
+      "short_id": "S88"
+    },
+    "should_stop": true
+  },
+  "hidden_levels": [
+    {
+      "count": 8,
+      "direction": "manual",
+      "level": 2
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "e91699dcdbeccecf2e3faacc",
-      "target_short_id": "S119"
+      "count": 3,
+      "direction": "structural",
+      "level": 2,
+      "relation": "contains_symbol"
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "6557d3b244263e4971245831",
-      "target_short_id": "S74"
+      "count": 1,
+      "direction": "manual",
+      "level": 3
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "298cd57cedbe61b98d446788",
-      "target_short_id": "S75"
+      "count": 76,
+      "direction": "structural",
+      "level": 3,
+      "relation": "contains_symbol"
     },
     {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "8200e68767cfb0ef6ab7ba79",
-      "target_short_id": "S77"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "188d0a5a3eecda3b89bd6663",
-      "target_short_id": "S78"
-    },
-    {
-      "multiplicity": 3,
-      "relation": "references",
-      "source": "421333df5881c48ef6b4be16",
-      "source_short_id": "F1",
-      "target": "b93da718e1d46a0927bc4074",
-      "target_short_id": "F3"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "exports",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "e9c19d163d3cf8ad8aba5ac5",
-      "target_short_id": "S61"
-    },
-    {
-      "multiplicity": 1,
-      "relation": "imports_symbol",
-      "source": "e4fc6ac96af7e1f5b261fe1f",
-      "source_short_id": "F2",
-      "target": "8812e3cd9c2deda7699c27ff",
-... clipped 4223 more lines ...
+      "count": 38,
+      "direction": "structural",
+      "level": 4,
+      "relation": "contains_symbol"
+    }
+  ],
+... clipped 67 more lines ...
 ```
 
 ## Read coderef-backed excerpts from the final working set
 
-### S71 `symbol:crates/ucp-cli/src/commands/codegraph.rs::resolve_selector`
+### S88 `symbol:crates/ucp-cli/src/state.rs::AgentSessionState::goto`
 
-- ref: `crates/ucp-cli/src/commands/codegraph.rs:740-745`
+- ref: `crates/ucp-cli/src/state.rs:84-89`
 
 ```rust
- 738 }
- 739 
- 740 fn resolve_selector(doc: &Document, selector: &str) -> Result<BlockId> {
- 741     BlockId::from_str(selector)
- 742         .ok()
- 743         .or_else(|| resolve_codegraph_selector(doc, selector))
- 744         .ok_or_else(|| anyhow!("Could not resolve selector: {}", selector))
- 745 }
- 746 
- 747 fn get_session<'a>(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState> {
+  82     }
+  83 
+  84     pub fn goto(&mut self, block_id: &BlockId) {
+  85         if let Some(current) = &self.current_block {
+  86             self.history.push(current.clone());
+  87         }
+  88         self.current_block = Some(block_id.to_string());
+  89     }
+  90 
+  91     pub fn back(&mut self, steps: usize) -> Option<BlockId> {
 ```
-### S56 `symbol:crates/ucp-cli/src/commands/codegraph.rs::context_show`
+### S83 `symbol:crates/ucp-cli/src/state.rs::AgentSessionState#69`
 
-- ref: `crates/ucp-cli/src/commands/codegraph.rs:402-434`
-
-```rust
- 400 }
- 401 
- 402 fn context_show(
- 403     input: Option<String>,
- 404     session: String,
- 405     max_tokens: usize,
- 406     compact: bool,
- 407     no_rendered: bool,
- 408     levels: Option<usize>,
- 409     format: OutputFormat,
- 410 ) -> Result<()> {
- 411     let stateful = read_stateful_document(input)?;
- 412     ensure_codegraph_document(&stateful.document)?;
- 413     let sess = get_session(&stateful, &session)?;
- 414     let context = sess
- 415         .codegraph_context
- 416         .as_ref()
- 417         .ok_or_else(|| anyhow!("Session has no codegraph context: {}", session))?;
- 418     let config = CodeGraphRenderConfig::for_max_tokens(max_tokens);
- 419     let export_config = make_export_config(compact, no_rendered, levels);
- 420     let export = export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
- 421 
- 422     match format {
- 423         OutputFormat::Json => {
- 424             let mut value = serde_json::to_value(&export)?;
- 425             if let Some(object) = value.as_object_mut() {
- 426                 object.insert("session".to_string(), serde_json::Value::String(session));
- 427             }
- 428             println!("{}", serde_json::to_string_pretty(&value)?);
- 429         }
- 430         OutputFormat::Text => println!("{}", render_context_show_text(&stateful.document, context, &config, &export)),
- 431     }
- 432 
- 433     Ok(())
- 434 }
- 435 
- 436 fn context_export(
-```
-### S60 `symbol:crates/ucp-cli/src/commands/codegraph.rs::get_session_mut`
-
-- ref: `crates/ucp-cli/src/commands/codegraph.rs:755-764`
+- ref: `crates/ucp-cli/src/state.rs:69-137`
 
 ```rust
- 753 }
- 754 
- 755 fn get_session_mut<'a>(
- 756     stateful: &'a mut StatefulDocument,
- 757     session: &str,
- 758 ) -> Result<&'a mut AgentSessionState> {
- 759     stateful
- 760         .state_mut()
- 761         .sessions
- 762         .get_mut(session)
- 763         .ok_or_else(|| anyhow!("Session not found: {}", session))
- 764 }
- 765 
- 766 fn merge_updates(into: &mut CodeGraphContextUpdate, next: CodeGraphContextUpdate) {
-```
-### S67 `symbol:crates/ucp-cli/src/commands/codegraph.rs::print_context_update`
-
-- ref: `crates/ucp-cli/src/commands/codegraph.rs:774-811`
-
-```rust
- 772 }
- 773 
- 774 fn print_context_update(
- 775     format: OutputFormat,
- 776     session_id: &str,
- 777     update: &CodeGraphContextUpdate,
- 778     session: &AgentSessionState,
- 779 ) -> Result<()> {
- 780     match format {
- 781         OutputFormat::Json => {
- 782             println!(
- 783                 "{}",
- 784                 serde_json::to_string_pretty(&serde_json::json!({
- 785                     "success": true,
- 786                     "session": session_id,
- 787                     "added": update.added.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
- 788                     "removed": update.removed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
- 789                     "changed": update.changed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
- 790                     "focus": update.focus.map(|id| id.to_string()),
- 791                     "warnings": update.warnings,
- 792                     "total": session.context_blocks.len(),
- 793                 }))?
- 794             );
- 795         }
- 796         OutputFormat::Text => {
- 797             print_success(&format!(
- 798                 "Updated codegraph context {} (added {}, removed {}, changed {}, total {})",
- 799                 session_id,
- 800                 update.added.len(),
- 801                 update.removed.len(),
- 802                 update.changed.len(),
- 803                 session.context_blocks.len()
- 804             ));
- 805             for warning in &update.warnings {
- 806                 print_warning(warning);
- 807             }
- 808         }
- 809     }
- 810     Ok(())
- 811 }
- 812 
- 813 fn uuid_short() -> String {
-```
-### S14 `symbol:crates/ucp-cli/src/commands/agent.rs::context_show`
-
-- ref: `crates/ucp-cli/src/commands/agent.rs:952-1022`
-
-```rust
- 950 }
- 951 
- 952 fn context_show(input: Option<String>, session: String, format: OutputFormat) -> Result<()> {
- 953     let stateful = read_stateful_document(input)?;
- 954 
- 955     let sess = stateful
- 956         .state()
- 957         .sessions
- 958         .get(&session)
- 959         .ok_or_else(|| anyhow!("Session not found: {}", session))?;
- 960 
- 961     if is_codegraph_document(&stateful.document) {
- 962         if let Some(context) = sess.codegraph_context.as_ref() {
- 963             let rendered = render_codegraph_context_prompt(
- 964                 &stateful.document,
- 965                 context,
- 966                 &CodeGraphRenderConfig::default(),
- 967             );
- 968             match format {
- 969                 OutputFormat::Json => {
- 970                     println!("{}", serde_json::to_string_pretty(&serde_json::json!({
- 971                         "session": session,
- 972                         "focus": context.focus.map(|id| id.to_string()),
- 973                         "summary": context.summary(&stateful.document),
- 974                         "blocks": sess.context_blocks,
- 975                         "rendered": rendered
- 976                     }))?);
- 977                 }
- 978                 OutputFormat::Text => {
- 979                     println!("{}", rendered);
- 980                 }
- 981             }
- 982             return Ok(());
- 983         }
- 984     }
- 985 
- 986     match format {
- 987         OutputFormat::Json => {
- 988             #[derive(Serialize)]
- 989             struct ContextInfo {
- 990                 session: String,
- 991                 blocks: Vec<String>,
- 992                 count: usize,
- 993             }
- 994             let result = ContextInfo {
- 995                 session,
- 996                 blocks: sess.context_blocks.clone(),
- 997                 count: sess.context_blocks.len(),
- 998             };
- 999             println!("{}", serde_json::to_string_pretty(&result)?);
-1000         }
-1001         OutputFormat::Text => {
-1002             println!("{}", "Context Window:".cyan().bold());
-1003             if sess.context_blocks.is_empty() {
-1004                 println!("  (empty)");
-1005             } else {
-1006                 for id in &sess.context_blocks {
-1007                     if let Ok(block_id) = BlockId::from_str(id) {
-1008                         if let Some(block) = stateful.document.get_block(&block_id) {
-1009                             let preview = content_preview(&block.content, 60);
-1010                             let preview_line = preview.lines().next().unwrap_or("");
-1011                             println!("  [{}] {}", id.yellow(), preview_line.dimmed());
-1012                         } else {
-1013                             println!("  [{}] (block not found)", id.yellow());
-1014                         }
-1015                     }
-1016                 }
-1017             }
-1018         }
-1019     }
-1020 
-1021     Ok(())
-1022 }
-1023 
-1024 fn resolve_selectors(doc: &ucm_core::Document, selectors: &str) -> Result<Vec<BlockId>> {
-```
-### S30 `symbol:crates/ucp-cli/src/commands/agent.rs::print_context_update`
-
-- ref: `crates/ucp-cli/src/commands/agent.rs:1055-1092`
-
-```rust
-1053 }
-1054 
-1055 fn print_context_update(
-1056     format: OutputFormat,
-1057     session: &str,
-1058     update: &ucp_api::CodeGraphContextUpdate,
-1059     total: usize,
-1060     text_message: &str,
-1061 ) -> Result<()> {
-1062     match format {
-1063         OutputFormat::Json => {
-1064             println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-1065                 "success": true,
-1066                 "session": session,
-1067                 "added": update.added.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-1068                 "removed": update.removed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-1069                 "changed": update.changed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-1070                 "focus": update.focus.map(|id| id.to_string()),
-1071                 "warnings": update.warnings,
-1072                 "total": total
-1073             }))?);
-1074         }
-1075         OutputFormat::Text => {
-1076             print_success(&format!(
-1077                 "{} (added {}, removed {}, changed {}, total {})",
-1078                 text_message,
-1079                 update.added.len(),
-1080                 update.removed.len(),
-1081                 update.changed.len(),
-1082                 total
-1083             ));
-1084             if !update.warnings.is_empty() {
-1085                 for warning in &update.warnings {
-1086                     eprintln!("warning: {}", warning);
-1087                 }
-1088             }
-1089         }
-1090     }
-1091     Ok(())
-1092 }
-1093 
-1094 fn view(input: Option<String>, session: String, mode: String, format: OutputFormat) -> Result<()> {
-```
-### S24 `symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut`
-
-- ref: `crates/ucp-cli/src/commands/agent.rs:1044-1053`
-
-```rust
-1042 }
-1043 
-1044 fn get_session_mut<'a>(
-1045     stateful: &'a mut crate::state::StatefulDocument,
-1046     session: &str,
-1047 ) -> Result<&'a mut AgentSessionState> {
-1048     stateful
-1049         .state_mut()
-1050         .sessions
-1051         .get_mut(session)
-1052         .ok_or_else(|| anyhow!("Session not found: {}", session))
-1053 }
-1054 
-1055 fn print_context_update(
-```
-### S31 `symbol:crates/ucp-cli/src/commands/agent.rs::resolve_selector`
-
-- ref: `crates/ucp-cli/src/commands/agent.rs:1031-1042`
-
-```rust
-1029 }
-1030 
-1031 fn resolve_selector(doc: &ucm_core::Document, selector: &str) -> Result<BlockId> {
-1032     BlockId::from_str(selector)
-1033         .ok()
-1034         .or_else(|| {
-1035             if is_codegraph_document(doc) {
-1036                 resolve_codegraph_selector(doc, selector)
-1037             } else {
-1038                 None
-1039             }
-1040         })
-1041         .ok_or_else(|| anyhow!("Could not resolve selector: {}", selector))
-1042 }
-1043 
-1044 fn get_session_mut<'a>(
-```
-### F2 `file:crates/ucp-cli/src/commands/codegraph.rs`
-
-- ref: `crates/ucp-cli/src/commands/codegraph.rs:None-None`
-
-```rust
-   1 use anyhow::{anyhow, Context, Result};
-   2 use colored::Colorize;
-   3 use serde::Serialize;
-```
-### F3 `file:crates/ucp-cli/src/state.rs`
-
-- ref: `crates/ucp-cli/src/state.rs:None-None`
-
-```rust
-   1 //! State management for CLI sessions
-   2 //!
-   3 //! This module provides state persistence for agent sessions, transactions,
-```
-### F1 `file:crates/ucp-cli/src/commands/agent.rs`
-
-- ref: `crates/ucp-cli/src/commands/agent.rs:None-None`
-
-```rust
-   1 //! Agent traversal commands
-   2 
-   3 use anyhow::{anyhow, Result};
+  67 }
+  68 
+  69 impl AgentSessionState {
+  70     pub fn new(id: String, name: Option<String>, start_block: Option<BlockId>) -> Self {
+  71         Self {
+  72             id,
+  73             name,
+  74             current_block: start_block.map(|b| b.to_string()),
+  75             history: Vec::new(),
+  76             context_blocks: Vec::new(),
+  77             codegraph_context: None,
+  78             codegraph_preferences: CodeGraphSessionPreferences::default(),
+  79             state: "active".to_string(),
+  80             created_at: chrono::Utc::now().to_rfc3339(),
+  81         }
+  82     }
+  83 
+  84     pub fn goto(&mut self, block_id: &BlockId) {
+  85         if let Some(current) = &self.current_block {
+  86             self.history.push(current.clone());
+  87         }
+  88         self.current_block = Some(block_id.to_string());
+  89     }
+  90 
+  91     pub fn back(&mut self, steps: usize) -> Option<BlockId> {
+  92         use std::str::FromStr;
+  93         for _ in 0..steps {
+  94             if let Some(prev) = self.history.pop() {
+  95                 self.current_block = Some(prev);
+  96             }
+  97         }
+  98         self.current_block
+  99             .as_ref()
+ 100             .and_then(|s| BlockId::from_str(s).ok())
+ 101     }
+ 102 
+ 103     pub fn add_to_context(&mut self, block_id: &BlockId) {
+ 104         let id_str = block_id.to_string();
+ 105         if !self.context_blocks.contains(&id_str) {
+ 106             self.context_blocks.push(id_str);
+ 107         }
+ 108     }
+ 109 
+ 110     pub fn remove_from_context(&mut self, block_id: &BlockId) {
+ 111         let id_str = block_id.to_string();
+ 112         self.context_blocks.retain(|b| b != &id_str);
+ 113     }
+ 114 
+ 115     #[allow(dead_code)]
+ 116     pub fn clear_context(&mut self) {
+ 117         self.context_blocks.clear();
+ 118         if let Some(context) = self.codegraph_context.as_mut() {
+ 119             context.clear();
+ 120         }
+ 121     }
+ 122 
+ 123     pub fn ensure_codegraph_context(&mut self) -> &mut CodeGraphContextSession {
+ 124         self.codegraph_context
+ 125             .get_or_insert_with(CodeGraphContextSession::new)
+ 126     }
+ 127 
+ 128     pub fn sync_context_blocks_from_codegraph(&mut self) {
+ 129         if let Some(context) = self.codegraph_context.as_ref() {
+ 130             self.context_blocks = context
+ 131                 .selected_block_ids()
+ 132                 .into_iter()
+ 133                 .map(|block_id| block_id.to_string())
+ 134                 .collect();
+ 135         }
+ 136     }
+ 137 }
+ 138 
+ 139 /// Serializable snapshot info
 ```
 
 ## Final summary
 
-- selected nodes: 123
+- selected nodes: 129
 - frontier actions remaining: 2
 - transcript file: `artifacts/codegraph-context-demo-transcript.md`

@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
 use serde::Serialize;
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str::FromStr;
@@ -10,8 +9,9 @@ use ucp_api::{
     export_codegraph_context_with_config, is_codegraph_document, render_codegraph_context_prompt,
     resolve_codegraph_selector,
     validate_code_graph_profile, CodeGraphBuildInput, CodeGraphBuildStatus,
-    CodeGraphContextExport, CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphExportConfig,
-    CodeGraphExtractorConfig, CodeGraphPrunePolicy, CodeGraphRenderConfig, CodeGraphSeverity,
+    CodeGraphContextExport, CodeGraphContextFrontierAction, CodeGraphContextUpdate,
+    CodeGraphDetailLevel, CodeGraphExportConfig, CodeGraphExtractorConfig, CodeGraphPrunePolicy,
+    CodeGraphRenderConfig, CodeGraphSeverity, CodeGraphTraversalConfig,
 };
 use ucm_core::{BlockId, Document};
 
@@ -20,7 +20,8 @@ use crate::output::{
     print_error, print_success, print_warning, read_document, write_output, DocumentJson,
 };
 use crate::state::{
-    read_stateful_document, write_stateful_document, AgentSessionState, StatefulDocument,
+    read_stateful_document, write_stateful_document, AgentSessionState,
+    CodeGraphSessionPreferences, StatefulDocument,
 };
 
 pub fn handle(cmd: CodegraphCommands, format: OutputFormat) -> Result<()> {
@@ -278,7 +279,35 @@ fn context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> {
             name,
             max_selected,
             initial_depth,
-        } => context_init(input, name, max_selected, initial_depth, format),
+            focus,
+            focus_mode,
+            focus_depth,
+            preset,
+            default_relations,
+            default_compact,
+            default_levels,
+            default_preset,
+            default_depth,
+            default_only,
+            default_exclude,
+        } => context_init(
+            input,
+            name,
+            max_selected,
+            initial_depth,
+            focus,
+            focus_mode,
+            focus_depth,
+            preset,
+            default_relations,
+            default_compact,
+            default_levels,
+            default_preset,
+            default_depth,
+            default_only,
+            default_exclude,
+            format,
+        ),
         CodegraphContextCommands::Show {
             input,
             session,
@@ -286,7 +315,19 @@ fn context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> {
             compact,
             no_rendered,
             levels,
-        } => context_show(input, session, max_tokens, compact, no_rendered, levels, format),
+            only,
+            exclude,
+        } => context_show(
+            input,
+            session,
+            max_tokens,
+            compact,
+            no_rendered,
+            levels,
+            only,
+            exclude,
+            format,
+        ),
         CodegraphContextCommands::Export {
             input,
             session,
@@ -294,7 +335,55 @@ fn context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> {
             compact,
             no_rendered,
             levels,
-        } => context_export(input, session, max_tokens, compact, no_rendered, levels, format),
+            only,
+            exclude,
+        } => context_export(
+            input,
+            session,
+            max_tokens,
+            compact,
+            no_rendered,
+            levels,
+            only,
+            exclude,
+            format,
+        ),
+        CodegraphContextCommands::Defaults {
+            input,
+            session,
+            compact,
+            no_compact,
+            levels,
+            clear_levels,
+            preset,
+            relations,
+            clear_preset,
+            clear_relations,
+            depth,
+            clear_depth,
+            only,
+            exclude,
+            clear_only,
+            clear_exclude,
+        } => context_defaults(
+            input,
+            session,
+            compact,
+            no_compact,
+            levels,
+            clear_levels,
+            preset,
+            relations,
+            clear_preset,
+            clear_relations,
+            depth,
+            clear_depth,
+            only,
+            exclude,
+            clear_only,
+            clear_exclude,
+            format,
+        ),
         CodegraphContextCommands::Add {
             input,
             session,
@@ -312,8 +401,41 @@ fn context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> {
             mode,
             relation,
             relations,
+            preset,
             depth,
-        } => context_expand(input, session, target, mode, relation, relations, depth, format),
+            max_add,
+            priority_threshold,
+        } => context_expand(
+            input,
+            session,
+            target,
+            mode,
+            relation,
+            relations,
+            preset,
+            depth,
+            max_add,
+            priority_threshold,
+            format,
+        ),
+        CodegraphContextCommands::ExpandRecommended {
+            input,
+            session,
+            top,
+            padding,
+            depth,
+            max_add,
+            priority_threshold,
+        } => context_expand_recommended(
+            input,
+            session,
+            top,
+            padding,
+            depth,
+            max_add,
+            priority_threshold,
+            format,
+        ),
         CodegraphContextCommands::Hydrate {
             input,
             session,
@@ -349,20 +471,78 @@ fn context_init(
     name: Option<String>,
     max_selected: usize,
     initial_depth: Option<usize>,
+    focus: Option<String>,
+    focus_mode: String,
+    focus_depth: usize,
+    preset: Option<String>,
+    default_relations: Option<String>,
+    default_compact: bool,
+    default_levels: Option<usize>,
+    default_preset: Option<String>,
+    default_depth: Option<usize>,
+    default_only: Option<String>,
+    default_exclude: Option<String>,
     format: OutputFormat,
 ) -> Result<()> {
     let mut stateful = read_stateful_document(input.clone())?;
     ensure_codegraph_document(&stateful.document)?;
+    let focus_id = focus
+        .as_deref()
+        .map(|selector| resolve_selector(&stateful.document, selector))
+        .transpose()?;
+    let default_relation_filters = parse_csv_arg(default_relations.as_deref())?;
+    let default_only_classes = parse_node_classes(default_only.as_deref())?;
+    let default_exclude_classes = parse_node_classes(default_exclude.as_deref())?;
+    let preferences = build_session_preferences(
+        default_compact,
+        default_levels,
+        default_preset,
+        default_relation_filters,
+        default_depth,
+        default_only_classes,
+        default_exclude_classes,
+    )?;
 
     let session_id = format!("cgctx_{}", uuid_short());
     let mut session = AgentSessionState::new(session_id.clone(), name.clone(), None);
+    session.codegraph_preferences = preferences.clone();
     {
         let context = session.ensure_codegraph_context();
         context.set_prune_policy(CodeGraphPrunePolicy {
             max_selected: max_selected.max(1),
             ..CodeGraphPrunePolicy::default()
         });
-        let update = context.seed_overview_with_depth(&stateful.document, initial_depth);
+        let update = if let Some(block_id) = focus_id {
+            let mut merged = CodeGraphContextUpdate::default();
+            if initial_depth.is_some() {
+                merge_updates(
+                    &mut merged,
+                    context.seed_overview_with_depth(&stateful.document, initial_depth),
+                );
+            }
+            let traversal = CodeGraphTraversalConfig {
+                depth: focus_depth.max(1),
+                relation_filters: preset
+                    .as_deref()
+                    .map(expand_relation_preset)
+                    .transpose()?
+                    .unwrap_or_default(),
+                ..CodeGraphTraversalConfig::default()
+            };
+            merge_updates(
+                &mut merged,
+                init_focus_first_context(
+                    context,
+                    &stateful.document,
+                    block_id,
+                    focus_mode.as_str(),
+                    &traversal,
+                )?,
+            );
+            merged
+        } else {
+            context.seed_overview_with_depth(&stateful.document, initial_depth)
+        };
         session.current_block = update.focus.map(|id| id.to_string());
         session.sync_context_blocks_from_codegraph();
     }
@@ -385,6 +565,9 @@ fn context_init(
                     "session_id": session_id,
                     "name": name,
                     "initial_depth": initial_depth,
+                    "focus": focus,
+                    "focus_mode": focus_mode,
+                    "preferences": preferences,
                     "summary": session.codegraph_context.as_ref().map(|ctx| ctx.summary(&stateful.document)),
                     "rendered": rendered,
                 }))?
@@ -406,6 +589,8 @@ fn context_show(
     compact: bool,
     no_rendered: bool,
     levels: Option<usize>,
+    only: Option<String>,
+    exclude: Option<String>,
     format: OutputFormat,
 ) -> Result<()> {
     let stateful = read_stateful_document(input)?;
@@ -416,7 +601,14 @@ fn context_show(
         .as_ref()
         .ok_or_else(|| anyhow!("Session has no codegraph context: {}", session))?;
     let config = CodeGraphRenderConfig::for_max_tokens(max_tokens);
-    let export_config = make_export_config(compact, no_rendered, levels);
+    let export_config = make_export_config(
+        &sess.codegraph_preferences,
+        compact,
+        no_rendered,
+        levels,
+        only.as_deref(),
+        exclude.as_deref(),
+    )?;
     let export = export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
 
     match format {
@@ -440,6 +632,8 @@ fn context_export(
     compact: bool,
     no_rendered: bool,
     levels: Option<usize>,
+    only: Option<String>,
+    exclude: Option<String>,
     format: OutputFormat,
 ) -> Result<()> {
     let stateful = read_stateful_document(input)?;
@@ -450,7 +644,14 @@ fn context_export(
         .as_ref()
         .ok_or_else(|| anyhow!("Session has no codegraph context: {}", session))?;
     let config = CodeGraphRenderConfig::for_max_tokens(max_tokens);
-    let export_config = make_export_config(compact, no_rendered, levels);
+    let export_config = make_export_config(
+        &sess.codegraph_preferences,
+        compact,
+        no_rendered,
+        levels,
+        only.as_deref(),
+        exclude.as_deref(),
+    )?;
     let export = export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
 
     match format {
@@ -467,8 +668,84 @@ fn context_export(
     Ok(())
 }
 
-fn make_export_config(compact: bool, no_rendered: bool, levels: Option<usize>) -> CodeGraphExportConfig {
-    let mut export_config = if compact {
+#[allow(clippy::too_many_arguments)]
+fn context_defaults(
+    input: Option<String>,
+    session: String,
+    compact: bool,
+    no_compact: bool,
+    levels: Option<usize>,
+    clear_levels: bool,
+    preset: Option<String>,
+    relations: Option<String>,
+    clear_preset: bool,
+    clear_relations: bool,
+    depth: Option<usize>,
+    clear_depth: bool,
+    only: Option<String>,
+    exclude: Option<String>,
+    clear_only: bool,
+    clear_exclude: bool,
+    format: OutputFormat,
+) -> Result<()> {
+    let has_updates = compact
+        || no_compact
+        || levels.is_some()
+        || clear_levels
+        || preset.is_some()
+        || relations.is_some()
+        || clear_preset
+        || clear_relations
+        || depth.is_some()
+        || clear_depth
+        || only.is_some()
+        || exclude.is_some()
+        || clear_only
+        || clear_exclude;
+
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+
+    if !has_updates {
+        let sess = get_session(&stateful, &session)?;
+        return print_context_defaults(format, &session, &sess.codegraph_preferences, Vec::new(), false);
+    }
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let (preferences, changed_fields) = update_session_preferences(
+        &sess.codegraph_preferences,
+        compact,
+        no_compact,
+        levels,
+        clear_levels,
+        preset,
+        relations,
+        clear_preset,
+        clear_relations,
+        depth,
+        clear_depth,
+        only,
+        exclude,
+        clear_only,
+        clear_exclude,
+    )?;
+    sess.codegraph_preferences = preferences.clone();
+
+    print_context_defaults(format, &session, &preferences, changed_fields, true)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn make_export_config(
+    preferences: &CodeGraphSessionPreferences,
+    compact: bool,
+    no_rendered: bool,
+    levels: Option<usize>,
+    only: Option<&str>,
+    exclude: Option<&str>,
+) -> Result<CodeGraphExportConfig> {
+    let effective_compact = compact || preferences.compact;
+    let mut export_config = if effective_compact {
         CodeGraphExportConfig::compact()
     } else {
         CodeGraphExportConfig::default()
@@ -476,8 +753,18 @@ fn make_export_config(compact: bool, no_rendered: bool, levels: Option<usize>) -
     if no_rendered {
         export_config.include_rendered = false;
     }
-    export_config.visible_levels = levels;
-    export_config
+    export_config.visible_levels = levels.or(preferences.levels);
+    export_config.only_node_classes = if let Some(only) = only {
+        parse_node_classes(Some(only))?
+    } else {
+        preferences.only_node_classes.clone()
+    };
+    export_config.exclude_node_classes = if let Some(exclude) = exclude {
+        parse_node_classes(Some(exclude))?
+    } else {
+        preferences.exclude_node_classes.clone()
+    };
+    Ok(export_config)
 }
 
 fn render_context_show_text(
@@ -486,7 +773,7 @@ fn render_context_show_text(
     config: &CodeGraphRenderConfig,
     export: &CodeGraphContextExport,
 ) -> String {
-    if export.visible_levels.is_none() {
+    if export.visible_levels.is_none() && export.visible_node_count == export.summary.selected {
         return render_codegraph_context_prompt(document, context, config);
     }
 
@@ -494,12 +781,21 @@ fn render_context_show_text(
         "visible nodes: {} of {} selected",
         export.visible_node_count, export.summary.selected
     )];
+    if export.visible_node_count < export.summary.selected && export.visible_levels.is_none() {
+        lines.push("node-class filters applied".to_string());
+    }
     if let Some(levels) = export.visible_levels {
         lines.push(format!("focus window: +{} levels", levels));
     }
     if !export.hidden_levels.is_empty() {
         for hidden in &export.hidden_levels {
-            lines.push(format!("+ {} nodes at level {}", hidden.count, hidden.level));
+            let suffix = match (&hidden.direction, &hidden.relation) {
+                (Some(direction), Some(relation)) => format!(" via {} {}", direction, relation),
+                (Some(direction), None) => format!(" via {}", direction),
+                (None, Some(relation)) => format!(" via {}", relation),
+                (None, None) => String::new(),
+            };
+            lines.push(format!("+ {} nodes at level {}{}", hidden.count, hidden.level, suffix));
         }
     }
     if export.hidden_unreachable_count > 0 {
@@ -521,24 +817,361 @@ fn render_context_show_text(
 fn parse_relation_filters(
     relation: Option<String>,
     relations: Option<String>,
-) -> Result<Option<HashSet<String>>> {
+) -> Result<Vec<String>> {
     if relation.is_some() && relations.is_some() {
         return Err(anyhow!("Use either --relation or --relations, not both"));
     }
     let raw = relation.or(relations);
+    parse_csv_arg(raw.as_deref())
+}
+
+fn parse_csv_arg(raw: Option<&str>) -> Result<Vec<String>> {
     let Some(raw) = raw else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
-    let filters: HashSet<String> = raw
+    let mut values: Vec<String> = raw
         .split(',')
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
         .collect();
-    if filters.is_empty() {
-        Ok(None)
+    values.sort();
+    values.dedup();
+    Ok(values)
+}
+
+fn parse_node_classes(raw: Option<&str>) -> Result<Vec<String>> {
+    let classes = parse_csv_arg(raw)?;
+    let allowed = ["repository", "directory", "file", "symbol", "unknown"];
+    for class in &classes {
+        if !allowed.contains(&class.as_str()) {
+            return Err(anyhow!("Unsupported node class filter: {}", class));
+        }
+    }
+    Ok(classes)
+}
+
+fn expand_relation_preset(name: &str) -> Result<Vec<String>> {
+    let relations = match name {
+        "semantic" => vec!["uses_symbol", "calls", "imports_symbol", "reexports_symbol"],
+        "imports" => vec!["imports_symbol", "reexports_symbol"],
+        "reverse-impact" => vec!["uses_symbol", "calls", "imports_symbol", "reexports_symbol"],
+        "references" => vec!["references", "cited_by", "links_to"],
+        other => return Err(anyhow!("Unknown relation preset: {}", other)),
+    };
+    Ok(relations.into_iter().map(str::to_string).collect())
+}
+
+fn build_session_preferences(
+    compact: bool,
+    levels: Option<usize>,
+    preset: Option<String>,
+    relation_filters: Vec<String>,
+    expand_depth: Option<usize>,
+    only_node_classes: Vec<String>,
+    exclude_node_classes: Vec<String>,
+) -> Result<CodeGraphSessionPreferences> {
+    if preset.is_some() && !relation_filters.is_empty() {
+        return Err(anyhow!("Use either --default-preset or --default-relations, not both"));
+    }
+    if let Some(name) = preset.as_deref() {
+        let _ = expand_relation_preset(name)?;
+    }
+    Ok(CodeGraphSessionPreferences {
+        compact,
+        levels,
+        relation_preset: preset,
+        relation_filters,
+        expand_depth,
+        only_node_classes,
+        exclude_node_classes,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn update_session_preferences(
+    current: &CodeGraphSessionPreferences,
+    compact: bool,
+    no_compact: bool,
+    levels: Option<usize>,
+    clear_levels: bool,
+    preset: Option<String>,
+    relations: Option<String>,
+    clear_preset: bool,
+    clear_relations: bool,
+    depth: Option<usize>,
+    clear_depth: bool,
+    only: Option<String>,
+    exclude: Option<String>,
+    clear_only: bool,
+    clear_exclude: bool,
+) -> Result<(CodeGraphSessionPreferences, Vec<String>)> {
+    if compact && no_compact {
+        return Err(anyhow!("Use either --compact or --no-compact, not both"));
+    }
+    if levels.is_some() && clear_levels {
+        return Err(anyhow!("Use either --levels or --clear-levels, not both"));
+    }
+    if preset.is_some() && relations.is_some() {
+        return Err(anyhow!("Use either --preset or --relations, not both"));
+    }
+    if preset.is_some() && clear_preset {
+        return Err(anyhow!("Use either --preset or --clear-preset, not both"));
+    }
+    if relations.is_some() && clear_relations {
+        return Err(anyhow!("Use either --relations or --clear-relations, not both"));
+    }
+    if depth.is_some() && clear_depth {
+        return Err(anyhow!("Use either --depth or --clear-depth, not both"));
+    }
+    if only.is_some() && clear_only {
+        return Err(anyhow!("Use either --only or --clear-only, not both"));
+    }
+    if exclude.is_some() && clear_exclude {
+        return Err(anyhow!("Use either --exclude or --clear-exclude, not both"));
+    }
+
+    let mut next = current.clone();
+    let mut changed_fields = Vec::new();
+
+    if compact {
+        next.compact = true;
+        changed_fields.push("compact".to_string());
+    }
+    if no_compact {
+        next.compact = false;
+        changed_fields.push("compact".to_string());
+    }
+    if let Some(levels) = levels {
+        next.levels = Some(levels);
+        changed_fields.push("levels".to_string());
+    }
+    if clear_levels {
+        next.levels = None;
+        changed_fields.push("levels".to_string());
+    }
+    if let Some(preset) = preset {
+        let _ = expand_relation_preset(&preset)?;
+        next.relation_preset = Some(preset);
+        next.relation_filters.clear();
+        changed_fields.push("relation_preset".to_string());
+        changed_fields.push("relation_filters".to_string());
+    }
+    if let Some(relations) = relations {
+        next.relation_filters = parse_csv_arg(Some(relations.as_str()))?;
+        next.relation_preset = None;
+        changed_fields.push("relation_filters".to_string());
+        changed_fields.push("relation_preset".to_string());
+    }
+    if clear_preset {
+        next.relation_preset = None;
+        changed_fields.push("relation_preset".to_string());
+    }
+    if clear_relations {
+        next.relation_filters.clear();
+        changed_fields.push("relation_filters".to_string());
+    }
+    if let Some(depth) = depth {
+        next.expand_depth = Some(depth);
+        changed_fields.push("expand_depth".to_string());
+    }
+    if clear_depth {
+        next.expand_depth = None;
+        changed_fields.push("expand_depth".to_string());
+    }
+    if let Some(only) = only {
+        next.only_node_classes = parse_node_classes(Some(only.as_str()))?;
+        changed_fields.push("only_node_classes".to_string());
+    }
+    if clear_only {
+        next.only_node_classes.clear();
+        changed_fields.push("only_node_classes".to_string());
+    }
+    if let Some(exclude) = exclude {
+        next.exclude_node_classes = parse_node_classes(Some(exclude.as_str()))?;
+        changed_fields.push("exclude_node_classes".to_string());
+    }
+    if clear_exclude {
+        next.exclude_node_classes.clear();
+        changed_fields.push("exclude_node_classes".to_string());
+    }
+
+    changed_fields.sort();
+    changed_fields.dedup();
+
+    Ok((next, changed_fields))
+}
+
+fn print_context_defaults(
+    format: OutputFormat,
+    session: &str,
+    preferences: &CodeGraphSessionPreferences,
+    changed_fields: Vec<String>,
+    updated: bool,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "session": session,
+                    "updated": updated,
+                    "changed_fields": changed_fields,
+                    "preferences": preferences,
+                }))?
+            );
+        }
+        OutputFormat::Text => {
+            if updated {
+                print_success(&format!("Updated codegraph defaults for session: {}", session));
+                if !changed_fields.is_empty() {
+                    println!("Changed: {}", changed_fields.join(", "));
+                }
+            } else {
+                print_success(&format!("Codegraph defaults for session: {}", session));
+            }
+            println!("- compact: {}", preferences.compact);
+            println!(
+                "- levels: {}",
+                preferences
+                    .levels
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "<unset>".to_string())
+            );
+            println!(
+                "- relation preset: {}",
+                preferences
+                    .relation_preset
+                    .clone()
+                    .unwrap_or_else(|| "<unset>".to_string())
+            );
+            println!(
+                "- relation filters: {}",
+                if preferences.relation_filters.is_empty() {
+                    "<unset>".to_string()
+                } else {
+                    preferences.relation_filters.join(",")
+                }
+            );
+            println!(
+                "- expand depth: {}",
+                preferences
+                    .expand_depth
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "<unset>".to_string())
+            );
+            println!(
+                "- only classes: {}",
+                if preferences.only_node_classes.is_empty() {
+                    "<unset>".to_string()
+                } else {
+                    preferences.only_node_classes.join(",")
+                }
+            );
+            println!(
+                "- exclude classes: {}",
+                if preferences.exclude_node_classes.is_empty() {
+                    "<unset>".to_string()
+                } else {
+                    preferences.exclude_node_classes.join(",")
+                }
+            );
+        }
+    }
+    Ok(())
+}
+
+fn build_traversal_config(
+    preferences: &CodeGraphSessionPreferences,
+    relation: Option<String>,
+    relations: Option<String>,
+    preset: Option<String>,
+    depth: Option<usize>,
+    max_add: Option<usize>,
+    priority_threshold: Option<u16>,
+) -> Result<CodeGraphTraversalConfig> {
+    if preset.is_some() && (relation.is_some() || relations.is_some()) {
+        return Err(anyhow!("Use either relation filters or --preset, not both"));
+    }
+
+    let mut relation_filters = if let Some(preset) = preset.as_deref() {
+        expand_relation_preset(preset)?
     } else {
-        Ok(Some(filters))
+        parse_relation_filters(relation, relations)?
+    };
+
+    if relation_filters.is_empty() {
+        if !preferences.relation_filters.is_empty() {
+            relation_filters = preferences.relation_filters.clone();
+        } else if let Some(preset) = preferences.relation_preset.as_deref() {
+            relation_filters = expand_relation_preset(preset)?;
+        }
+    }
+
+    Ok(CodeGraphTraversalConfig {
+        depth: depth.or(preferences.expand_depth).unwrap_or(1),
+        relation_filters,
+        max_add,
+        priority_threshold,
+    })
+}
+
+fn init_focus_first_context(
+    context: &mut ucp_api::CodeGraphContextSession,
+    document: &Document,
+    block_id: BlockId,
+    focus_mode: &str,
+    traversal: &CodeGraphTraversalConfig,
+) -> Result<CodeGraphContextUpdate> {
+    let block = document
+        .get_block(&block_id)
+        .ok_or_else(|| anyhow!("Focused block no longer exists: {}", block_id))?;
+    let node_class = block
+        .metadata
+        .custom
+        .get("node_class")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown");
+
+    let effective_mode = match focus_mode {
+        "auto" => match node_class {
+            "file" => "file",
+            "symbol" => "dependencies",
+            _ => "focus",
+        },
+        "file" | "dependencies" | "dependents" | "focus" => focus_mode,
+        other => return Err(anyhow!("Unsupported focus mode: {}", other)),
+    };
+
+    Ok(match effective_mode {
+        "file" => context.expand_file_with_config(document, block_id, traversal),
+        "dependencies" => context.expand_dependencies_with_config(document, block_id, traversal),
+        "dependents" => context.expand_dependents_with_config(document, block_id, traversal),
+        "focus" => {
+            let detail = if node_class == "symbol" {
+                CodeGraphDetailLevel::SymbolCard
+            } else {
+                CodeGraphDetailLevel::Neighborhood
+            };
+            let mut merged = context.select_block(document, block_id, detail);
+            merge_updates(&mut merged, context.set_focus(document, Some(block_id)));
+            merged
+        }
+        _ => unreachable!(),
+    })
+}
+
+fn action_summary(action: &CodeGraphContextFrontierAction) -> String {
+    match action.relation.as_deref() {
+        Some(relation) => format!(
+            "{} {} via {} (priority {}, {} candidates)",
+            action.action, action.short_id, relation, action.priority, action.candidate_count
+        ),
+        None => format!(
+            "{} {} (priority {}, {} candidates)",
+            action.action, action.short_id, action.priority, action.candidate_count
+        ),
     }
 }
 
@@ -603,32 +1236,158 @@ fn context_expand(
     mode: String,
     relation: Option<String>,
     relations: Option<String>,
-    depth: usize,
+    preset: Option<String>,
+    depth: Option<usize>,
+    max_add: Option<usize>,
+    priority_threshold: Option<u16>,
     format: OutputFormat,
 ) -> Result<()> {
     let mut stateful = read_stateful_document(input.clone())?;
     ensure_codegraph_document(&stateful.document)?;
     let document = stateful.document.clone();
     let block_id = resolve_selector(&document, &target)?;
-    let relation_filters = parse_relation_filters(relation, relations)?;
 
     let sess = get_session_mut(&mut stateful, &session)?;
+    let traversal = build_traversal_config(
+        &sess.codegraph_preferences,
+        relation,
+        relations,
+        preset,
+        depth,
+        max_add,
+        priority_threshold,
+    )?;
     let update = match mode.as_str() {
         "file" => sess
             .ensure_codegraph_context()
-            .expand_file_with_depth(&document, block_id, depth),
+            .expand_file_with_config(&document, block_id, &traversal),
         "dependencies" => sess
             .ensure_codegraph_context()
-            .expand_dependencies_with_filters(&document, block_id, relation_filters.as_ref(), depth),
+            .expand_dependencies_with_config(&document, block_id, &traversal),
         "dependents" => sess
             .ensure_codegraph_context()
-            .expand_dependents_with_filters(&document, block_id, relation_filters.as_ref(), depth),
+            .expand_dependents_with_config(&document, block_id, &traversal),
         other => return Err(anyhow!("Unsupported expand mode: {}", other)),
     };
     sess.sync_context_blocks_from_codegraph();
     sess.current_block = update.focus.map(|id| id.to_string());
 
     print_context_update(format, &session, &update, sess)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn context_expand_recommended(
+    input: Option<String>,
+    session: String,
+    top: usize,
+    padding: usize,
+    depth: Option<usize>,
+    max_add: Option<usize>,
+    priority_threshold: Option<u16>,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+    let document = stateful.document.clone();
+    let mut export_config = CodeGraphExportConfig::default();
+    export_config.max_frontier_actions = top.max(1).max(8);
+
+    let actions = {
+        let sess = get_session(&stateful, &session)?;
+        let context = sess
+            .codegraph_context
+            .as_ref()
+            .ok_or_else(|| anyhow!("Session has no codegraph context: {}", session))?;
+        let export = export_codegraph_context_with_config(
+            &document,
+            context,
+            &CodeGraphRenderConfig::default(),
+            &export_config,
+        );
+        export
+            .frontier
+            .into_iter()
+            .filter(|action| action.candidate_count > 0)
+            .filter(|action| {
+                priority_threshold
+                    .map(|threshold| action.priority >= threshold)
+                    .unwrap_or(true)
+            })
+            .take(top.max(1))
+            .collect::<Vec<_>>()
+    };
+
+    if actions.is_empty() {
+        return Err(anyhow!("No recommended actions available for the current focus"));
+    }
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let mut merged = CodeGraphContextUpdate::default();
+    let mut applied = Vec::new();
+    for action in actions {
+        let traversal = CodeGraphTraversalConfig {
+            depth: depth.or(sess.codegraph_preferences.expand_depth).unwrap_or(1),
+            relation_filters: action.relation.clone().into_iter().collect(),
+            max_add,
+            priority_threshold,
+        };
+        let next = match action.action.as_str() {
+            "hydrate_source" => sess
+                .ensure_codegraph_context()
+                .hydrate_source(&document, action.block_id, padding),
+            "expand_file" => sess
+                .ensure_codegraph_context()
+                .expand_file_with_config(&document, action.block_id, &traversal),
+            "expand_dependencies" => sess
+                .ensure_codegraph_context()
+                .expand_dependencies_with_config(&document, action.block_id, &traversal),
+            "expand_dependents" => sess
+                .ensure_codegraph_context()
+                .expand_dependents_with_config(&document, action.block_id, &traversal),
+            "collapse" => sess
+                .ensure_codegraph_context()
+                .collapse(&document, action.block_id, false),
+            _ => continue,
+        };
+        applied.push(action_summary(&action));
+        merge_updates(&mut merged, next);
+    }
+
+    sess.sync_context_blocks_from_codegraph();
+    sess.current_block = merged.focus.map(|id| id.to_string()).or_else(|| sess.current_block.clone());
+
+    match format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "session": session,
+                    "applied_actions": applied,
+                    "added": merged.added.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "removed": merged.removed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "changed": merged.changed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "focus": merged.focus.map(|id| id.to_string()),
+                    "warnings": merged.warnings,
+                    "total": sess.context_blocks.len(),
+                }))?
+            );
+        }
+        OutputFormat::Text => {
+            print_success(&format!(
+                "Applied {} recommended action(s) to codegraph context {}",
+                applied.len(), session
+            ));
+            for item in &applied {
+                println!("- {}", item);
+            }
+            for warning in &merged.warnings {
+                print_warning(warning);
+            }
+        }
+    }
+
     write_stateful_document(&stateful, input)?;
     Ok(())
 }

@@ -1167,6 +1167,50 @@ pub enum CodegraphContextCommands {
         /// Limit initial overview seeding to this many structural levels from the root
         #[arg(long)]
         initial_depth: Option<usize>,
+
+        /// Initialize by focusing a specific selector instead of broad overview seeding
+        #[arg(long)]
+        focus: Option<String>,
+
+        /// Focus-first expansion mode: auto, file, dependencies, dependents
+        #[arg(long, default_value = "auto")]
+        focus_mode: String,
+
+        /// Traversal depth for focus-first initialization
+        #[arg(long, default_value = "1")]
+        focus_depth: usize,
+
+        /// Optional relation preset for focus-first traversal defaults: semantic, imports, reverse-impact, references
+        #[arg(long)]
+        preset: Option<String>,
+
+        /// Optional comma-separated default relation filters to preserve on the session
+        #[arg(long)]
+        default_relations: Option<String>,
+
+        /// Preserve compact exports as the session default
+        #[arg(long)]
+        default_compact: bool,
+
+        /// Preserve this bounded levels view as the session default
+        #[arg(long)]
+        default_levels: Option<usize>,
+
+        /// Preserve this relation preset as the session default
+        #[arg(long)]
+        default_preset: Option<String>,
+
+        /// Preserve this expansion depth as the session default
+        #[arg(long)]
+        default_depth: Option<usize>,
+
+        /// Preserve allowed node classes for show/export (comma-separated)
+        #[arg(long)]
+        default_only: Option<String>,
+
+        /// Preserve excluded node classes for show/export (comma-separated)
+        #[arg(long)]
+        default_exclude: Option<String>,
     },
 
     /// Show the current codegraph working set
@@ -1194,6 +1238,14 @@ pub enum CodegraphContextCommands {
         /// Show only nodes within N levels of the current focus
         #[arg(long)]
         levels: Option<usize>,
+
+        /// Restrict output to these node classes (comma-separated)
+        #[arg(long)]
+        only: Option<String>,
+
+        /// Exclude these node classes from output (comma-separated)
+        #[arg(long)]
+        exclude: Option<String>,
     },
 
     /// Export the current working set as structured JSON with frontier metadata
@@ -1221,6 +1273,81 @@ pub enum CodegraphContextCommands {
         /// Export only nodes within N levels of the current focus
         #[arg(long)]
         levels: Option<usize>,
+
+        /// Restrict output to these node classes (comma-separated)
+        #[arg(long)]
+        only: Option<String>,
+
+        /// Exclude these node classes from output (comma-separated)
+        #[arg(long)]
+        exclude: Option<String>,
+    },
+
+    /// View or update persisted codegraph session defaults
+    Defaults {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Preserve compact exports as the session default
+        #[arg(long)]
+        compact: bool,
+
+        /// Clear the compact default
+        #[arg(long)]
+        no_compact: bool,
+
+        /// Preserve this bounded levels view as the session default
+        #[arg(long)]
+        levels: Option<usize>,
+
+        /// Clear the bounded levels default
+        #[arg(long)]
+        clear_levels: bool,
+
+        /// Preserve this relation preset as the session default
+        #[arg(long)]
+        preset: Option<String>,
+
+        /// Preserve these comma-separated relation filters as the session default
+        #[arg(long)]
+        relations: Option<String>,
+
+        /// Clear the relation preset default
+        #[arg(long)]
+        clear_preset: bool,
+
+        /// Clear explicit relation filter defaults
+        #[arg(long)]
+        clear_relations: bool,
+
+        /// Preserve this expansion depth as the session default
+        #[arg(long)]
+        depth: Option<usize>,
+
+        /// Clear the expansion depth default
+        #[arg(long)]
+        clear_depth: bool,
+
+        /// Preserve allowed node classes for show/export (comma-separated)
+        #[arg(long)]
+        only: Option<String>,
+
+        /// Preserve excluded node classes for show/export (comma-separated)
+        #[arg(long)]
+        exclude: Option<String>,
+
+        /// Clear allowed node-class filters
+        #[arg(long)]
+        clear_only: bool,
+
+        /// Clear excluded node-class filters
+        #[arg(long)]
+        clear_exclude: bool,
     },
 
     /// Add one or more blocks/selectors into the working set
@@ -1276,9 +1403,52 @@ pub enum CodegraphContextCommands {
         #[arg(long)]
         relations: Option<String>,
 
+        /// Optional relation preset: semantic, imports, reverse-impact, references
+        #[arg(long)]
+        preset: Option<String>,
+
         /// Expand outward for N hops
+        #[arg(long)]
+        depth: Option<usize>,
+
+        /// Stop after adding at most N new nodes
+        #[arg(long)]
+        max_add: Option<usize>,
+
+        /// Only follow candidates at or above this frontier priority
+        #[arg(long)]
+        priority_threshold: Option<u16>,
+    },
+
+    /// Apply the top recommended frontier actions automatically
+    ExpandRecommended {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Apply up to N recommended actions
         #[arg(long, default_value = "1")]
-        depth: usize,
+        top: usize,
+
+        /// Padding to use if the recommended action hydrates source
+        #[arg(long, default_value = "2")]
+        padding: usize,
+
+        /// Override traversal depth for recommended expand actions
+        #[arg(long)]
+        depth: Option<usize>,
+
+        /// Stop after adding at most N new nodes per recommended expand action
+        #[arg(long)]
+        max_add: Option<usize>,
+
+        /// Only apply recommended actions at or above this priority
+        #[arg(long)]
+        priority_threshold: Option<u16>,
     },
 
     /// Hydrate source from coderef for a selected block

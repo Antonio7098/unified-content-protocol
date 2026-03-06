@@ -33,6 +33,24 @@ impl CliState {
 }
 
 /// Serializable agent session state
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CodeGraphSessionPreferences {
+    #[serde(default)]
+    pub compact: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub levels: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relation_preset: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub relation_filters: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expand_depth: Option<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub only_node_classes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_node_classes: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSessionState {
     pub id: String,
@@ -42,6 +60,8 @@ pub struct AgentSessionState {
     pub context_blocks: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codegraph_context: Option<CodeGraphContextSession>,
+    #[serde(default)]
+    pub codegraph_preferences: CodeGraphSessionPreferences,
     pub state: String,
     pub created_at: String,
 }
@@ -55,6 +75,7 @@ impl AgentSessionState {
             history: Vec::new(),
             context_blocks: Vec::new(),
             codegraph_context: None,
+            codegraph_preferences: CodeGraphSessionPreferences::default(),
             state: "active".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
         }

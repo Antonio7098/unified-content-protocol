@@ -44,6 +44,7 @@ pub use ucp_codegraph::{
     CodeGraphHiddenLevelSummary,
     CodeGraphPromptProjectionConfig, CodeGraphPrunePolicy, CodeGraphRenderConfig,
     CodeGraphSelectionOrigin, CodeGraphSelectionOriginKind, CodeGraphSeverity,
+    CodeGraphTraversalConfig,
     CodeGraphStats, CodeGraphValidationResult, HydratedSourceExcerpt,
     PortableDocument, CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER,
     CODEGRAPH_PROFILE_VERSION,

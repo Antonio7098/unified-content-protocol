@@ -12,6 +12,7 @@ pub use context::{
     CodeGraphHiddenLevelSummary,
     CodeGraphDetailLevel, CodeGraphExportConfig, CodeGraphExportMode, CodeGraphPrunePolicy,
     CodeGraphRenderConfig, CodeGraphSelectionOrigin, CodeGraphSelectionOriginKind,
+    CodeGraphTraversalConfig,
     HydratedSourceExcerpt,
 };
 pub use legacy::{

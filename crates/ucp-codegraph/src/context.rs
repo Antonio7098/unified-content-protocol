@@ -201,7 +201,23 @@ pub struct CodeGraphExportConfig {
     pub dedupe_edges: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visible_levels: Option<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub only_node_classes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_node_classes: Vec<String>,
     pub max_frontier_actions: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphTraversalConfig {
+    #[serde(default = "default_one")]
+    pub depth: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub relation_filters: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_add: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority_threshold: Option<u16>,
 }
 
 impl Default for CodeGraphExportConfig {
@@ -211,7 +227,20 @@ impl Default for CodeGraphExportConfig {
             include_rendered: true,
             dedupe_edges: true,
             visible_levels: None,
+            only_node_classes: Vec::new(),
+            exclude_node_classes: Vec::new(),
             max_frontier_actions: 12,
+        }
+    }
+}
+
+impl Default for CodeGraphTraversalConfig {
+    fn default() -> Self {
+        Self {
+            depth: 1,
+            relation_filters: Vec::new(),
+            max_add: None,
+            priority_threshold: None,
         }
     }
 }
@@ -223,7 +252,23 @@ impl CodeGraphExportConfig {
             include_rendered: false,
             dedupe_edges: true,
             visible_levels: None,
+            only_node_classes: Vec::new(),
+            exclude_node_classes: Vec::new(),
             max_frontier_actions: 6,
+        }
+    }
+}
+
+impl CodeGraphTraversalConfig {
+    fn depth(&self) -> usize {
+        self.depth.max(1)
+    }
+
+    fn relation_filter_set(&self) -> Option<HashSet<String>> {
+        if self.relation_filters.is_empty() {
+            None
+        } else {
+            Some(self.relation_filters.iter().cloned().collect())
         }
     }
 }
@@ -305,6 +350,10 @@ pub struct CodeGraphContextHeuristics {
 pub struct CodeGraphHiddenLevelSummary {
     pub level: usize,
     pub count: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -566,7 +615,7 @@ impl CodeGraphContextSession {
     }
 
     pub fn expand_file(&mut self, doc: &Document, file_id: BlockId) -> CodeGraphContextUpdate {
-        self.expand_file_with_depth(doc, file_id, 1)
+        self.expand_file_with_config(doc, file_id, &CodeGraphTraversalConfig::default())
     }
 
     pub fn expand_file_with_depth(
@@ -574,6 +623,22 @@ impl CodeGraphContextSession {
         doc: &Document,
         file_id: BlockId,
         depth: usize,
+    ) -> CodeGraphContextUpdate {
+        self.expand_file_with_config(
+            doc,
+            file_id,
+            &CodeGraphTraversalConfig {
+                depth,
+                ..CodeGraphTraversalConfig::default()
+            },
+        )
+    }
+
+    pub fn expand_file_with_config(
+        &mut self,
+        doc: &Document,
+        file_id: BlockId,
+        traversal: &CodeGraphTraversalConfig,
     ) -> CodeGraphContextUpdate {
         let index = CodeGraphQueryIndex::new(doc);
         let mut update = CodeGraphContextUpdate::default();
@@ -583,20 +648,44 @@ impl CodeGraphContextSession {
             selection_origin(CodeGraphSelectionOriginKind::Manual, None, None),
             &mut update,
         );
-        if depth > 0 {
+        let mut added_count = 0usize;
+        let mut skipped_for_threshold = 0usize;
+        let mut budget_exhausted = false;
+        if traversal.depth() > 0 {
             let mut queue: VecDeque<(BlockId, usize)> = index
                 .file_symbols(&file_id)
                 .into_iter()
                 .map(|symbol_id| (symbol_id, 1usize))
                 .collect();
             while let Some((symbol_id, symbol_depth)) = queue.pop_front() {
+                let candidate_priority = frontier_priority("expand_file", None, 1, false);
+                if traversal
+                    .priority_threshold
+                    .map(|threshold| candidate_priority < threshold)
+                    .unwrap_or(false)
+                {
+                    skipped_for_threshold += 1;
+                    continue;
+                }
+                if traversal
+                    .max_add
+                    .map(|limit| added_count >= limit)
+                    .unwrap_or(false)
+                {
+                    budget_exhausted = true;
+                    break;
+                }
+                let was_selected = self.selected.contains_key(&symbol_id);
                 self.ensure_selected_with_origin(
                     symbol_id,
                     CodeGraphDetailLevel::SymbolCard,
                     selection_origin(CodeGraphSelectionOriginKind::FileSymbols, None, Some(file_id)),
                     &mut update,
                 );
-                if symbol_depth >= depth {
+                if !was_selected && self.selected.contains_key(&symbol_id) {
+                    added_count += 1;
+                }
+                if symbol_depth >= traversal.depth() {
                     continue;
                 }
                 for child in index.symbol_children(&symbol_id) {
@@ -604,11 +693,31 @@ impl CodeGraphContextSession {
                 }
             }
         }
+        if skipped_for_threshold > 0 {
+            update.warnings.push(format!(
+                "skipped {} file-symbol candidates below priority threshold",
+                skipped_for_threshold
+            ));
+        }
+        if budget_exhausted {
+            update.warnings.push(format!(
+                "stopped file expansion after adding {} nodes due to max_add budget",
+                added_count
+            ));
+        }
         self.focus = Some(file_id);
         self.apply_prune_policy(doc, &mut update);
         update.focus = self.focus;
-        self.history
-            .push(format!("expand:file:{}:{}", file_id, depth));
+        self.history.push(format!(
+            "expand:file:{}:{}:{}:{}",
+            file_id,
+            traversal.depth(),
+            traversal.max_add.map(|value| value.to_string()).unwrap_or_else(|| "*".to_string()),
+            traversal
+                .priority_threshold
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "*".to_string())
+        ));
         update
     }
 
@@ -618,9 +727,16 @@ impl CodeGraphContextSession {
         block_id: BlockId,
         relation_filter: Option<&str>,
     ) -> CodeGraphContextUpdate {
-        let relation_filters = relation_filter
-            .map(|relation| HashSet::from([relation.to_string()]));
-        self.expand_dependencies_with_filters(doc, block_id, relation_filters.as_ref(), 1)
+        self.expand_dependencies_with_config(
+            doc,
+            block_id,
+            &CodeGraphTraversalConfig {
+                relation_filters: relation_filter
+                    .map(|relation| vec![relation.to_string()])
+                    .unwrap_or_default(),
+                ..CodeGraphTraversalConfig::default()
+            },
+        )
     }
 
     pub fn expand_dependencies_with_filters(
@@ -630,7 +746,26 @@ impl CodeGraphContextSession {
         relation_filters: Option<&HashSet<String>>,
         depth: usize,
     ) -> CodeGraphContextUpdate {
-        self.expand_neighbors(doc, block_id, relation_filters, depth, TraversalKind::Outgoing)
+        self.expand_dependencies_with_config(
+            doc,
+            block_id,
+            &CodeGraphTraversalConfig {
+                depth,
+                relation_filters: relation_filters
+                    .map(|filters| filters.iter().cloned().collect())
+                    .unwrap_or_default(),
+                ..CodeGraphTraversalConfig::default()
+            },
+        )
+    }
+
+    pub fn expand_dependencies_with_config(
+        &mut self,
+        doc: &Document,
+        block_id: BlockId,
+        traversal: &CodeGraphTraversalConfig,
+    ) -> CodeGraphContextUpdate {
+        self.expand_neighbors(doc, block_id, traversal, TraversalKind::Outgoing)
     }
 
     pub fn expand_dependents(
@@ -639,9 +774,16 @@ impl CodeGraphContextSession {
         block_id: BlockId,
         relation_filter: Option<&str>,
     ) -> CodeGraphContextUpdate {
-        let relation_filters = relation_filter
-            .map(|relation| HashSet::from([relation.to_string()]));
-        self.expand_dependents_with_filters(doc, block_id, relation_filters.as_ref(), 1)
+        self.expand_dependents_with_config(
+            doc,
+            block_id,
+            &CodeGraphTraversalConfig {
+                relation_filters: relation_filter
+                    .map(|relation| vec![relation.to_string()])
+                    .unwrap_or_default(),
+                ..CodeGraphTraversalConfig::default()
+            },
+        )
     }
 
     pub fn expand_dependents_with_filters(
@@ -651,7 +793,26 @@ impl CodeGraphContextSession {
         relation_filters: Option<&HashSet<String>>,
         depth: usize,
     ) -> CodeGraphContextUpdate {
-        self.expand_neighbors(doc, block_id, relation_filters, depth, TraversalKind::Incoming)
+        self.expand_dependents_with_config(
+            doc,
+            block_id,
+            &CodeGraphTraversalConfig {
+                depth,
+                relation_filters: relation_filters
+                    .map(|filters| filters.iter().cloned().collect())
+                    .unwrap_or_default(),
+                ..CodeGraphTraversalConfig::default()
+            },
+        )
+    }
+
+    pub fn expand_dependents_with_config(
+        &mut self,
+        doc: &Document,
+        block_id: BlockId,
+        traversal: &CodeGraphTraversalConfig,
+    ) -> CodeGraphContextUpdate {
+        self.expand_neighbors(doc, block_id, traversal, TraversalKind::Incoming)
     }
 
     pub fn collapse(
@@ -952,6 +1113,8 @@ impl CodeGraphContextSession {
             export_config.visible_levels,
         );
         let hidden_levels = hidden_level_summaries(
+            self,
+            &index,
             &selected_ids,
             &visible_selected_ids,
             &distances,
@@ -963,6 +1126,11 @@ impl CodeGraphContextSession {
                 !visible_selected_ids.contains(block_id) && !distances.contains_key(block_id)
             })
             .count();
+        let filtered_selected_ids = class_filtered_selected_ids(
+            &index,
+            &visible_selected_ids,
+            export_config,
+        );
         let rendered = if export_config.include_rendered {
             self.render_for_prompt(doc, config)
         } else {
@@ -971,7 +1139,7 @@ impl CodeGraphContextSession {
 
         let mut nodes = Vec::new();
         for block_id in self.selected_block_ids() {
-            if !visible_selected_ids.contains(&block_id) {
+            if !filtered_selected_ids.contains(&block_id) {
                 continue;
             }
             let Some(block) = doc.get_block(&block_id) else {
@@ -1053,7 +1221,7 @@ impl CodeGraphContextSession {
         });
 
         let (edges, total_selected_edges) =
-            export_edges(&index, &visible_selected_ids, &short_ids, export_config);
+            export_edges(&index, &filtered_selected_ids, &short_ids, export_config);
 
         let frontier = self.export_frontier(doc, &index, &short_ids, &selected_ids);
         let heuristics = self.compute_heuristics(&index, &frontier);
@@ -1342,18 +1510,20 @@ impl CodeGraphContextSession {
         &mut self,
         doc: &Document,
         block_id: BlockId,
-        relation_filters: Option<&HashSet<String>>,
-        depth: usize,
-        traversal: TraversalKind,
+        traversal_config: &CodeGraphTraversalConfig,
+        traversal_kind: TraversalKind,
     ) -> CodeGraphContextUpdate {
         let index = CodeGraphQueryIndex::new(doc);
         let mut update = CodeGraphContextUpdate::default();
+        let relation_filters = traversal_config.relation_filter_set();
         self.ensure_selected_with_origin(
             block_id,
             CodeGraphDetailLevel::Neighborhood,
             selection_origin(
                 CodeGraphSelectionOriginKind::Manual,
-                relation_filters.and_then(|filters| join_relation_filters(filters)),
+                relation_filters
+                    .as_ref()
+                    .and_then(|filters| join_relation_filters(filters)),
                 None,
             ),
             &mut update,
@@ -1361,18 +1531,47 @@ impl CodeGraphContextSession {
 
         let mut queue = VecDeque::from([(block_id, 0usize)]);
         let mut visited = HashSet::from([block_id]);
+        let mut added_count = 0usize;
+        let mut skipped_for_threshold = 0usize;
+        let mut budget_exhausted = false;
         while let Some((current, current_depth)) = queue.pop_front() {
-            if current_depth >= depth.max(1) {
+            if current_depth >= traversal_config.depth() {
                 continue;
             }
-            let edges = match traversal {
+            let edges = match traversal_kind {
                 TraversalKind::Outgoing => index.outgoing_edges(&current),
                 TraversalKind::Incoming => index.incoming_edges(&current),
             };
 
             for edge in edges {
-                if !relation_matches(relation_filters, edge.relation.as_str()) {
+                if !relation_matches(relation_filters.as_ref(), edge.relation.as_str()) {
                     continue;
+                }
+                let action_name = match traversal_kind {
+                    TraversalKind::Outgoing => "expand_dependencies",
+                    TraversalKind::Incoming => "expand_dependents",
+                };
+                let candidate_priority = frontier_priority(
+                    action_name,
+                    Some(edge.relation.as_str()),
+                    1,
+                    is_low_value_relation(action_name, edge.relation.as_str()),
+                );
+                if traversal_config
+                    .priority_threshold
+                    .map(|threshold| candidate_priority < threshold)
+                    .unwrap_or(false)
+                {
+                    skipped_for_threshold += 1;
+                    continue;
+                }
+                if traversal_config
+                    .max_add
+                    .map(|limit| added_count >= limit)
+                    .unwrap_or(false)
+                {
+                    budget_exhausted = true;
+                    break;
                 }
                 let class = index.node_class(&edge.other).unwrap_or("unknown");
                 let level = if class == "symbol" {
@@ -1380,11 +1579,12 @@ impl CodeGraphContextSession {
                 } else {
                     CodeGraphDetailLevel::Skeleton
                 };
+                let was_selected = self.selected.contains_key(&edge.other);
                 self.ensure_selected_with_origin(
                     edge.other,
                     level,
                     selection_origin(
-                        match traversal {
+                        match traversal_kind {
                             TraversalKind::Outgoing => CodeGraphSelectionOriginKind::Dependencies,
                             TraversalKind::Incoming => CodeGraphSelectionOriginKind::Dependents,
                         },
@@ -1393,26 +1593,54 @@ impl CodeGraphContextSession {
                     ),
                     &mut update,
                 );
+                if !was_selected && self.selected.contains_key(&edge.other) {
+                    added_count += 1;
+                }
                 if visited.insert(edge.other) {
                     queue.push_back((edge.other, current_depth + 1));
                 }
             }
+            if budget_exhausted {
+                break;
+            }
+        }
+
+        if skipped_for_threshold > 0 {
+            update.warnings.push(format!(
+                "skipped {} candidates below priority threshold",
+                skipped_for_threshold
+            ));
+        }
+        if budget_exhausted {
+            update.warnings.push(format!(
+                "stopped expansion after adding {} nodes due to max_add budget",
+                added_count
+            ));
         }
 
         self.focus = Some(block_id);
         self.apply_prune_policy(doc, &mut update);
         update.focus = self.focus;
         self.history.push(format!(
-            "expand:{}:{}:{}:{}",
-            match traversal {
+            "expand:{}:{}:{}:{}:{}:{}",
+            match traversal_kind {
                 TraversalKind::Outgoing => "dependencies",
                 TraversalKind::Incoming => "dependents",
             },
             block_id,
             relation_filters
+                .as_ref()
                 .map(join_relation_filter_string)
                 .unwrap_or_else(|| "*".to_string()),
-            depth.max(1)
+            traversal_config.depth(),
+            traversal_config
+                .max_add
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "*".to_string()),
+            traversal_config
+                .priority_threshold
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "*".to_string())
         ));
         update
     }
@@ -1943,10 +2171,7 @@ fn append_relation_frontier(
         *counts.entry(edge.relation).or_default() += 1;
     }
     for (relation, candidate_count) in counts {
-        let low_value = matches!(action, "expand_dependents")
-            || relation == "references"
-            || relation == "cited_by"
-            || relation == "links_to";
+        let low_value = is_low_value_relation(action, relation.as_str());
         out.push(CodeGraphContextFrontierAction {
             block_id,
             short_id: short_id.to_string(),
@@ -1958,6 +2183,13 @@ fn append_relation_frontier(
             description: format!("{} {} neighbors via {} for {}", action, direction, relation, label),
         });
     }
+}
+
+fn is_low_value_relation(action: &str, relation: &str) -> bool {
+    matches!(action, "expand_dependents")
+        || relation == "references"
+        || relation == "cited_by"
+        || relation == "links_to"
 }
 
 fn dedupe_visible_edges(
@@ -2104,7 +2336,26 @@ fn visible_selected_ids(
     }
 }
 
+fn class_filtered_selected_ids(
+    index: &CodeGraphQueryIndex,
+    selected_ids: &HashSet<BlockId>,
+    export_config: &CodeGraphExportConfig,
+) -> HashSet<BlockId> {
+    selected_ids
+        .iter()
+        .copied()
+        .filter(|block_id| {
+            node_class_visible(
+                index.node_class(block_id).unwrap_or("unknown"),
+                export_config,
+            )
+        })
+        .collect()
+}
+
 fn hidden_level_summaries(
+    session: &CodeGraphContextSession,
+    index: &CodeGraphQueryIndex,
     selected_ids: &HashSet<BlockId>,
     visible_selected_ids: &HashSet<BlockId>,
     distances: &HashMap<BlockId, usize>,
@@ -2113,7 +2364,7 @@ fn hidden_level_summaries(
     let Some(levels) = visible_levels else {
         return Vec::new();
     };
-    let mut counts: BTreeMap<usize, usize> = BTreeMap::new();
+    let mut counts: BTreeMap<(usize, Option<String>, Option<String>), usize> = BTreeMap::new();
     for block_id in selected_ids {
         if visible_selected_ids.contains(block_id) {
             continue;
@@ -2122,13 +2373,65 @@ fn hidden_level_summaries(
             continue;
         };
         if distance > levels {
-            *counts.entry(distance).or_default() += 1;
+            let (relation, direction) = hidden_summary_metadata(session, index, *block_id);
+            *counts.entry((distance, relation, direction)).or_default() += 1;
         }
     }
     counts
         .into_iter()
-        .map(|(level, count)| CodeGraphHiddenLevelSummary { level, count })
+        .map(|((level, relation, direction), count)| CodeGraphHiddenLevelSummary {
+            level,
+            count,
+            relation,
+            direction,
+        })
         .collect()
+}
+
+fn hidden_summary_metadata(
+    session: &CodeGraphContextSession,
+    index: &CodeGraphQueryIndex,
+    block_id: BlockId,
+) -> (Option<String>, Option<String>) {
+    let Some(node) = session.selected.get(&block_id) else {
+        return (None, None);
+    };
+    match node.origin.as_ref() {
+        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::Dependencies => {
+            (origin.relation.clone(), Some("outgoing".to_string()))
+        }
+        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::Dependents => {
+            (origin.relation.clone(), Some("incoming".to_string()))
+        }
+        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::FileSymbols => {
+            (Some("contains_symbol".to_string()), Some("structural".to_string()))
+        }
+        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::Overview => {
+            (Some("structure".to_string()), Some("structural".to_string()))
+        }
+        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::Manual => {
+            (origin.relation.clone(), Some("manual".to_string()))
+        }
+        _ => match index.node_class(&block_id).unwrap_or("unknown") {
+            "repository" | "directory" | "file" => {
+                (Some("structure".to_string()), Some("structural".to_string()))
+            }
+            _ => (None, None),
+        },
+    }
+}
+
+fn node_class_visible(node_class: &str, export_config: &CodeGraphExportConfig) -> bool {
+    let only_matches = export_config.only_node_classes.is_empty()
+        || export_config
+            .only_node_classes
+            .iter()
+            .any(|allowed| allowed == node_class);
+    let excluded = export_config
+        .exclude_node_classes
+        .iter()
+        .any(|excluded| excluded == node_class);
+    only_matches && !excluded
 }
 
 fn relation_matches(relation_filters: Option<&HashSet<String>>, relation: &str) -> bool {
@@ -2798,6 +3101,88 @@ mod tests {
         session.expand_dependencies_with_filters(&doc, add_id, Some(&relation_filters), 2);
         assert!(session.selected.contains_key(&sub_id));
         assert!(session.selected.contains_key(&util_id));
+    }
+
+    #[test]
+    fn traversal_budget_caps_additions_and_reports_warning() {
+        let doc = build_test_graph();
+        let mut session = CodeGraphContextSession::new();
+        let file_id = resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
+
+        session.seed_overview(&doc);
+        let update = session.expand_file_with_config(
+            &doc,
+            file_id,
+            &CodeGraphTraversalConfig {
+                depth: 2,
+                max_add: Some(1),
+                ..CodeGraphTraversalConfig::default()
+            },
+        );
+
+        assert_eq!(update.added.len(), 1);
+        assert!(update.warnings.iter().any(|warning| warning.contains("max_add")));
+    }
+
+    #[test]
+    fn priority_threshold_skips_low_value_relations() {
+        let mut doc = build_test_graph();
+        let mut session = CodeGraphContextSession::new();
+        let file_id = resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
+        let add_id = resolve_codegraph_selector(&doc, "symbol:src/lib.rs::add").unwrap();
+        let util_id = resolve_codegraph_selector(&doc, "symbol:src/util.rs::util").unwrap();
+
+        doc.add_edge(&add_id, ucm_core::EdgeType::References, util_id);
+
+        session.seed_overview(&doc);
+        session.expand_file(&doc, file_id);
+        let update = session.expand_dependencies_with_config(
+            &doc,
+            add_id,
+            &CodeGraphTraversalConfig {
+                depth: 1,
+                relation_filters: vec!["references".to_string()],
+                priority_threshold: Some(80),
+                ..CodeGraphTraversalConfig::default()
+            },
+        );
+
+        assert!(!session.selected.contains_key(&util_id));
+        assert!(update.added.is_empty());
+    }
+
+    #[test]
+    fn export_filters_node_classes_and_includes_hidden_relation_metadata() {
+        let doc = build_test_graph();
+        let mut session = CodeGraphContextSession::new();
+        let file_id = resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
+        let add_id = resolve_codegraph_selector(&doc, "symbol:src/lib.rs::add").unwrap();
+
+        session.seed_overview(&doc);
+        session.expand_file(&doc, file_id);
+        session.expand_dependencies(&doc, add_id, Some("uses_symbol"));
+        session.focus = Some(add_id);
+
+        let mut export_config = CodeGraphExportConfig::compact();
+        export_config.visible_levels = Some(0);
+        export_config.only_node_classes = vec!["symbol".to_string()];
+        let export = session.export_with_config(&doc, &CodeGraphRenderConfig::default(), &export_config);
+
+        assert!(export.nodes.iter().all(|node| node.node_class == "symbol"));
+        assert!(export.edges.iter().all(|edge| {
+            export
+                .nodes
+                .iter()
+                .any(|node| node.block_id == edge.source && node.node_class == "symbol")
+                && export
+                    .nodes
+                    .iter()
+                    .any(|node| node.block_id == edge.target && node.node_class == "symbol")
+        }));
+        assert!(export.hidden_levels.iter().any(|hidden| {
+            hidden.relation.as_deref() == Some("uses_symbol")
+                && hidden.direction.as_deref() == Some("outgoing")
+        }));
     }
 
     #[test]
