@@ -5246,6 +5246,100 @@ mod tests {
     }
 
     #[test]
+    fn test_function_local_member_aliases_resolve_call_sites_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as utilns from './util';\nexport function run() { const f = utilns.util; return f(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from . import helper as helper_mod\ndef execute():\n    alias = helper_mod.helper\n    return alias()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "function-local-member-aliases".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_function_local_member_alias_chains_resolve_call_sites_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as utilns from './util';\nexport function run() { const first = utilns.util; const second = first; return second(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from . import helper as helper_mod\ndef execute():\n    first = helper_mod.helper\n    second = first\n    return second()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "function-local-member-alias-chains".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
     fn test_nested_symbols_are_captured_and_nested_in_structure() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
