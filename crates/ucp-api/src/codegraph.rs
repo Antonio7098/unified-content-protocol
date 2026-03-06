@@ -5959,12 +5959,17 @@ mod tests {
         .unwrap();
         fs::write(
             dir.path().join("web/index.ts"),
-            "export { default as util } from './util';\nexport { default as Thing } from './thing';\nexport * from './util';\n",
+            "export { default as util } from './util';\nexport { util as util_alias } from './util';\nexport { default as Thing } from './thing';\nexport * from './util';\n",
         )
         .unwrap();
         fs::write(
             dir.path().join("web/index2.ts"),
             "export { util as util_chain } from './index';\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/ns_main.ts"),
+            "import * as ns from './index';\nexport function run_alias_member() { return ns.util_alias(); }\n",
         )
         .unwrap();
         fs::write(
@@ -6002,6 +6007,13 @@ mod tests {
         assert!(symbol_has_edge_to_symbol(
             &build.document,
             "symbol:web/main.ts::run_chain",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/ns_main.ts::run_alias_member",
             "uses_symbol",
             "uses_symbol",
             "symbol:web/util.ts::util",
@@ -6155,7 +6167,7 @@ mod tests {
         .unwrap();
         fs::write(
             dir.path().join("py/pkg/__init__.py"),
-            "from .helper import helper\n",
+            "from .helper import helper\nfrom .helper import helper as alias\n",
         )
         .unwrap();
         fs::write(
@@ -6170,7 +6182,7 @@ mod tests {
         .unwrap();
         fs::write(
             dir.path().join("py/main.py"),
-            "from .pkg import helper\nfrom .pkg import helper as alias\nfrom .pkg_wild import helper as wild_helper\ndef run_pkg():\n    helper()\n    return alias()\ndef run_pkg_wild():\n    return wild_helper()\n",
+            "from .pkg import helper\nfrom .pkg import helper as alias\nfrom .pkg_wild import helper as wild_helper\nfrom . import pkg\ndef run_pkg():\n    helper()\n    return alias()\ndef run_pkg_member_alias():\n    return pkg.alias()\ndef run_pkg_wild():\n    return wild_helper()\n",
         )
         .unwrap();
 
@@ -6184,6 +6196,13 @@ mod tests {
         assert!(symbol_has_edge_to_symbol(
             &build.document,
             "symbol:py/main.py::run_pkg",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/pkg/helper.py::helper",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::run_pkg_member_alias",
             "uses_symbol",
             "uses_symbol",
             "symbol:py/pkg/helper.py::helper",
