@@ -460,7 +460,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         BTreeMap::new();
     let mut imported_module_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<String>>> =
         BTreeMap::new();
-    let mut aliased_symbol_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<BlockId>>> =
+    let mut aliased_symbol_targets_by_scope: BTreeMap<(String, String), BTreeMap<String, Vec<BlockId>>> =
         BTreeMap::new();
     let mut pending_reference_edges: BTreeSet<(String, String, String)> = BTreeSet::new();
     let mut pending_symbol_reference_edges: BTreeSet<(String, String, String, String)> =
@@ -606,15 +606,15 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 &top_level_symbol_ids,
                 &imported_symbol_targets_by_file,
                 &imported_module_targets_by_file,
-                &aliased_symbol_targets_by_file,
+                &aliased_symbol_targets_by_scope,
             );
             if target_ids.is_empty() {
                 next_unresolved.push((file, language, alias));
                 continue;
             }
 
-            aliased_symbol_targets_by_file
-                .entry(file)
+            aliased_symbol_targets_by_scope
+                .entry((file, alias_scope_key(alias.owner_identity.as_deref())))
                 .or_default()
                 .entry(alias.name)
                 .or_default()
@@ -628,7 +628,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         unresolved_aliases = next_unresolved;
     }
 
-    for targets in aliased_symbol_targets_by_file.values_mut() {
+    for targets in aliased_symbol_targets_by_scope.values_mut() {
         for symbol_ids in targets.values_mut() {
             let mut unique_ids = Vec::new();
             for symbol_id in symbol_ids.drain(..) {
@@ -687,7 +687,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 &top_level_symbol_ids,
                 &imported_symbol_targets_by_file,
                 &imported_module_targets_by_file,
-                &aliased_symbol_targets_by_file,
+                &aliased_symbol_targets_by_scope,
                 &known_files,
             ) {
                 let edge = (*source_id, target_id, usage.target_expr.clone());
@@ -1275,6 +1275,7 @@ struct ExtractedAlias {
     name: String,
     target_expr: String,
     target_name: String,
+    owner_identity: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1415,11 +1416,13 @@ impl ExtractedAlias {
         name: impl Into<String>,
         target_expr: impl Into<String>,
         target_name: impl Into<String>,
+        owner_identity: Option<&str>,
     ) -> Self {
         Self {
             name: name.into(),
             target_expr: target_expr.into(),
             target_name: target_name.into(),
+            owner_identity: owner_identity.map(str::to_string),
         }
     }
 }
@@ -1938,11 +1941,17 @@ fn analyze_python_node(
                 .imports
                 .extend(python_imports_from_from_statement(node, source));
         }
-        "expression_statement" if scope.is_empty() => {
-            analysis
-                .exported_symbol_names
-                .extend(python_explicit_exports_from_statement(node, source));
-            analysis.aliases.extend(python_aliases_from_statement(node, source));
+        "expression_statement" => {
+            if scope.is_empty() {
+                analysis
+                    .exported_symbol_names
+                    .extend(python_explicit_exports_from_statement(node, source));
+            }
+            if scope.is_empty() || parent_identity.is_some() {
+                analysis
+                    .aliases
+                    .extend(python_aliases_from_statement(node, source, parent_identity));
+            }
         }
         _ => {}
     }
@@ -2112,7 +2121,11 @@ fn python_imports_from_import_statement(node: Node<'_>, source: &str) -> Vec<Ext
     imports
 }
 
-fn python_aliases_from_statement(node: Node<'_>, source: &str) -> Vec<ExtractedAlias> {
+fn python_aliases_from_statement(
+    node: Node<'_>,
+    source: &str,
+    owner_identity: Option<&str>,
+) -> Vec<ExtractedAlias> {
     if node.kind() != "expression_statement" {
         return Vec::new();
     }
@@ -2140,7 +2153,12 @@ fn python_aliases_from_statement(node: Node<'_>, source: &str) -> Vec<ExtractedA
         }
 
         if let Some((target_expr, target_name)) = python_alias_reference(right, source) {
-            aliases.push(ExtractedAlias::new(alias_name, target_expr, target_name));
+            aliases.push(ExtractedAlias::new(
+                alias_name,
+                target_expr,
+                target_name,
+                owner_identity,
+            ));
         }
     }
 
@@ -2415,8 +2433,10 @@ fn analyze_ts_node(
                 scope,
                 parent_identity,
             ));
-            if scope.is_empty() {
-                analysis.aliases.extend(ts_aliases_from_variable_statement(node, source));
+            if scope.is_empty() || parent_identity.is_some() {
+                analysis
+                    .aliases
+                    .extend(ts_aliases_from_variable_statement(node, source, parent_identity));
             }
             return;
         }
@@ -2725,7 +2745,11 @@ fn ts_namespace_import_aliases(node: Node<'_>, source: &str) -> Vec<String> {
     aliases
 }
 
-fn ts_aliases_from_variable_statement(node: Node<'_>, source: &str) -> Vec<ExtractedAlias> {
+fn ts_aliases_from_variable_statement(
+    node: Node<'_>,
+    source: &str,
+    owner_identity: Option<&str>,
+) -> Vec<ExtractedAlias> {
     let mut aliases = Vec::new();
     let mut stack = vec![node];
 
@@ -2747,7 +2771,12 @@ fn ts_aliases_from_variable_statement(node: Node<'_>, source: &str) -> Vec<Extra
             }
 
             if let Some((target_expr, target_name)) = ts_alias_reference(value_node, source) {
-                aliases.push(ExtractedAlias::new(alias_name, target_expr, target_name));
+                aliases.push(ExtractedAlias::new(
+                    alias_name,
+                    target_expr,
+                    target_name,
+                    owner_identity,
+                ));
             }
             continue;
         }
@@ -3085,16 +3114,24 @@ fn resolve_alias_target_ids(
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
-    aliased_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
+    aliased_symbol_targets_by_scope: &BTreeMap<(String, String), BTreeMap<String, Vec<BlockId>>>,
 ) -> Vec<BlockId> {
     let mut target_ids = Vec::new();
 
     if alias.target_expr == alias.target_name {
-        if let Some(alias_ids) = aliased_symbol_targets_by_file
-            .get(source_file)
-            .and_then(|aliases| aliases.get(&alias.target_name))
-        {
-            return alias_ids.clone();
+        for scope_key in [
+            alias_scope_key(alias.owner_identity.as_deref()),
+            alias_scope_key(None),
+        ] {
+            if let Some(alias_ids) = aliased_symbol_targets_by_scope
+                .get(&(source_file.to_string(), scope_key.clone()))
+                .and_then(|aliases| aliases.get(&alias.target_name))
+            {
+                return alias_ids.clone();
+            }
+            if scope_key.is_empty() {
+                break;
+            }
         }
     }
 
@@ -3138,15 +3175,23 @@ fn resolve_usage_target_ids(
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
-    aliased_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
+    aliased_symbol_targets_by_scope: &BTreeMap<(String, String), BTreeMap<String, Vec<BlockId>>>,
     known_files: &BTreeSet<String>,
 ) -> Vec<BlockId> {
     if usage.target_expr == usage.target_name {
-        if let Some(alias_ids) = aliased_symbol_targets_by_file
-            .get(source_file)
-            .and_then(|aliases| aliases.get(&usage.target_name))
-        {
-            return alias_ids.clone();
+        for scope_key in [
+            alias_scope_key(Some(&usage.source_identity)),
+            alias_scope_key(None),
+        ] {
+            if let Some(alias_ids) = aliased_symbol_targets_by_scope
+                .get(&(source_file.to_string(), scope_key.clone()))
+                .and_then(|aliases| aliases.get(&usage.target_name))
+            {
+                return alias_ids.clone();
+            }
+            if scope_key.is_empty() {
+                break;
+            }
         }
     }
 
@@ -3209,6 +3254,10 @@ fn member_usage_parts(text: &str) -> Option<(String, String)> {
     } else {
         Some((left.to_string(), right.to_string()))
     }
+}
+
+fn alias_scope_key(owner_identity: Option<&str>) -> String {
+    owner_identity.unwrap_or("").to_string()
 }
 
 fn resolve_import(
@@ -5082,6 +5131,53 @@ mod tests {
         let build = build_code_graph(&CodeGraphBuildInput {
             repository_path: dir.path().to_path_buf(),
             commit_hash: "alias-chains".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_function_local_aliases_resolve_call_sites_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { util } from './util';\nexport function run() { const localAlias = util; return localAlias(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .helper import helper\ndef execute():\n    alias = helper\n    return alias()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "function-local-aliases".to_string(),
             config: CodeGraphExtractorConfig::default(),
         })
         .unwrap();
