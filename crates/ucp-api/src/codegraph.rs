@@ -457,8 +457,10 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     let mut pending_reference_edges: BTreeSet<(String, String, String)> = BTreeSet::new();
     let mut pending_symbol_reference_edges: BTreeSet<(String, String, String, String)> =
         BTreeSet::new();
+    let mut pending_wildcard_symbol_reference_edges: BTreeSet<(String, String, String)> =
+        BTreeSet::new();
     let mut pending_reexport_edges: BTreeSet<(String, String, String, String)> = BTreeSet::new();
-    let mut pending_wildcard_reexport_edges: BTreeSet<(String, String, String)> =
+    let mut pending_wildcard_reexport_edges: BTreeSet<(String, String, String, Vec<String>)> =
         BTreeSet::new();
     let mut pending_relationship_edges: Vec<(BlockId, BlockId, String, String)> = Vec::new();
 
@@ -510,8 +512,17 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                         }
                     }
 
-                    if import.reexported && import.wildcard {
+                    if import.reexported && import.wildcard && import.symbols.is_empty() {
                         pending_wildcard_reexport_edges.insert((
+                            record.file.clone(),
+                            target.clone(),
+                            import.module.clone(),
+                            import.symbols.clone(),
+                        ));
+                    }
+
+                    if import.wildcard && import.symbols.is_empty() {
+                        pending_wildcard_symbol_reference_edges.insert((
                             record.file.clone(),
                             target,
                             import.module.clone(),
@@ -623,6 +634,31 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         }
     }
 
+    for (source_path, target_path, raw_import) in pending_wildcard_symbol_reference_edges {
+        let Some(source_id) = file_ids.get(&source_path) else {
+            continue;
+        };
+        let Some(target_symbols) = exported_top_level_symbol_ids.get(&target_path) else {
+            continue;
+        };
+
+        for (symbol_name, target_symbol_id) in target_symbols {
+            let mut edge = Edge::new(EdgeType::Custom("imports_symbol".to_string()), *target_symbol_id);
+            edge.metadata
+                .custom
+                .insert("relation".to_string(), json!("imports_symbol"));
+            edge.metadata
+                .custom
+                .insert("raw_import".to_string(), json!(raw_import.clone()));
+            edge.metadata
+                .custom
+                .insert("symbol".to_string(), json!(symbol_name.clone()));
+            if let Some(source_block) = doc.get_block_mut(source_id) {
+                source_block.edges.push(edge);
+            }
+        }
+    }
+
     if input.config.emit_export_edges {
         for (source_path, target_path, symbol_name, raw_import) in pending_reexport_edges {
             let Some(source_id) = file_ids.get(&source_path) else {
@@ -651,7 +687,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             }
         }
 
-        for (source_path, target_path, raw_import) in pending_wildcard_reexport_edges {
+        for (source_path, target_path, raw_import, filter_names) in pending_wildcard_reexport_edges {
             let Some(source_id) = file_ids.get(&source_path) else {
                 continue;
             };
@@ -660,6 +696,9 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             };
 
             for (symbol_name, target_symbol_id) in target_symbols {
+                if !filter_names.is_empty() && !filter_names.contains(symbol_name) {
+                    continue;
+                }
                 let mut edge = Edge::new(EdgeType::Custom("exports".to_string()), *target_symbol_id);
                 edge.metadata
                     .custom
@@ -1930,6 +1969,11 @@ fn apply_python_explicit_exports(analysis: &mut FileAnalysis) {
     }
 
     for import in analysis.imports.iter_mut() {
+        if import.wildcard && !analysis.exported_symbol_names.is_empty() {
+            import.symbols = analysis.exported_symbol_names.iter().cloned().collect();
+            import.reexported = true;
+        }
+
         if import
             .symbols
             .iter()
@@ -3966,6 +4010,106 @@ mod tests {
             "imports_symbol",
             "imports_symbol",
             "symbol:web/helper.ts::helper",
+        ));
+    }
+
+    #[test]
+    fn test_wildcard_imports_and_reexports_expand_to_exported_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("pkg")).unwrap();
+
+        fs::write(
+            dir.path().join("src/helper.rs"),
+            "pub fn a() {}\npub fn b() {}\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "pub mod helper;\npub use helper::*;\n",
+        )
+        .unwrap();
+
+        fs::write(
+            dir.path().join("web/helper.ts"),
+            "export function a() { return 1; }\nexport const b = 2;\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/mod.ts"),
+            "export * from './helper';\n",
+        )
+        .unwrap();
+
+        fs::write(
+            dir.path().join("pkg/helper.py"),
+            "def a():\n    return 1\n\ndef _hidden():\n    return 2\n__all__ = [\"a\"]\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("pkg/__init__.py"),
+            "from .helper import *\n__all__ = [\"a\"]\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "wildcard-semantics".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:src/lib.rs",
+            "imports_symbol",
+            "imports_symbol",
+            "symbol:src/helper.rs::a",
+        ));
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:src/lib.rs",
+            "exports",
+            "reexports",
+            "symbol:src/helper.rs::b",
+        ));
+
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:web/mod.ts",
+            "imports_symbol",
+            "imports_symbol",
+            "symbol:web/helper.ts::a",
+        ));
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:web/mod.ts",
+            "exports",
+            "reexports",
+            "symbol:web/helper.ts::b",
+        ));
+
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:pkg/__init__.py",
+            "imports_symbol",
+            "imports_symbol",
+            "symbol:pkg/helper.py::a",
+        ));
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:pkg/__init__.py",
+            "exports",
+            "reexports",
+            "symbol:pkg/helper.py::a",
+        ));
+        assert!(!file_has_edge_to_symbol(
+            &build.document,
+            "file:pkg/__init__.py",
+            "exports",
+            "reexports",
+            "symbol:pkg/helper.py::_hidden",
         ));
     }
 
