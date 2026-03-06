@@ -4,6 +4,7 @@ members = [
     "crates/ucm-core",
     "crates/ucm-engine",
     "crates/ucl-parser",
+    "crates/ucp-codegraph",
     "crates/ucp-api",
     "crates/ucp-observe",
     "crates/ucp-llm",
@@ -77,6 +78,7 @@ ucl-parser = { path = "crates/ucl-parser", version = "0.1.13" }
 ucp-observe = { path = "crates/ucp-observe", version = "0.1.13" }
 ucp-llm = { path = "crates/ucp-llm", version = "0.1.13" }
 ucp-agent = { path = "crates/ucp-agent", version = "0.1.13" }
+ucp-codegraph = { path = "crates/ucp-codegraph", version = "0.1.13" }
 ucp-api = { path = "crates/ucp-api", version = "0.1.13" }
 ucp-translator-markdown = { path = "crates/translators/markdown", version = "0.1.13" }
 ucp-translator-html = { path = "crates/translators/html", version = "0.1.13" }

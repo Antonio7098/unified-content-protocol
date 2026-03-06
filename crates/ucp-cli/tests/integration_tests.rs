@@ -610,8 +610,10 @@ mod workflow_tests {
             .get("projection")
             .and_then(|v| v.as_str())
             .expect("projection string");
-        assert!(projection.contains("Document structure:"));
-        assert!(projection.contains("Blocks:"));
+        assert!(projection.contains("CodeGraph projection"));
+        assert!(projection.contains("summary: files="));
+        assert!(projection.contains("- file src/lib.rs [rust]"));
+        assert!(projection.contains("function add(a: i32, b: i32) -> i32"));
     }
 }
 
