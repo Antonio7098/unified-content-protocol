@@ -583,27 +583,49 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         }
     }
 
-    for record in &file_analyses {
-        for alias in &record.aliases {
+    let mut unresolved_aliases = file_analyses
+        .iter()
+        .flat_map(|record| {
+            record
+                .aliases
+                .iter()
+                .cloned()
+                .map(|alias| (record.file.clone(), record.language, alias))
+        })
+        .collect::<Vec<_>>();
+
+    while !unresolved_aliases.is_empty() {
+        let mut next_unresolved = Vec::new();
+        let mut made_progress = false;
+
+        for (file, language, alias) in unresolved_aliases {
             let target_ids = resolve_alias_target_ids(
-                &record.file,
-                record.language,
-                alias,
+                &file,
+                language,
+                &alias,
                 &top_level_symbol_ids,
                 &imported_symbol_targets_by_file,
                 &imported_module_targets_by_file,
+                &aliased_symbol_targets_by_file,
             );
             if target_ids.is_empty() {
+                next_unresolved.push((file, language, alias));
                 continue;
             }
 
             aliased_symbol_targets_by_file
-                .entry(record.file.clone())
+                .entry(file)
                 .or_default()
-                .entry(alias.name.clone())
+                .entry(alias.name)
                 .or_default()
                 .extend(target_ids);
+            made_progress = true;
         }
+
+        if !made_progress {
+            break;
+        }
+        unresolved_aliases = next_unresolved;
     }
 
     for targets in aliased_symbol_targets_by_file.values_mut() {
@@ -3063,8 +3085,18 @@ fn resolve_alias_target_ids(
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    aliased_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
 ) -> Vec<BlockId> {
     let mut target_ids = Vec::new();
+
+    if alias.target_expr == alias.target_name {
+        if let Some(alias_ids) = aliased_symbol_targets_by_file
+            .get(source_file)
+            .and_then(|aliases| aliases.get(&alias.target_name))
+        {
+            return alias_ids.clone();
+        }
+    }
 
     if let Some(local_ids) = top_level_symbol_ids.get(&(source_file.to_string(), alias.target_name.clone())) {
         target_ids.extend(local_ids.iter().copied());
@@ -5003,6 +5035,53 @@ mod tests {
         let build = build_code_graph(&CodeGraphBuildInput {
             repository_path: dir.path().to_path_buf(),
             commit_hash: "top-level-aliases".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_alias_chains_resolve_call_sites_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { util } from './util';\nconst first = util;\nconst second = first;\nexport function run() { return second(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .helper import helper\nfirst = helper\nsecond = first\ndef execute():\n    return second()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "alias-chains".to_string(),
             config: CodeGraphExtractorConfig::default(),
         })
         .unwrap();
