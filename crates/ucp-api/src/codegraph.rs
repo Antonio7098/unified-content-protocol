@@ -332,6 +332,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     let mut top_level_symbol_ids: BTreeMap<(String, String), Vec<BlockId>> = BTreeMap::new();
     let mut exported_top_level_symbol_ids: BTreeMap<String, Vec<(String, BlockId)>> =
         BTreeMap::new();
+    let mut default_exported_top_level_symbol_ids: BTreeMap<String, Vec<BlockId>> = BTreeMap::new();
     let mut file_analyses = Vec::new();
     let mut used_symbol_keys: HashSet<String> = HashSet::new();
 
@@ -383,6 +384,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             relationships,
             usages,
             aliases,
+            default_exported_symbol_names,
             diagnostics: analysis_diagnostics,
             ..
         } = analyze_file(&file.relative_path, &source, file.language);
@@ -428,6 +430,12 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                         .entry(file.relative_path.clone())
                         .or_default()
                         .push((symbol.name.clone(), symbol_id));
+                    if default_exported_symbol_names.contains(&symbol.name) {
+                        default_exported_top_level_symbol_ids
+                            .entry(file.relative_path.clone())
+                            .or_default()
+                            .push(symbol_id);
+                    }
                 }
             }
 
@@ -456,6 +464,8 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     }
 
     let known_files: BTreeSet<String> = file_ids.keys().cloned().collect();
+    let mut exported_symbol_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<BlockId>>> =
+        BTreeMap::new();
     let mut imported_symbol_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<BlockId>>> =
         BTreeMap::new();
     let mut imported_module_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<String>>> =
@@ -463,6 +473,8 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     let mut imported_module_paths_by_file: BTreeMap<String, BTreeMap<String, Vec<String>>> =
         BTreeMap::new();
     let mut alias_names_by_scope: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+    let mut alias_records_by_scope: BTreeMap<(String, String), BTreeMap<String, Vec<ExtractedAlias>>> =
+        BTreeMap::new();
     let mut aliased_symbol_targets_by_scope: BTreeMap<(String, String), BTreeMap<String, Vec<BlockId>>> =
         BTreeMap::new();
     let mut pending_reference_edges: BTreeSet<(String, String, String)> = BTreeSet::new();
@@ -475,6 +487,76 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         BTreeSet::new();
     let mut pending_relationship_edges: Vec<(BlockId, BlockId, String, String)> = Vec::new();
     let mut pending_usage_edges: Vec<(BlockId, BlockId, String)> = Vec::new();
+
+    for (file, exports) in &exported_top_level_symbol_ids {
+        let entry = exported_symbol_targets_by_file.entry(file.clone()).or_default();
+        for (name, symbol_id) in exports {
+            entry.entry(name.clone()).or_default().push(*symbol_id);
+        }
+    }
+    for (file, ids) in &default_exported_top_level_symbol_ids {
+        exported_symbol_targets_by_file
+            .entry(file.clone())
+            .or_default()
+            .entry("default".to_string())
+            .or_default()
+            .extend(ids.iter().copied());
+    }
+
+    for targets in exported_symbol_targets_by_file.values_mut() {
+        for ids in targets.values_mut() {
+            let existing = std::mem::take(ids);
+            extend_unique_block_ids(ids, existing);
+        }
+    }
+
+    for _ in 0..=file_analyses.len() {
+        let mut progress = false;
+
+        for record in &file_analyses {
+            for import in &record.imports {
+                if !import.reexported {
+                    continue;
+                }
+
+                let ImportResolution::Resolved(target) = resolve_import(
+                    &record.file,
+                    &record.language,
+                    &import.module,
+                    &known_files,
+                ) else {
+                    continue;
+                };
+
+                let target_exports = exported_symbol_targets_by_file
+                    .get(&target)
+                    .cloned()
+                    .unwrap_or_default();
+                let entry = exported_symbol_targets_by_file.entry(record.file.clone()).or_default();
+
+                if import.wildcard {
+                    for (export_name, ids) in target_exports.clone() {
+                        if export_name == "default" {
+                            continue;
+                        }
+                        let targets = entry.entry(export_name).or_default();
+                        progress |= extend_unique_block_ids(targets, ids.iter().copied());
+                    }
+                }
+
+                for binding in &import.bindings {
+                    if let Some(ids) = target_exports.get(&binding.source_name) {
+                        let targets = entry.entry(binding.local_name.clone()).or_default();
+                        progress |= extend_unique_block_ids(targets, ids.iter().copied());
+                    }
+                }
+            }
+        }
+
+        if !progress {
+            break;
+        }
+    }
 
     for record in &file_analyses {
         for import in &record.imports {
@@ -513,8 +595,9 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                             .entry(record.file.clone())
                             .or_default();
                         for binding in &import.bindings {
-                            if let Some(target_symbol_ids) = top_level_symbol_ids
-                                .get(&(target.clone(), binding.source_name.clone()))
+                            if let Some(target_symbol_ids) = exported_symbol_targets_by_file
+                                .get(&target)
+                                .and_then(|exports| exports.get(&binding.source_name))
                             {
                                 entry
                                     .entry(binding.local_name.clone())
@@ -605,10 +688,17 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
 
     for record in &file_analyses {
         for alias in &record.aliases {
+            let scope_key = alias_scope_key(alias.owner_identity.as_deref());
             alias_names_by_scope
-                .entry((record.file.clone(), alias_scope_key(alias.owner_identity.as_deref())))
+                .entry((record.file.clone(), scope_key.clone()))
                 .or_default()
                 .insert(alias.name.clone());
+            alias_records_by_scope
+                .entry((record.file.clone(), scope_key))
+                .or_default()
+                .entry(alias.name.clone())
+                .or_default()
+                .push(alias.clone());
         }
     }
 
@@ -721,6 +811,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 &imported_module_targets_by_file,
                 &imported_module_paths_by_file,
                 &alias_names_by_scope,
+                &alias_records_by_scope,
                 &aliased_symbol_targets_by_scope,
                 &known_files,
             ) {
@@ -1327,6 +1418,7 @@ struct FileAnalysis {
     usages: Vec<ExtractedUsage>,
     aliases: Vec<ExtractedAlias>,
     exported_symbol_names: BTreeSet<String>,
+    default_exported_symbol_names: BTreeSet<String>,
     diagnostics: Vec<CodeGraphDiagnostic>,
 }
 
@@ -1660,7 +1752,7 @@ fn analyze_file(path: &str, source: &str, language: CodeLanguage) -> FileAnalysi
 
     match language {
         CodeLanguage::Rust => analyze_rust_tree(source, root, &mut analysis),
-        CodeLanguage::Python => analyze_python_tree(source, root, &mut analysis),
+        CodeLanguage::Python => analyze_python_tree(path, source, root, &mut analysis),
         CodeLanguage::TypeScript | CodeLanguage::JavaScript => {
             analyze_ts_tree(source, root, &mut analysis)
         }
@@ -1686,6 +1778,10 @@ fn language_for(language: CodeLanguage) -> Language {
         CodeLanguage::TypeScript => tree_sitter_typescript::language_typescript(),
         CodeLanguage::JavaScript => tree_sitter_javascript::language(),
     }
+}
+
+fn is_python_package_init(path: &str) -> bool {
+    path == "__init__.py" || path.ends_with("/__init__.py")
 }
 
 fn analyze_rust_tree(source: &str, root: Node<'_>, analysis: &mut FileAnalysis) {
@@ -1985,13 +2081,19 @@ fn rust_last_path_segment(path: &str) -> Option<String> {
     }
 }
 
-fn analyze_python_tree(source: &str, root: Node<'_>, analysis: &mut FileAnalysis) {
+fn analyze_python_tree(path: &str, source: &str, root: Node<'_>, analysis: &mut FileAnalysis) {
     let mut cursor = root.walk();
     for node in root.named_children(&mut cursor) {
         analyze_python_node(source, node, analysis, &[], None);
     }
 
     apply_python_explicit_exports(analysis);
+
+    if is_python_package_init(path) {
+        for import in &mut analysis.imports {
+            import.reexported = true;
+        }
+    }
 }
 
 fn analyze_python_node(
@@ -2499,6 +2601,9 @@ fn analyze_ts_node(
                 analysis.imports.push(import);
             }
             collect_ts_local_export_names(node, source, &mut analysis.exported_symbol_names);
+            analysis
+                .default_exported_symbol_names
+                .extend(ts_default_export_names_from_text(node_text(source, node)));
 
             let mut cursor = node.walk();
             for child in node.named_children(&mut cursor) {
@@ -2773,6 +2878,21 @@ fn ts_import_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
     let mut stack = vec![node];
 
     while let Some(current) = stack.pop() {
+        if current.kind() == "import_clause" {
+            let mut cursor = current.walk();
+            for child in current.named_children(&mut cursor) {
+                if child.kind() == "identifier" {
+                    let local_name = node_text(source, child).trim().to_string();
+                    if !local_name.is_empty() {
+                        bindings.push(ImportBinding::new("default", local_name));
+                    }
+                } else {
+                    stack.push(child);
+                }
+            }
+            continue;
+        }
+
         if current.kind() == "import_specifier" {
             if let Some(name_node) = current.child_by_field_name("name") {
                 let source_name = node_text(source, name_node).trim().to_string();
@@ -2991,6 +3111,39 @@ fn ts_local_export_names_from_text(text: &str) -> Vec<String> {
     }
 
     names
+}
+
+fn ts_default_export_names_from_text(text: &str) -> Vec<String> {
+    let trimmed = text.trim().trim_end_matches(';').trim();
+    let Some(rest) = trimmed.strip_prefix("export default ") else {
+        return Vec::new();
+    };
+    let rest = rest.trim();
+
+    let candidate = if let Some(rest) = rest.strip_prefix("async function ") {
+        leading_js_identifier(rest)
+    } else if let Some(rest) = rest.strip_prefix("function ") {
+        leading_js_identifier(rest)
+    } else if let Some(rest) = rest.strip_prefix("class ") {
+        leading_js_identifier(rest)
+    } else {
+        leading_js_identifier(rest)
+    };
+
+    candidate.into_iter().collect()
+}
+
+fn extend_unique_block_ids<I>(target: &mut Vec<BlockId>, ids: I) -> bool
+where
+    I: IntoIterator<Item = BlockId>,
+{
+    let before = target.len();
+    for id in ids {
+        if !target.contains(&id) {
+            target.push(id);
+        }
+    }
+    target.len() != before
 }
 
 fn leading_js_identifier(text: &str) -> Option<String> {
@@ -3313,6 +3466,7 @@ fn resolve_usage_target_ids(
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
     imported_module_paths_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
     alias_names_by_scope: &BTreeMap<(String, String), BTreeSet<String>>,
+    alias_records_by_scope: &BTreeMap<(String, String), BTreeMap<String, Vec<ExtractedAlias>>>,
     aliased_symbol_targets_by_scope: &BTreeMap<(String, String), BTreeMap<String, Vec<BlockId>>>,
     known_files: &BTreeSet<String>,
 ) -> Vec<BlockId> {
@@ -3360,14 +3514,17 @@ fn resolve_usage_target_ids(
     }
 
     if let Some((module_alias, member_name)) = member_usage_parts(&usage.target_expr) {
-        if let Some(target_files) = imported_module_targets_by_file
-            .get(source_file)
-            .and_then(|aliases| aliases.get(&module_alias))
-        {
-            for target_file in target_files {
-                if let Some(ids) = top_level_symbol_ids.get(&(target_file.clone(), member_name.clone())) {
-                    target_ids.extend(ids.iter().copied());
-                }
+        let target_files = resolve_module_alias_target_files(
+            source_file,
+            Some(&usage.source_identity),
+            &module_alias,
+            imported_module_targets_by_file,
+            alias_names_by_scope,
+            alias_records_by_scope,
+        );
+        for target_file in target_files {
+            if let Some(ids) = top_level_symbol_ids.get(&(target_file, member_name.clone())) {
+                target_ids.extend(ids.iter().copied());
             }
         }
     }
@@ -3428,6 +3585,88 @@ fn member_usage_parts(text: &str) -> Option<(String, String)> {
     } else {
         Some((left.to_string(), right.to_string()))
     }
+}
+
+fn resolve_module_alias_target_files(
+    source_file: &str,
+    owner_identity: Option<&str>,
+    alias_name: &str,
+    imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    alias_names_by_scope: &BTreeMap<(String, String), BTreeSet<String>>,
+    alias_records_by_scope: &BTreeMap<(String, String), BTreeMap<String, Vec<ExtractedAlias>>>,
+) -> Vec<String> {
+    let mut visited = BTreeSet::new();
+    resolve_module_alias_target_files_recursive(
+        source_file,
+        owner_identity,
+        alias_name,
+        imported_module_targets_by_file,
+        alias_names_by_scope,
+        alias_records_by_scope,
+        &mut visited,
+    )
+}
+
+fn resolve_module_alias_target_files_recursive(
+    source_file: &str,
+    owner_identity: Option<&str>,
+    alias_name: &str,
+    imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    alias_names_by_scope: &BTreeMap<(String, String), BTreeSet<String>>,
+    alias_records_by_scope: &BTreeMap<(String, String), BTreeMap<String, Vec<ExtractedAlias>>>,
+    visited: &mut BTreeSet<(String, String, String)>,
+) -> Vec<String> {
+    let visit_key = (
+        source_file.to_string(),
+        alias_scope_key(owner_identity),
+        alias_name.to_string(),
+    );
+    if !visited.insert(visit_key) {
+        return Vec::new();
+    }
+
+    if let Some(target_files) = imported_module_targets_by_file
+        .get(source_file)
+        .and_then(|aliases| aliases.get(alias_name))
+    {
+        return target_files.clone();
+    }
+
+    for scope_key in [alias_scope_key(owner_identity), alias_scope_key(None)] {
+        let scope_identity = (source_file.to_string(), scope_key.clone());
+        if let Some(alias_entries) = alias_records_by_scope
+            .get(&scope_identity)
+            .and_then(|aliases| aliases.get(alias_name))
+        {
+            if alias_entries.len() != 1 {
+                return Vec::new();
+            }
+            let alias = &alias_entries[0];
+            if alias.target_expr != alias.target_name || alias.target_expr.is_empty() {
+                return Vec::new();
+            }
+            return resolve_module_alias_target_files_recursive(
+                source_file,
+                alias.owner_identity.as_deref(),
+                &alias.target_name,
+                imported_module_targets_by_file,
+                alias_names_by_scope,
+                alias_records_by_scope,
+                visited,
+            );
+        }
+        if alias_names_by_scope
+            .get(&scope_identity)
+            .is_some_and(|aliases| aliases.contains(alias_name))
+        {
+            return Vec::new();
+        }
+        if scope_key.is_empty() {
+            break;
+        }
+    }
+
+    Vec::new()
 }
 
 fn rust_alias_path_parts(text: &str) -> Option<(String, String)> {
@@ -5203,6 +5442,301 @@ mod tests {
     }
 
     #[test]
+    fn test_ts_namespace_and_module_alias_member_constructors_resolve_to_class_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+
+        fs::write(dir.path().join("web/thing.ts"), "export class Thing {}\n").unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as ns from './thing';\nexport function direct() { return new ns.Thing(); }\nconst alias = ns;\nexport function top() { return new alias.Thing(); }\nexport function local() { const first = ns; const second = first; return new second.Thing(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "ts-namespace-member-constructors".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::direct",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/thing.ts::Thing",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::top",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/thing.ts::Thing",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::local",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/thing.ts::Thing",
+        ));
+    }
+
+    #[test]
+    fn test_ts_default_import_calls_and_constructors_resolve_to_default_export_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export default function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/thing.ts"),
+            "export default class Thing {}\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import util from './util';\nimport { default as util_spec } from './util';\nimport Thing from './thing';\nconst first = util;\nconst second = first;\nconst third = util_spec;\nconst Alias = Thing;\nexport function run() { return second(); }\nexport function run_spec() { return third(); }\nexport function make() { return new Alias(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "ts-default-import-calls-and-constructors".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run_spec",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::make",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/thing.ts::Thing",
+        ));
+    }
+
+    #[test]
+    fn test_ts_default_import_shadowing_does_not_fall_back_and_anonymous_defaults_stay_unresolved() {
+        let shadow_dir = tempdir().unwrap();
+        fs::create_dir_all(shadow_dir.path().join("web")).unwrap();
+
+        fs::write(
+            shadow_dir.path().join("web/util.ts"),
+            "export default function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            shadow_dir.path().join("web/main.ts"),
+            "import util from './util';\nexport function missing_case() { const util = missing; return util(); }\nexport function expr_case() { const util = true ? missing : util; return util(); }\n",
+        )
+        .unwrap();
+
+        let shadow_build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: shadow_dir.path().to_path_buf(),
+            commit_hash: "ts-default-import-shadowing".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!symbol_has_edge_to_symbol(
+            &shadow_build.document,
+            "symbol:web/main.ts::missing_case",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &shadow_build.document,
+            "symbol:web/main.ts::expr_case",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+
+        let anon_dir = tempdir().unwrap();
+        fs::create_dir_all(anon_dir.path().join("web")).unwrap();
+        fs::write(
+            anon_dir.path().join("web/util.ts"),
+            "export default function() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            anon_dir.path().join("web/main.ts"),
+            "import util from './util';\nexport function run() { return util(); }\n",
+        )
+        .unwrap();
+
+        let anon_build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: anon_dir.path().to_path_buf(),
+            commit_hash: "ts-anonymous-default-import".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!symbol_has_edge_to_symbol(
+            &anon_build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+    }
+
+    #[test]
+    fn test_ts_reexported_calls_and_constructors_resolve_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export default function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/thing.ts"),
+            "export default class Thing {}\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/index.ts"),
+            "export { default as util } from './util';\nexport { default as Thing } from './thing';\nexport * from './util';\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/index2.ts"),
+            "export { util as util_chain } from './index';\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/default_index.ts"),
+            "export * from './util';\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { util, Thing } from './index';\nimport { util as util_wildcard } from './index';\nimport { util_chain } from './index2';\nimport util_default from './default_index';\nconst alias = util_chain;\nexport function run() { return util(); }\nexport function run_wildcard() { return util_wildcard(); }\nexport function run_chain() { return alias(); }\nexport function run_default_excluded() { return util_default(); }\nexport function make() { return new Thing(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "ts-reexported-calls-and-constructors".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run_wildcard",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run_chain",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run_default_excluded",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::make",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/thing.ts::Thing",
+        ));
+    }
+
+    #[test]
+    fn test_python_package_reexported_calls_resolve_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("py/pkg")).unwrap();
+        fs::create_dir_all(dir.path().join("py/pkg_wild")).unwrap();
+
+        fs::write(
+            dir.path().join("py/pkg/helper.py"),
+            "def helper():\n    return 1\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/pkg/__init__.py"),
+            "from .helper import helper\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/pkg_wild/helper.py"),
+            "def helper():\n    return 1\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/pkg_wild/__init__.py"),
+            "from .helper import *\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .pkg import helper\nfrom .pkg import helper as alias\nfrom .pkg_wild import helper as wild_helper\ndef run_pkg():\n    helper()\n    return alias()\ndef run_pkg_wild():\n    return wild_helper()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "python-package-reexported-calls".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::run_pkg",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/pkg/helper.py::helper",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::run_pkg_wild",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/pkg_wild/helper.py::helper",
+        ));
+    }
+
+    #[test]
     fn test_rust_import_aliases_and_nested_paths_resolve_to_symbols() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src/nested")).unwrap();
@@ -5614,6 +6148,114 @@ mod tests {
         assert!(symbol_has_edge_to_symbol(
             &build.document,
             "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_top_level_module_aliases_resolve_member_call_sites_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as ns from './util';\nconst alias = ns;\nexport function run() { return alias.util(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from . import helper as helper_mod\nalias = helper_mod\ndef execute():\n    return alias.helper()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "top-level-module-aliases".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_unresolved_or_unsupported_module_alias_shadowing_does_not_fall_back() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as ns from './util';\nconst alias = ns;\nexport function missing_case() { const alias = missing; return alias.util(); }\nexport function expr_case() { const alias = true ? ns : ns; return alias.util(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from . import helper as helper_mod\nalias = helper_mod\ndef missing_case():\n    alias = missing\n    return alias.helper()\ndef expr_case():\n    alias = helper_mod if True else helper_mod\n    return alias.helper()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "module-alias-shadowing-no-fallback".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::missing_case",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::expr_case",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::missing_case",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::expr_case",
             "uses_symbol",
             "uses_symbol",
             "symbol:py/helper.py::helper",
@@ -6077,6 +6719,114 @@ mod tests {
         assert!(symbol_has_edge_to_symbol(
             &build.document,
             "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_function_local_module_alias_chains_resolve_member_call_sites_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as ns from './util';\nexport function run() { const first = ns; const second = first; return second.util(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from . import helper as helper_mod\ndef execute():\n    first = helper_mod\n    second = first\n    return second.helper()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "function-local-module-alias-chains".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_function_local_module_aliases_are_isolated_to_their_own_enclosing_symbol() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as ns from './util';\nexport function first() { const alias = ns; return alias.util(); }\nexport function second() { return ns.util(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from . import helper as helper_mod\ndef first():\n    alias = helper_mod\n    return alias.helper()\ndef second():\n    return helper_mod.helper()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "function-local-module-alias-isolation".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::first",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::second",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::first",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::second",
             "uses_symbol",
             "uses_symbol",
             "symbol:py/helper.py::helper",
