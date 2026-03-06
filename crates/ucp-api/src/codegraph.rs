@@ -21,12 +21,10 @@ pub const CODEGRAPH_EXTRACTOR_VERSION: &str = "ucp-codegraph-extractor.v1";
 
 const META_NODE_CLASS: &str = "node_class";
 const META_LOGICAL_KEY: &str = "logical_key";
-const META_PATH: &str = "path";
+const META_CODEREF: &str = "coderef";
 const META_LANGUAGE: &str = "language";
 const META_SYMBOL_KIND: &str = "symbol_kind";
 const META_SYMBOL_NAME: &str = "name";
-const META_SPAN: &str = "span";
-const META_LINE_RANGE: &str = "line_range";
 const META_EXPORTED: &str = "exported";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1396,6 +1394,7 @@ struct ExtractedSymbol {
     parent_identity: Option<String>,
     kind: String,
     description: Option<String>,
+    modifiers: ExtractedModifiers,
     inputs: Vec<ExtractedInput>,
     output: Option<String>,
     type_info: Option<String>,
@@ -1418,6 +1417,28 @@ struct ExtractedSignature {
     inputs: Vec<ExtractedInput>,
     output: Option<String>,
     type_info: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+struct ExtractedModifiers {
+    #[serde(rename = "async", skip_serializing_if = "is_false")]
+    is_async: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    generator: bool,
+    #[serde(rename = "static", skip_serializing_if = "is_false")]
+    is_static: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    visibility: Option<String>,
+}
+
+impl ExtractedModifiers {
+    fn is_empty(&self) -> bool {
+        !self.is_async && !self.generator && !self.is_static && self.visibility.is_none()
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone)]
@@ -1646,12 +1667,13 @@ fn initialize_document_metadata(
 }
 
 fn make_repository_block(repo_name: &str, commit_hash: &str) -> Block {
+    let coderef = json!({
+        "path": ".",
+        "display": repo_name,
+    });
     let mut block = Block::new(
         Content::json(json!({
-            "coderef": {
-                "path": ".",
-                "display": repo_name,
-            },
+            "coderef": coderef.clone(),
             "name": repo_name,
             "commit": commit_hash,
         })),
@@ -1667,15 +1689,20 @@ fn make_repository_block(repo_name: &str, commit_hash: &str) -> Block {
         json!(format!("repository:{}", repo_name)),
     );
     block
+        .metadata
+        .custom
+        .insert(META_CODEREF.to_string(), coderef);
+    block
 }
 
 fn make_directory_block(path: &str) -> Block {
+    let coderef = json!({
+        "path": path,
+        "display": path,
+    });
     let mut block = Block::new(
         Content::json(json!({
-            "coderef": {
-                "path": path,
-                "display": path,
-            },
+            "coderef": coderef.clone(),
         })),
         Some("custom.directory"),
     );
@@ -1687,7 +1714,7 @@ fn make_directory_block(path: &str) -> Block {
     block
         .metadata
         .custom
-        .insert(META_PATH.to_string(), json!(path));
+        .insert(META_CODEREF.to_string(), coderef);
     block.metadata.custom.insert(
         META_LOGICAL_KEY.to_string(),
         json!(format!("directory:{}", path)),
@@ -1696,14 +1723,12 @@ fn make_directory_block(path: &str) -> Block {
 }
 
 fn make_file_block(path: &str, language: &str, description: Option<&str>) -> Block {
+    let coderef = json!({
+        "path": path,
+        "display": path,
+    });
     let mut content = serde_json::Map::new();
-    content.insert(
-        "coderef".to_string(),
-        json!({
-            "path": path,
-            "display": path,
-        }),
-    );
+    content.insert("coderef".to_string(), coderef.clone());
     content.insert("language".to_string(), json!(language));
     if let Some(description) = description {
         content.insert("description".to_string(), json!(description));
@@ -1722,7 +1747,7 @@ fn make_file_block(path: &str, language: &str, description: Option<&str>) -> Blo
     block
         .metadata
         .custom
-        .insert(META_PATH.to_string(), json!(path));
+        .insert(META_CODEREF.to_string(), coderef);
     block
         .metadata
         .custom
@@ -1741,12 +1766,6 @@ fn make_symbol_block(
     symbol: &ExtractedSymbol,
 ) -> Block {
     let line_range = format_line_range(symbol.start_line, symbol.end_line);
-    let span = json!({
-        "start_line": symbol.start_line,
-        "start_col": symbol.start_col,
-        "end_line": symbol.end_line,
-        "end_col": symbol.end_col,
-    });
     let coderef = json!({
         "path": path,
         "start_line": symbol.start_line,
@@ -1759,10 +1778,13 @@ fn make_symbol_block(
     let mut content = serde_json::Map::new();
     content.insert("name".to_string(), json!(symbol.name));
     content.insert("kind".to_string(), json!(symbol.kind));
-    content.insert("coderef".to_string(), coderef);
+    content.insert("coderef".to_string(), coderef.clone());
     content.insert("exported".to_string(), json!(symbol.exported));
     if let Some(description) = &symbol.description {
         content.insert("description".to_string(), json!(description));
+    }
+    if !symbol.modifiers.is_empty() {
+        content.insert("modifiers".to_string(), json!(symbol.modifiers));
     }
     if !symbol.inputs.is_empty() {
         content.insert("inputs".to_string(), json!(symbol.inputs));
@@ -1792,7 +1814,7 @@ fn make_symbol_block(
     block
         .metadata
         .custom
-        .insert(META_PATH.to_string(), json!(path));
+        .insert(META_CODEREF.to_string(), coderef);
     block
         .metadata
         .custom
@@ -1805,11 +1827,6 @@ fn make_symbol_block(
         .metadata
         .custom
         .insert(META_SYMBOL_NAME.to_string(), json!(symbol.name));
-    block.metadata.custom.insert(META_SPAN.to_string(), span);
-    block
-        .metadata
-        .custom
-        .insert(META_LINE_RANGE.to_string(), json!(line_range));
     block
         .metadata
         .custom
@@ -3679,6 +3696,147 @@ fn extract_symbol_signature(
     }
 }
 
+fn extract_symbol_modifiers(
+    source: &str,
+    language: CodeLanguage,
+    node: Node<'_>,
+    kind: &str,
+) -> ExtractedModifiers {
+    match language {
+        CodeLanguage::Rust => extract_rust_symbol_modifiers(node_text(source, node), node.kind()),
+        CodeLanguage::Python => extract_python_symbol_modifiers(source, node, node.kind()),
+        CodeLanguage::TypeScript | CodeLanguage::JavaScript => {
+            extract_ts_js_symbol_modifiers(source, node, kind)
+        }
+    }
+}
+
+fn extract_rust_symbol_modifiers(raw: &str, node_kind: &str) -> ExtractedModifiers {
+    let header = take_until_top_level(raw, &['{', ';']).trim();
+    ExtractedModifiers {
+        is_async: node_kind == "function_item" && has_modifier_token(header, "async"),
+        visibility: rust_visibility(header),
+        ..Default::default()
+    }
+}
+
+fn extract_python_symbol_modifiers(source: &str, node: Node<'_>, node_kind: &str) -> ExtractedModifiers {
+    let raw = node_text(source, node);
+    ExtractedModifiers {
+        is_async: node_kind == "async_function_definition"
+            || take_until_top_level(raw, &[':']).trim_start().starts_with("async def "),
+        is_static: has_python_decorator(source, node, "staticmethod"),
+        ..Default::default()
+    }
+}
+
+fn has_python_decorator(source: &str, node: Node<'_>, decorator: &str) -> bool {
+    let lines: Vec<&str> = source.lines().collect();
+    let start_line = node.start_position().row;
+    let decorator_line = format!("@{}", decorator);
+    let mut index = start_line;
+    while index > 0 {
+        index -= 1;
+        let line = lines.get(index).copied().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line == decorator_line {
+            return true;
+        }
+        if line.starts_with('@') {
+            continue;
+        }
+        break;
+    }
+    false
+}
+
+fn extract_ts_js_symbol_modifiers(source: &str, node: Node<'_>, kind: &str) -> ExtractedModifiers {
+    let raw = node_text(source, node);
+    let header = take_until_top_level(raw, &['{', ';']).trim();
+    let target_header = if node.kind() == "variable_declarator" {
+        node.child_by_field_name("value")
+            .map(|value| take_until_top_level(node_text(source, value), &['{', ';']).trim().to_string())
+            .unwrap_or_else(|| header.to_string())
+    } else {
+        header.to_string()
+    };
+
+    let generator = matches!(node.kind(), "generator_function_declaration" | "generator_function")
+        || target_header.starts_with("function*")
+        || target_header.starts_with("async function*")
+        || first_non_modifier_fragment(header)
+            .map(|fragment| fragment.starts_with('*'))
+            .unwrap_or(false);
+
+    ExtractedModifiers {
+        is_async: matches!(kind, "function" | "method")
+            && (has_modifier_token(header, "async") || has_modifier_token(&target_header, "async")),
+        generator,
+        is_static: has_modifier_token(header, "static"),
+        visibility: extract_ts_js_visibility(header),
+    }
+}
+
+fn rust_visibility(header: &str) -> Option<String> {
+    let trimmed = header.trim_start();
+    if trimmed.starts_with("pub(") {
+        Some("restricted".to_string())
+    } else if trimmed.starts_with("pub ") || trimmed == "pub" {
+        Some("public".to_string())
+    } else {
+        None
+    }
+}
+
+fn extract_ts_js_visibility(header: &str) -> Option<String> {
+    ["public", "private", "protected"]
+        .into_iter()
+        .find(|candidate| has_modifier_token(header, candidate))
+        .map(|value| value.to_string())
+}
+
+fn has_modifier_token(header: &str, target: &str) -> bool {
+    header
+        .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
+        .any(|token| token == target)
+}
+
+fn first_non_modifier_fragment(header: &str) -> Option<&str> {
+    let mut rest = header.trim_start();
+    loop {
+        let next = strip_modifier_prefix(rest, "export")
+            .or_else(|| strip_modifier_prefix(rest, "default"))
+            .or_else(|| strip_modifier_prefix(rest, "declare"))
+            .or_else(|| strip_modifier_prefix(rest, "abstract"))
+            .or_else(|| strip_modifier_prefix(rest, "public"))
+            .or_else(|| strip_modifier_prefix(rest, "private"))
+            .or_else(|| strip_modifier_prefix(rest, "protected"))
+            .or_else(|| strip_modifier_prefix(rest, "readonly"))
+            .or_else(|| strip_modifier_prefix(rest, "static"))
+            .or_else(|| strip_modifier_prefix(rest, "async"));
+        match next {
+            Some(value) => rest = value,
+            None => break,
+        }
+    }
+
+    if rest.is_empty() {
+        None
+    } else {
+        Some(rest)
+    }
+}
+
+fn strip_modifier_prefix<'a>(value: &'a str, token: &str) -> Option<&'a str> {
+    let rest = value.strip_prefix(token)?;
+    match rest.chars().next() {
+        Some(ch) if ch.is_whitespace() => Some(rest.trim_start()),
+        _ => None,
+    }
+}
+
 fn extract_rust_symbol_signature(raw: &str, node_kind: &str, name: &str) -> ExtractedSignature {
     let header = take_until_top_level(raw, &['{', ';']);
     match node_kind {
@@ -4403,6 +4561,7 @@ fn make_extracted_symbol(
     let qualified_name = qualify_symbol_name(scope, &name);
     let (start_line, start_col, end_line, end_col) = node_span(node);
     let signature = extract_symbol_signature(source, language, node, kind, &name);
+    let modifiers = extract_symbol_modifiers(source, language, node, kind);
 
     ExtractedSymbol {
         name,
@@ -4411,6 +4570,7 @@ fn make_extracted_symbol(
         parent_identity: parent_identity.map(|s| s.to_string()),
         kind: kind.to_string(),
         description: extract_symbol_description(source, language, node),
+        modifiers,
         inputs: signature.inputs,
         output: signature.output,
         type_info: signature.type_info,
@@ -5328,7 +5488,8 @@ fn block_path(block: &Block) -> Option<String> {
     block
         .metadata
         .custom
-        .get(META_PATH)
+        .get(META_CODEREF)
+        .and_then(|v| v.get("path"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
 }
@@ -5360,16 +5521,15 @@ fn validate_required_metadata(
     diagnostics: &mut Vec<CodeGraphDiagnostic>,
 ) {
     let required = match class_name {
-        "repository" => vec![META_LOGICAL_KEY],
-        "directory" => vec![META_LOGICAL_KEY, META_PATH],
-        "file" => vec![META_LOGICAL_KEY, META_PATH, META_LANGUAGE],
+        "repository" => vec![META_LOGICAL_KEY, META_CODEREF],
+        "directory" => vec![META_LOGICAL_KEY, META_CODEREF],
+        "file" => vec![META_LOGICAL_KEY, META_CODEREF, META_LANGUAGE],
         "symbol" => vec![
             META_LOGICAL_KEY,
-            META_PATH,
+            META_CODEREF,
             META_LANGUAGE,
             META_SYMBOL_KIND,
             META_SYMBOL_NAME,
-            META_SPAN,
             META_EXPORTED,
         ],
         _ => {
@@ -5990,11 +6150,16 @@ mod tests {
         symbol_content_json_field(doc, prefix, field)?.get(subfield).cloned()
     }
 
-    fn symbol_line_range(doc: &Document, prefix: &str) -> Option<String> {
-        symbol_block_by_prefix(doc, prefix)
-            .and_then(|block| block.metadata.custom.get(META_LINE_RANGE))
-            .and_then(|value| value.as_str())
-            .map(|value| value.to_string())
+    fn block_metadata_custom_field(block: &Block, field: &str) -> Option<serde_json::Value> {
+        block.metadata.custom.get(field).cloned()
+    }
+
+    fn block_metadata_custom_subfield(
+        block: &Block,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        block_metadata_custom_field(block, field)?.get(subfield).cloned()
     }
 
     fn repository_block(doc: &Document) -> Option<&Block> {
@@ -6017,6 +6182,14 @@ mod tests {
         subfield: &str,
     ) -> Option<serde_json::Value> {
         repository_content_json_field(doc, field)?.get(subfield).cloned()
+    }
+
+    fn repository_metadata_custom_subfield(
+        doc: &Document,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        block_metadata_custom_subfield(repository_block(doc)?, field, subfield)
     }
 
     fn directory_block_by_key<'a>(doc: &'a Document, logical_key: &str) -> Option<&'a Block> {
@@ -6047,6 +6220,15 @@ mod tests {
         directory_content_json_field(doc, logical_key, field)?.get(subfield).cloned()
     }
 
+    fn directory_metadata_custom_subfield(
+        doc: &Document,
+        logical_key: &str,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        block_metadata_custom_subfield(directory_block_by_key(doc, logical_key)?, field, subfield)
+    }
+
     fn file_content_json_field(
         doc: &Document,
         logical_key: &str,
@@ -6066,6 +6248,32 @@ mod tests {
         subfield: &str,
     ) -> Option<serde_json::Value> {
         file_content_json_field(doc, logical_key, field)?.get(subfield).cloned()
+    }
+
+    fn file_metadata_custom_subfield(
+        doc: &Document,
+        logical_key: &str,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        block_metadata_custom_subfield(file_block_by_key(doc, logical_key)?, field, subfield)
+    }
+
+    fn symbol_metadata_custom_subfield(
+        doc: &Document,
+        prefix: &str,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        block_metadata_custom_subfield(symbol_block_by_prefix(doc, prefix)?, field, subfield)
+    }
+
+    fn symbol_metadata_custom_field(
+        doc: &Document,
+        prefix: &str,
+        field: &str,
+    ) -> Option<serde_json::Value> {
+        block_metadata_custom_field(symbol_block_by_prefix(doc, prefix)?, field)
     }
 
     fn file_block_by_key<'a>(doc: &'a Document, logical_key: &str) -> Option<&'a Block> {
@@ -8584,22 +8792,22 @@ mod tests {
 
         fs::write(
             dir.path().join("src/lib.rs"),
-            "//! Rust module summary\n\n/// Rust helper description.\npub fn helper(value: i32) -> i32 { value }\n/// Rust thing description.\npub trait Thing: Send + Sync {}\n",
+            "//! Rust module summary\n\n/// Rust helper description.\npub async fn helper(value: i32) -> i32 { value }\n/// Rust thing description.\npub trait Thing: Send + Sync {}\n",
         )
         .unwrap();
         fs::write(
             dir.path().join("py/mod.py"),
-            "\"\"\"Python module summary.\"\"\"\nfrom typing import Protocol, runtime_checkable\n\ndef helper(value: int) -> int:\n    \"\"\"Python helper description.\"\"\"\n    return value\n\n@runtime_checkable\nclass Thing(Protocol):\n    \"\"\"Python thing description.\"\"\"\n\n    async def generate_answer(self, question: str) -> str:\n        \"\"\"Generate an answer.\"\"\"\n        return question\n",
+            "\"\"\"Python module summary.\"\"\"\nfrom typing import Protocol, runtime_checkable\n\ndef helper(value: int) -> int:\n    \"\"\"Python helper description.\"\"\"\n    return value\n\n@runtime_checkable\nclass Thing(Protocol):\n    \"\"\"Python thing description.\"\"\"\n    async def generate_answer(self, question: str) -> str:\n        \"\"\"Generate an answer.\"\"\"\n        return question\n\n    @staticmethod\n    def normalize(value: str) -> str:\n        return value\n",
         )
         .unwrap();
         fs::write(
             dir.path().join("web/mod.ts"),
-            "/** TS module summary */\n/** TS helper description. */\nexport function helper(value: number, label: string): number { return value; }\n/** TS thing description. */\nexport class Thing extends Base implements Named {}\n",
+            "/** TS module summary */\n/** TS helper description. */\nexport async function helper(value: number, label: string): Promise<number> { return value; }\n/** TS thing description. */\nexport class Thing extends Base implements Named { public static make(value: number): Thing { return new Thing(); } }\n",
         )
         .unwrap();
         fs::write(
             dir.path().join("web/mod.js"),
-            "/** JS helper description. */\nfunction helper(value, label = 'x') { return 1; }\nmodule.exports = { helper };\n",
+            "/** JS helper description. */\nfunction* helper(value, label = 'x') { yield value; }\nmodule.exports = { helper };\n",
         )
         .unwrap();
 
@@ -8619,6 +8827,10 @@ mod tests {
             Some(json!(repo_name))
         );
         assert_eq!(
+            repository_metadata_custom_subfield(&build.document, META_CODEREF, "path"),
+            Some(json!("."))
+        );
+        assert_eq!(
             directory_content_json_subfield(&build.document, "directory:src", "coderef", "path"),
             Some(json!("src"))
         );
@@ -8629,6 +8841,10 @@ mod tests {
         assert_eq!(
             directory_content_json_field(&build.document, "directory:src", "path"),
             None
+        );
+        assert_eq!(
+            directory_metadata_custom_subfield(&build.document, "directory:src", META_CODEREF, "path"),
+            Some(json!("src"))
         );
         assert_eq!(
             file_summary(&build.document, "file:src/lib.rs").as_deref(),
@@ -8645,6 +8861,10 @@ mod tests {
         assert_eq!(
             file_content_json_field(&build.document, "file:src/lib.rs", "path"),
             None
+        );
+        assert_eq!(
+            file_metadata_custom_subfield(&build.document, "file:src/lib.rs", META_CODEREF, "display"),
+            Some(json!("src/lib.rs"))
         );
         assert_eq!(
             file_summary(&build.document, "file:py/mod.py").as_deref(),
@@ -8690,6 +8910,10 @@ mod tests {
             Some(json!("src/lib.rs#L4"))
         );
         assert_eq!(
+            symbol_metadata_custom_subfield(&build.document, "symbol:src/lib.rs::helper", META_CODEREF, "display"),
+            Some(json!("src/lib.rs#L4"))
+        );
+        assert_eq!(
             symbol_content_json_subfield(&build.document, "symbol:src/lib.rs::helper", "coderef", "start_line"),
             Some(json!(4))
         );
@@ -8710,13 +8934,17 @@ mod tests {
             None
         );
         assert_eq!(
+            symbol_metadata_custom_field(&build.document, "symbol:src/lib.rs::helper", "path"),
+            None
+        );
+        assert_eq!(
             symbol_content_string_field(&build.document, "symbol:src/lib.rs::helper", "output")
                 .as_deref(),
             Some("i32")
         );
         assert_eq!(
-            symbol_line_range(&build.document, "symbol:src/lib.rs::helper").as_deref(),
-            Some("L4")
+            symbol_content_json_field(&build.document, "symbol:src/lib.rs::helper", "modifiers"),
+            Some(json!({"async": true, "visibility": "public"}))
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:src/lib.rs::Thing").as_deref(),
@@ -8749,8 +8977,8 @@ mod tests {
             Some("int")
         );
         assert_eq!(
-            symbol_line_range(&build.document, "symbol:py/mod.py::helper").as_deref(),
-            Some("L4-L6")
+            symbol_content_json_field(&build.document, "symbol:py/mod.py::helper", "modifiers"),
+            None
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:py/mod.py::Thing").as_deref(),
@@ -8786,6 +9014,18 @@ mod tests {
             Some("str")
         );
         assert_eq!(
+            symbol_content_json_field(
+                &build.document,
+                "symbol:py/mod.py::Thing::generate_answer",
+                "modifiers"
+            ),
+            Some(json!({"async": true}))
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:py/mod.py::Thing::normalize", "modifiers"),
+            Some(json!({"static": true}))
+        );
+        assert_eq!(
             symbol_summary(&build.document, "symbol:web/mod.ts::helper").as_deref(),
             Some("TS helper description.")
         );
@@ -8807,11 +9047,11 @@ mod tests {
         assert_eq!(
             symbol_content_string_field(&build.document, "symbol:web/mod.ts::helper", "output")
                 .as_deref(),
-            Some("number")
+            Some("Promise<number>")
         );
         assert_eq!(
-            symbol_line_range(&build.document, "symbol:web/mod.ts::helper").as_deref(),
-            Some("L3")
+            symbol_content_json_field(&build.document, "symbol:web/mod.ts::helper", "modifiers"),
+            Some(json!({"async": true}))
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:web/mod.ts::Thing").as_deref(),
@@ -8821,6 +9061,10 @@ mod tests {
             symbol_content_string_field(&build.document, "symbol:web/mod.ts::Thing", "type")
                 .as_deref(),
             Some("extends Base implements Named")
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:web/mod.ts::Thing::make", "modifiers"),
+            Some(json!({"static": true, "visibility": "public"}))
         );
         assert_eq!(
             symbol_summary(&build.document, "symbol:web/mod.js::helper").as_deref(),
@@ -8840,6 +9084,10 @@ mod tests {
         assert_eq!(
             symbol_content_json_subfield(&build.document, "symbol:web/mod.js::helper", "coderef", "display"),
             Some(json!("web/mod.js#L2"))
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:web/mod.js::helper", "modifiers"),
+            Some(json!({"generator": true}))
         );
     }
 
