@@ -1648,6 +1648,10 @@ fn initialize_document_metadata(
 fn make_repository_block(repo_name: &str, commit_hash: &str) -> Block {
     let mut block = Block::new(
         Content::json(json!({
+            "coderef": {
+                "path": ".",
+                "display": repo_name,
+            },
             "name": repo_name,
             "commit": commit_hash,
         })),
@@ -1668,7 +1672,10 @@ fn make_repository_block(repo_name: &str, commit_hash: &str) -> Block {
 fn make_directory_block(path: &str) -> Block {
     let mut block = Block::new(
         Content::json(json!({
-            "path": path,
+            "coderef": {
+                "path": path,
+                "display": path,
+            },
         })),
         Some("custom.directory"),
     );
@@ -1690,7 +1697,13 @@ fn make_directory_block(path: &str) -> Block {
 
 fn make_file_block(path: &str, language: &str, description: Option<&str>) -> Block {
     let mut content = serde_json::Map::new();
-    content.insert("path".to_string(), json!(path));
+    content.insert(
+        "coderef".to_string(),
+        json!({
+            "path": path,
+            "display": path,
+        }),
+    );
     content.insert("language".to_string(), json!(language));
     if let Some(description) = description {
         content.insert("description".to_string(), json!(description));
@@ -5984,6 +5997,77 @@ mod tests {
             .map(|value| value.to_string())
     }
 
+    fn repository_block(doc: &Document) -> Option<&Block> {
+        doc.blocks
+            .values()
+            .find(|block| node_class(block).as_deref() == Some("repository"))
+    }
+
+    fn repository_content_json_field(doc: &Document, field: &str) -> Option<serde_json::Value> {
+        let block = repository_block(doc)?;
+        let Content::Json { value, .. } = &block.content else {
+            return None;
+        };
+        value.get(field).cloned()
+    }
+
+    fn repository_content_json_subfield(
+        doc: &Document,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        repository_content_json_field(doc, field)?.get(subfield).cloned()
+    }
+
+    fn directory_block_by_key<'a>(doc: &'a Document, logical_key: &str) -> Option<&'a Block> {
+        doc.blocks.values().find(|block| {
+            node_class(block).as_deref() == Some("directory")
+                && block_logical_key(block).as_deref() == Some(logical_key)
+        })
+    }
+
+    fn directory_content_json_field(
+        doc: &Document,
+        logical_key: &str,
+        field: &str,
+    ) -> Option<serde_json::Value> {
+        let block = directory_block_by_key(doc, logical_key)?;
+        let Content::Json { value, .. } = &block.content else {
+            return None;
+        };
+        value.get(field).cloned()
+    }
+
+    fn directory_content_json_subfield(
+        doc: &Document,
+        logical_key: &str,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        directory_content_json_field(doc, logical_key, field)?.get(subfield).cloned()
+    }
+
+    fn file_content_json_field(
+        doc: &Document,
+        logical_key: &str,
+        field: &str,
+    ) -> Option<serde_json::Value> {
+        let block = file_block_by_key(doc, logical_key)?;
+        let Content::Json { value, .. } = &block.content else {
+            return None;
+        };
+        value.get(field).cloned()
+    }
+
+    fn file_content_json_subfield(
+        doc: &Document,
+        logical_key: &str,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        file_content_json_field(doc, logical_key, field)?.get(subfield).cloned()
+    }
+
     fn file_block_by_key<'a>(doc: &'a Document, logical_key: &str) -> Option<&'a Block> {
         doc.blocks.values().find(|block| {
             node_class(block).as_deref() == Some("file")
@@ -8489,6 +8573,11 @@ mod tests {
     #[test]
     fn test_file_descriptions_and_symbol_descriptions_are_extracted() {
         let dir = tempdir().unwrap();
+        let repo_name = dir
+            .path()
+            .file_name()
+            .map(|value| value.to_string_lossy().to_string())
+            .unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
         fs::create_dir_all(dir.path().join("py")).unwrap();
         fs::create_dir_all(dir.path().join("web")).unwrap();
@@ -8522,16 +8611,56 @@ mod tests {
         .unwrap();
 
         assert_eq!(
+            repository_content_json_subfield(&build.document, "coderef", "path"),
+            Some(json!("."))
+        );
+        assert_eq!(
+            repository_content_json_subfield(&build.document, "coderef", "display"),
+            Some(json!(repo_name))
+        );
+        assert_eq!(
+            directory_content_json_subfield(&build.document, "directory:src", "coderef", "path"),
+            Some(json!("src"))
+        );
+        assert_eq!(
+            directory_content_json_subfield(&build.document, "directory:src", "coderef", "display"),
+            Some(json!("src"))
+        );
+        assert_eq!(
+            directory_content_json_field(&build.document, "directory:src", "path"),
+            None
+        );
+        assert_eq!(
             file_summary(&build.document, "file:src/lib.rs").as_deref(),
             Some("Rust module summary")
+        );
+        assert_eq!(
+            file_content_json_subfield(&build.document, "file:src/lib.rs", "coderef", "path"),
+            Some(json!("src/lib.rs"))
+        );
+        assert_eq!(
+            file_content_json_subfield(&build.document, "file:src/lib.rs", "coderef", "display"),
+            Some(json!("src/lib.rs"))
+        );
+        assert_eq!(
+            file_content_json_field(&build.document, "file:src/lib.rs", "path"),
+            None
         );
         assert_eq!(
             file_summary(&build.document, "file:py/mod.py").as_deref(),
             Some("Python module summary.")
         );
         assert_eq!(
+            file_content_json_subfield(&build.document, "file:py/mod.py", "coderef", "path"),
+            Some(json!("py/mod.py"))
+        );
+        assert_eq!(
             file_summary(&build.document, "file:web/mod.ts").as_deref(),
             Some("TS module summary")
+        );
+        assert_eq!(
+            file_content_json_subfield(&build.document, "file:web/mod.ts", "coderef", "path"),
+            Some(json!("web/mod.ts"))
         );
 
         assert_eq!(
