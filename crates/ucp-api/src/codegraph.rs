@@ -1697,32 +1697,48 @@ fn rust_symbol_relationships(
     source: &str,
     symbol: &ExtractedSymbol,
 ) -> Vec<ExtractedRelationship> {
-    if node.kind() != "impl_item" {
-        return Vec::new();
-    }
-
     let mut relationships = Vec::new();
 
-    if let Some(type_node) = node.child_by_field_name("type") {
-        if let Some((target_expr, target_name)) = rust_type_reference(type_node, source) {
-            relationships.push(ExtractedRelationship::new(
-                symbol.identity.clone(),
-                "for_type",
-                target_expr,
-                target_name,
-            ));
-        }
-    }
+    match node.kind() {
+        "impl_item" => {
+            if let Some(type_node) = node.child_by_field_name("type") {
+                if let Some((target_expr, target_name)) = rust_type_reference(type_node, source) {
+                    relationships.push(ExtractedRelationship::new(
+                        symbol.identity.clone(),
+                        "for_type",
+                        target_expr,
+                        target_name,
+                    ));
+                }
+            }
 
-    if let Some(trait_node) = node.child_by_field_name("trait") {
-        if let Some((target_expr, target_name)) = rust_type_reference(trait_node, source) {
-            relationships.push(ExtractedRelationship::new(
-                symbol.identity.clone(),
-                "implements",
-                target_expr,
-                target_name,
-            ));
+            if let Some(trait_node) = node.child_by_field_name("trait") {
+                if let Some((target_expr, target_name)) = rust_type_reference(trait_node, source) {
+                    relationships.push(ExtractedRelationship::new(
+                        symbol.identity.clone(),
+                        "implements",
+                        target_expr,
+                        target_name,
+                    ));
+                }
+            }
         }
+        "trait_item" => {
+            if let Some(bounds_node) = node.child_by_field_name("bounds") {
+                let mut cursor = bounds_node.walk();
+                for bound in bounds_node.named_children(&mut cursor) {
+                    if let Some((target_expr, target_name)) = rust_type_reference(bound, source) {
+                        relationships.push(ExtractedRelationship::new(
+                            symbol.identity.clone(),
+                            "extends",
+                            target_expr,
+                            target_name,
+                        ));
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 
     relationships
@@ -2292,49 +2308,67 @@ fn ts_symbol_relationships(
     source: &str,
     symbol: &ExtractedSymbol,
 ) -> Vec<ExtractedRelationship> {
-    if node.kind() != "class_declaration" {
+    if !matches!(node.kind(), "class_declaration" | "interface_declaration") {
         return Vec::new();
     }
 
     let mut relationships = Vec::new();
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
-        if child.kind() != "class_heritage" {
-            continue;
-        }
-
-        let mut heritage_cursor = child.walk();
-        for clause in child.named_children(&mut heritage_cursor) {
-            match clause.kind() {
-                "extends_clause" => {
-                    if let Some(value_node) = clause.child_by_field_name("value") {
-                        if let Some((target_expr, target_name)) = ts_type_reference(value_node, source)
-                        {
-                            relationships.push(ExtractedRelationship::new(
-                                symbol.identity.clone(),
-                                "extends",
-                                target_expr,
-                                target_name,
-                            ));
+        match child.kind() {
+            "class_heritage" => {
+                let mut heritage_cursor = child.walk();
+                for clause in child.named_children(&mut heritage_cursor) {
+                    match clause.kind() {
+                        "extends_clause" => {
+                            if let Some(value_node) = clause.child_by_field_name("value") {
+                                if let Some((target_expr, target_name)) =
+                                    ts_type_reference(value_node, source)
+                                {
+                                    relationships.push(ExtractedRelationship::new(
+                                        symbol.identity.clone(),
+                                        "extends",
+                                        target_expr,
+                                        target_name,
+                                    ));
+                                }
+                            }
+                        }
+                        "implements_clause" => {
+                            let mut clause_cursor = clause.walk();
+                            for type_node in clause.named_children(&mut clause_cursor) {
+                                if let Some((target_expr, target_name)) =
+                                    ts_type_reference(type_node, source)
+                                {
+                                    relationships.push(ExtractedRelationship::new(
+                                        symbol.identity.clone(),
+                                        "implements",
+                                        target_expr,
+                                        target_name,
+                                    ));
+                                }
+                            }
+                        }
+                        _ => {
+                            if let Some((target_expr, target_name)) =
+                                ts_type_reference(clause, source)
+                            {
+                                relationships.push(ExtractedRelationship::new(
+                                    symbol.identity.clone(),
+                                    "extends",
+                                    target_expr,
+                                    target_name,
+                                ));
+                            }
                         }
                     }
                 }
-                "implements_clause" => {
-                    let mut clause_cursor = clause.walk();
-                    for type_node in clause.named_children(&mut clause_cursor) {
-                        if let Some((target_expr, target_name)) = ts_type_reference(type_node, source)
-                        {
-                            relationships.push(ExtractedRelationship::new(
-                                symbol.identity.clone(),
-                                "implements",
-                                target_expr,
-                                target_name,
-                            ));
-                        }
-                    }
-                }
-                _ => {
-                    if let Some((target_expr, target_name)) = ts_type_reference(clause, source) {
+            }
+            "extends_type_clause" => {
+                let mut clause_cursor = child.walk();
+                for type_node in child.named_children(&mut clause_cursor) {
+                    if let Some((target_expr, target_name)) = ts_type_reference(type_node, source)
+                    {
                         relationships.push(ExtractedRelationship::new(
                             symbol.identity.clone(),
                             "extends",
@@ -2344,6 +2378,7 @@ fn ts_symbol_relationships(
                     }
                 }
             }
+            _ => {}
         }
     }
 
@@ -4451,6 +4486,48 @@ mod tests {
             "uses_symbol",
             "uses_symbol",
             "symbol:web/util.ts::util",
+        ));
+    }
+
+    #[test]
+    fn test_interface_and_trait_inheritance_edges_are_emitted() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+
+        fs::write(
+            dir.path().join("src/base.rs"),
+            "pub trait Parent {}\npub trait Child: Parent {}\n",
+        )
+        .unwrap();
+        fs::write(dir.path().join("src/lib.rs"), "mod base;\n").unwrap();
+
+        fs::write(
+            dir.path().join("web/base.ts"),
+            "export interface Parent {}\nexport interface Child extends Parent {}\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "interface-trait-inheritance".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/base.ts::Child",
+            "extends",
+            "extends",
+            "symbol:web/base.ts::Parent",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/base.rs::Child",
+            "extends",
+            "extends",
+            "symbol:src/base.rs::Parent",
         ));
     }
 
