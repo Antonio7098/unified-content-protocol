@@ -456,6 +456,8 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     let known_files: BTreeSet<String> = file_ids.keys().cloned().collect();
     let mut imported_symbol_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<BlockId>>> =
         BTreeMap::new();
+    let mut imported_module_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<String>>> =
+        BTreeMap::new();
     let mut pending_reference_edges: BTreeSet<(String, String, String)> = BTreeSet::new();
     let mut pending_symbol_reference_edges: BTreeSet<(String, String, String, String)> =
         BTreeSet::new();
@@ -515,6 +517,18 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                         }
                     }
 
+                    if !import.module_aliases.is_empty() {
+                        let entry = imported_module_targets_by_file
+                            .entry(record.file.clone())
+                            .or_default();
+                        for alias in &import.module_aliases {
+                            let targets = entry.entry(alias.clone()).or_default();
+                            if !targets.contains(&target) {
+                                targets.push(target.clone());
+                            }
+                        }
+                    }
+
                     if import.reexported && import.wildcard && import.symbols.is_empty() {
                         pending_wildcard_reexport_edges.insert((
                             record.file.clone(),
@@ -555,6 +569,13 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 }
             }
             *symbol_ids = unique_ids;
+        }
+    }
+
+    for targets in imported_module_targets_by_file.values_mut() {
+        for file_paths in targets.values_mut() {
+            file_paths.sort();
+            file_paths.dedup();
         }
     }
 
@@ -604,6 +625,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 usage,
                 &top_level_symbol_ids,
                 &imported_symbol_targets_by_file,
+                &imported_module_targets_by_file,
                 &known_files,
             ) {
                 let edge = (*source_id, target_id, usage.target_expr.clone());
@@ -1160,6 +1182,7 @@ struct ExtractedImport {
     module: String,
     symbols: Vec<String>,
     bindings: Vec<ImportBinding>,
+    module_aliases: Vec<String>,
     reexported: bool,
     wildcard: bool,
 }
@@ -1217,6 +1240,7 @@ impl ExtractedImport {
             module: module.into(),
             symbols: Vec::new(),
             bindings: Vec::new(),
+            module_aliases: Vec::new(),
             reexported: false,
             wildcard: false,
         }
@@ -1228,6 +1252,7 @@ impl ExtractedImport {
             module: module.into(),
             symbols: vec![symbol.clone()],
             bindings: vec![ImportBinding::same(symbol)],
+            module_aliases: Vec::new(),
             reexported: false,
             wildcard: false,
         }
@@ -1245,9 +1270,18 @@ impl ExtractedImport {
             module: module.into(),
             symbols,
             bindings,
+            module_aliases: Vec::new(),
             reexported: false,
             wildcard: false,
         }
+    }
+
+    fn with_module_alias(mut self, alias: impl Into<String>) -> Self {
+        let alias = alias.into();
+        if !alias.is_empty() && !self.module_aliases.contains(&alias) {
+            self.module_aliases.push(alias);
+        }
+        self
     }
 
     fn reexported(mut self) -> Self {
@@ -1810,15 +1844,9 @@ fn analyze_python_node(
 
     match node.kind() {
         "import_statement" => {
-            let text = node_text(source, node).trim().to_string();
-            if let Some(list) = text.strip_prefix("import ") {
-                for item in list.split(',') {
-                    let name = item.split_whitespace().next().unwrap_or("").trim();
-                    if !name.is_empty() {
-                        analysis.imports.push(ExtractedImport::module(name.to_string()));
-                    }
-                }
-            }
+            analysis
+                .imports
+                .extend(python_imports_from_import_statement(node, source));
         }
         "import_from_statement" => {
             analysis
@@ -1938,16 +1966,64 @@ fn python_call_target(node: Node<'_>, source: &str) -> Option<(String, String)> 
     }
 
     let function_node = node.child_by_field_name("function")?;
-    if function_node.kind() != "identifier" {
-        return None;
+    match function_node.kind() {
+        "identifier" => {
+            let target_expr = node_text(source, function_node).trim().to_string();
+            if target_expr.is_empty() {
+                return None;
+            }
+            Some((target_expr.clone(), target_expr))
+        }
+        "attribute" => {
+            let object = function_node.child_by_field_name("object")?;
+            let attribute = function_node.child_by_field_name("attribute")?;
+            if object.kind() != "identifier" {
+                return None;
+            }
+            let object_name = node_text(source, object).trim().to_string();
+            let attr_name = node_text(source, attribute).trim().to_string();
+            if object_name.is_empty() || attr_name.is_empty() {
+                return None;
+            }
+            Some((format!("{object_name}.{attr_name}"), attr_name))
+        }
+        _ => None,
     }
+}
 
-    let target_expr = node_text(source, function_node).trim().to_string();
-    if target_expr.is_empty() {
-        return None;
+fn python_imports_from_import_statement(node: Node<'_>, source: &str) -> Vec<ExtractedImport> {
+    let mut imports = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        match child.kind() {
+            "aliased_import" => {
+                let module_name = child
+                    .child_by_field_name("name")
+                    .map(|name_node| node_text(source, name_node).trim().to_string())
+                    .unwrap_or_default();
+                let alias = child
+                    .child_by_field_name("alias")
+                    .map(|alias_node| node_text(source, alias_node).trim().to_string())
+                    .unwrap_or_default();
+                if !module_name.is_empty() {
+                    imports.push(ExtractedImport::module(module_name).with_module_alias(alias));
+                }
+            }
+            "dotted_name" => {
+                let module_name = node_text(source, child).trim().to_string();
+                if module_name.is_empty() {
+                    continue;
+                }
+                let mut import = ExtractedImport::module(module_name.clone());
+                if !module_name.contains('.') {
+                    import = import.with_module_alias(module_name);
+                }
+                imports.push(import);
+            }
+            _ => {}
+        }
     }
-
-    Some((target_expr.clone(), target_expr))
+    imports
 }
 
 fn python_imports_from_from_statement(node: Node<'_>, source: &str) -> Vec<ExtractedImport> {
@@ -1965,7 +2041,13 @@ fn python_imports_from_from_statement(node: Node<'_>, source: &str) -> Vec<Extra
     if module_name.chars().all(|ch| ch == '.') {
         return imported_bindings
             .into_iter()
-            .map(|binding| ExtractedImport::module(format!("{}{}", module_name, binding.source_name)))
+            .map(|binding| {
+                let mut import = ExtractedImport::module(format!("{}{}", module_name, binding.source_name));
+                if !binding.local_name.is_empty() {
+                    import = import.with_module_alias(binding.local_name);
+                }
+                import
+            })
             .collect();
     }
 
@@ -2152,7 +2234,11 @@ fn analyze_ts_node(
         "import_statement" => {
             if let Some(module) = extract_ts_module_from_text(node_text(source, node)) {
                 let imported_bindings = ts_import_bindings(node, source);
-                analysis.imports.push(ExtractedImport::bindings(module, imported_bindings));
+                let mut import = ExtractedImport::bindings(module, imported_bindings);
+                for alias in ts_namespace_import_aliases(node, source) {
+                    import = import.with_module_alias(alias);
+                }
+                analysis.imports.push(import);
             }
         }
         "export_statement" => {
@@ -2404,16 +2490,29 @@ fn ts_call_target(node: Node<'_>, source: &str) -> Option<(String, String)> {
         _ => return None,
     };
 
-    if callable.kind() != "identifier" {
-        return None;
+    match callable.kind() {
+        "identifier" => {
+            let target_expr = node_text(source, callable).trim().to_string();
+            if target_expr.is_empty() {
+                return None;
+            }
+            Some((target_expr.clone(), target_expr))
+        }
+        "member_expression" => {
+            let object = callable.child_by_field_name("object")?;
+            let property = callable.child_by_field_name("property")?;
+            if object.kind() != "identifier" {
+                return None;
+            }
+            let object_name = node_text(source, object).trim().to_string();
+            let property_name = node_text(source, property).trim().to_string();
+            if object_name.is_empty() || property_name.is_empty() {
+                return None;
+            }
+            Some((format!("{object_name}.{property_name}"), property_name))
+        }
+        _ => None,
     }
-
-    let target_expr = node_text(source, callable).trim().to_string();
-    if target_expr.is_empty() {
-        return None;
-    }
-
-    Some((target_expr.clone(), target_expr))
 }
 
 fn ts_import_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
@@ -2445,6 +2544,33 @@ fn ts_import_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
     bindings.sort();
     bindings.dedup();
     bindings
+}
+
+fn ts_namespace_import_aliases(node: Node<'_>, source: &str) -> Vec<String> {
+    let mut aliases = Vec::new();
+    let mut stack = vec![node];
+
+    while let Some(current) = stack.pop() {
+        if current.kind() == "namespace_import" {
+            let mut cursor = current.walk();
+            for child in current.named_children(&mut cursor) {
+                let alias = node_text(source, child).trim().to_string();
+                if !alias.is_empty() {
+                    aliases.push(alias);
+                }
+            }
+            continue;
+        }
+
+        let mut cursor = current.walk();
+        for child in current.named_children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    aliases.sort();
+    aliases.dedup();
+    aliases
 }
 
 fn ts_reexport_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
@@ -2742,6 +2868,7 @@ fn resolve_usage_target_ids(
     usage: &ExtractedUsage,
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
+    imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
     known_files: &BTreeSet<String>,
 ) -> Vec<BlockId> {
     let mut target_ids = Vec::new();
@@ -2755,6 +2882,19 @@ fn resolve_usage_target_ids(
         .and_then(|bindings| bindings.get(&usage.target_name))
     {
         target_ids.extend(imported_ids.iter().copied());
+    }
+
+    if let Some((module_alias, member_name)) = member_usage_parts(&usage.target_expr) {
+        if let Some(target_files) = imported_module_targets_by_file
+            .get(source_file)
+            .and_then(|aliases| aliases.get(&module_alias))
+        {
+            for target_file in target_files {
+                if let Some(ids) = top_level_symbol_ids.get(&(target_file.clone(), member_name.clone())) {
+                    target_ids.extend(ids.iter().copied());
+                }
+            }
+        }
     }
 
     if language == CodeLanguage::Rust && usage.target_expr.contains("::") {
@@ -2779,6 +2919,17 @@ fn resolve_usage_target_ids(
         }
     }
     unique_ids
+}
+
+fn member_usage_parts(text: &str) -> Option<(String, String)> {
+    let (left, right) = text.split_once('.')?;
+    let left = left.trim();
+    let right = right.trim();
+    if left.is_empty() || right.is_empty() {
+        None
+    } else {
+        Some((left.to_string(), right.to_string()))
+    }
 }
 
 fn resolve_import(
@@ -4528,6 +4679,53 @@ mod tests {
             "extends",
             "extends",
             "symbol:src/base.rs::Parent",
+        ));
+    }
+
+    #[test]
+    fn test_namespace_and_module_member_calls_resolve_to_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as utilns from './util';\nexport function run() { return utilns.util(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from . import helper as helper_mod\ndef execute():\n    return helper_mod.helper()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "member-call-sites".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
         ));
     }
 
