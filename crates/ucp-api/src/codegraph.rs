@@ -5248,7 +5248,7 @@ mod tests {
         fs::write(dir.path().join("src/nested/util.rs"), "pub fn wave() {}\n").unwrap();
         fs::write(
             dir.path().join("src/lib.rs"),
-            "mod nested;\nuse nested::util as util_mod;\nuse nested::util::{self as util_mod_two};\npub fn run() { util_mod::wave(); util_mod_two::wave(); }\n",
+            "mod nested;\nuse nested::util as util_mod;\nuse nested::util::{self as util_mod_two};\nuse nested::{util as util_mod_three};\npub fn run() { util_mod::wave(); util_mod_two::wave(); util_mod_three::wave(); }\n",
         )
         .unwrap();
 
@@ -5278,7 +5278,7 @@ mod tests {
         fs::write(dir.path().join("src/nested/util.rs"), "pub fn wave() {}\n").unwrap();
         fs::write(
             dir.path().join("src/lib.rs"),
-            "mod util;\nmod nested;\nuse util::greet;\nuse nested::util as util_mod;\npub fn run() { let first = greet; let second = first; let wave_alias = util_mod::wave; second(); wave_alias(); }\n",
+            "mod util;\nmod nested;\nuse util::greet;\nuse nested::util as util_mod;\nuse nested::util::{wave as hello};\npub fn run() { let first = greet; let second = first; let wave_alias = util_mod::wave; let hello_alias = hello; second(); wave_alias(); hello_alias(); }\n",
         )
         .unwrap();
 
@@ -5302,6 +5302,138 @@ mod tests {
             "uses_symbol",
             "uses_symbol",
             "symbol:src/nested/util.rs::wave",
+        ));
+    }
+
+    #[test]
+    fn test_rust_local_aliases_shadow_imported_names_and_stay_isolated() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+
+        fs::write(dir.path().join("src/one.rs"), "pub fn one() {}\n").unwrap();
+        fs::write(dir.path().join("src/two.rs"), "pub fn two() {}\n").unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod one;\nmod two;\nuse one::one;\nuse two::two;\npub fn run() { let one = two; one(); }\npub fn first() { let alias = one; alias(); }\npub fn second() { two(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "rust-local-shadowing-and-isolation".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/two.rs::two",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::first",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/one.rs::one",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::second",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/two.rs::two",
+        ));
+    }
+
+    #[test]
+    fn test_rust_unresolved_or_unsupported_local_shadowing_does_not_fall_back() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+
+        fs::write(dir.path().join("src/one.rs"), "pub fn one() {}\n").unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod one;\nuse one::one;\npub fn missing_case() { let one = missing; one(); }\npub fn expr_case() { let one = if true { missing } else { one }; one(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "rust-local-shadowing-no-fallback".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::missing_case",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/one.rs::one",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::expr_case",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/one.rs::one",
+        ));
+    }
+
+    #[test]
+    fn test_alias_cycles_remain_unresolved_without_symbol_edges() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "const a = b;\nconst b = a;\nexport function run() { return a(); }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "a = b\nb = a\ndef run():\n    return a()\n",
+        )
+        .unwrap();
+        fs::write(dir.path().join("src/util.rs"), "pub fn greet() {}\n").unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod util;\nuse util::greet;\npub fn run() { let a = b; let b = a; a(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "alias-cycles-unresolved".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/main.ts::a",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/main.py::a",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/util.rs::greet",
         ));
     }
 
