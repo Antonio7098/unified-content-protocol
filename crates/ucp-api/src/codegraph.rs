@@ -328,6 +328,10 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     }
 
     let mut file_ids: BTreeMap<String, BlockId> = BTreeMap::new();
+    let mut symbol_ids_by_file_identity: BTreeMap<(String, String), BlockId> = BTreeMap::new();
+    let mut top_level_symbol_ids: BTreeMap<(String, String), Vec<BlockId>> = BTreeMap::new();
+    let mut exported_top_level_symbol_ids: BTreeMap<String, Vec<(String, BlockId)>> =
+        BTreeMap::new();
     let mut file_analyses = Vec::new();
     let mut used_symbol_keys: HashSet<String> = HashSet::new();
 
@@ -373,15 +377,29 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         let file_block_id = doc.add_block(file_block, &parent_id)?;
         file_ids.insert(file.relative_path.clone(), file_block_id);
 
-        let analysis = analyze_file(&file.relative_path, &source, file.language);
-        for diag in &analysis.diagnostics {
+        let FileAnalysis {
+            mut symbols,
+            imports,
+            relationships,
+            diagnostics: analysis_diagnostics,
+            ..
+        } = analyze_file(&file.relative_path, &source, file.language);
+        for diag in &analysis_diagnostics {
             diagnostics.push(diag.clone().with_path(file.relative_path.clone()));
         }
 
-        for symbol in &analysis.symbols {
+        symbols.sort_by(compare_extracted_symbols);
+        let mut symbol_ids_by_identity: BTreeMap<String, BlockId> = BTreeMap::new();
+
+        for symbol in &symbols {
+            let parent_block_id = symbol
+                .parent_identity
+                .as_ref()
+                .and_then(|identity| symbol_ids_by_identity.get(identity).copied())
+                .unwrap_or(file_block_id);
             let logical_key = unique_symbol_logical_key(
                 &file.relative_path,
-                &symbol.name,
+                &symbol.qualified_name,
                 symbol.start_line,
                 &mut used_symbol_keys,
             );
@@ -391,7 +409,25 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 file.language.as_str(),
                 symbol,
             );
-            let symbol_id = doc.add_block(symbol_block, &file_block_id)?;
+            let symbol_id = doc.add_block(symbol_block, &parent_block_id)?;
+            symbol_ids_by_identity.insert(symbol.identity.clone(), symbol_id);
+            symbol_ids_by_file_identity.insert(
+                (file.relative_path.clone(), symbol.identity.clone()),
+                symbol_id,
+            );
+
+            if symbol.parent_identity.is_none() {
+                top_level_symbol_ids
+                    .entry((file.relative_path.clone(), symbol.name.clone()))
+                    .or_default()
+                    .push(symbol_id);
+                if symbol.exported {
+                    exported_top_level_symbol_ids
+                        .entry(file.relative_path.clone())
+                        .or_default()
+                        .push((symbol.name.clone(), symbol_id));
+                }
+            }
 
             if symbol.exported && input.config.emit_export_edges {
                 let mut edge = Edge::new(EdgeType::Custom("exports".to_string()), symbol_id);
@@ -410,25 +446,80 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         file_analyses.push(FileAnalysisRecord {
             file: file.relative_path,
             language: file.language,
-            imports: analysis.imports,
+            imports,
+            relationships,
         });
     }
 
     let known_files: BTreeSet<String> = file_ids.keys().cloned().collect();
+    let mut imported_symbol_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<BlockId>>> =
+        BTreeMap::new();
     let mut pending_reference_edges: BTreeSet<(String, String, String)> = BTreeSet::new();
+    let mut pending_symbol_reference_edges: BTreeSet<(String, String, String, String)> =
+        BTreeSet::new();
+    let mut pending_reexport_edges: BTreeSet<(String, String, String, String)> = BTreeSet::new();
+    let mut pending_wildcard_reexport_edges: BTreeSet<(String, String, String)> =
+        BTreeSet::new();
+    let mut pending_relationship_edges: Vec<(BlockId, BlockId, String, String)> = Vec::new();
 
     for record in &file_analyses {
         for import in &record.imports {
-            match resolve_import(&record.file, &record.language, &import.module, &known_files) {
-                Some(target) if target != record.file => {
+            match resolve_import(
+                &record.file,
+                &record.language,
+                &import.module,
+                &known_files,
+            ) {
+                ImportResolution::Resolved(target) if target != record.file => {
                     pending_reference_edges.insert((
                         record.file.clone(),
-                        target,
+                        target.clone(),
                         import.module.clone(),
                     ));
+
+                    for symbol_name in &import.symbols {
+                        pending_symbol_reference_edges.insert((
+                            record.file.clone(),
+                            target.clone(),
+                            symbol_name.clone(),
+                            import.module.clone(),
+                        ));
+                        if import.reexported {
+                            pending_reexport_edges.insert((
+                                record.file.clone(),
+                                target.clone(),
+                                symbol_name.clone(),
+                                import.module.clone(),
+                            ));
+                        }
+                    }
+
+                    if !import.bindings.is_empty() {
+                        let entry = imported_symbol_targets_by_file
+                            .entry(record.file.clone())
+                            .or_default();
+                        for binding in &import.bindings {
+                            if let Some(target_symbol_ids) = top_level_symbol_ids
+                                .get(&(target.clone(), binding.source_name.clone()))
+                            {
+                                entry
+                                    .entry(binding.local_name.clone())
+                                    .or_default()
+                                    .extend(target_symbol_ids.iter().copied());
+                            }
+                        }
+                    }
+
+                    if import.reexported && import.wildcard {
+                        pending_wildcard_reexport_edges.insert((
+                            record.file.clone(),
+                            target,
+                            import.module.clone(),
+                        ));
+                    }
                 }
-                Some(_) => {}
-                None => {
+                ImportResolution::Resolved(_) | ImportResolution::External => {}
+                ImportResolution::Unresolved => {
                     diagnostics.push(
                         CodeGraphDiagnostic::warning(
                             "CG2006",
@@ -436,6 +527,50 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                         )
                         .with_path(record.file.clone()),
                     );
+                }
+            }
+        }
+    }
+
+    for targets in imported_symbol_targets_by_file.values_mut() {
+        for symbol_ids in targets.values_mut() {
+            let mut unique_ids = Vec::new();
+            for symbol_id in symbol_ids.drain(..) {
+                if !unique_ids.contains(&symbol_id) {
+                    unique_ids.push(symbol_id);
+                }
+            }
+            *symbol_ids = unique_ids;
+        }
+    }
+
+    for record in &file_analyses {
+        for relationship in &record.relationships {
+            let Some(source_id) = symbol_ids_by_file_identity
+                .get(&(record.file.clone(), relationship.source_identity.clone()))
+            else {
+                continue;
+            };
+
+            for target_id in resolve_relationship_target_ids(
+                &record.file,
+                record.language,
+                relationship,
+                &top_level_symbol_ids,
+                &imported_symbol_targets_by_file,
+                &known_files,
+            ) {
+                if target_id == *source_id {
+                    continue;
+                }
+                let edge = (
+                    *source_id,
+                    target_id,
+                    relationship.relation.clone(),
+                    relationship.target_expr.clone(),
+                );
+                if !pending_relationship_edges.contains(&edge) {
+                    pending_relationship_edges.push(edge);
                 }
             }
         }
@@ -455,6 +590,102 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             .custom
             .insert("raw_import".to_string(), json!(raw_import));
         if let Some(source_block) = doc.get_block_mut(source_id) {
+            source_block.edges.push(edge);
+        }
+    }
+
+    for (source_path, target_path, symbol_name, raw_import) in pending_symbol_reference_edges {
+        let Some(source_id) = file_ids.get(&source_path) else {
+            continue;
+        };
+        let Some(target_symbol_ids) = top_level_symbol_ids.get(&(target_path.clone(), symbol_name.clone()))
+        else {
+            continue;
+        };
+
+        for target_symbol_id in target_symbol_ids {
+            let mut edge = Edge::new(
+                EdgeType::Custom("imports_symbol".to_string()),
+                *target_symbol_id,
+            );
+            edge.metadata
+                .custom
+                .insert("relation".to_string(), json!("imports_symbol"));
+            edge.metadata
+                .custom
+                .insert("raw_import".to_string(), json!(raw_import.clone()));
+            edge.metadata
+                .custom
+                .insert("symbol".to_string(), json!(symbol_name.clone()));
+            if let Some(source_block) = doc.get_block_mut(source_id) {
+                source_block.edges.push(edge);
+            }
+        }
+    }
+
+    if input.config.emit_export_edges {
+        for (source_path, target_path, symbol_name, raw_import) in pending_reexport_edges {
+            let Some(source_id) = file_ids.get(&source_path) else {
+                continue;
+            };
+            let Some(target_symbol_ids) =
+                top_level_symbol_ids.get(&(target_path.clone(), symbol_name.clone()))
+            else {
+                continue;
+            };
+
+            for target_symbol_id in target_symbol_ids {
+                let mut edge = Edge::new(EdgeType::Custom("exports".to_string()), *target_symbol_id);
+                edge.metadata
+                    .custom
+                    .insert("relation".to_string(), json!("reexports"));
+                edge.metadata
+                    .custom
+                    .insert("raw_import".to_string(), json!(raw_import.clone()));
+                edge.metadata
+                    .custom
+                    .insert("symbol".to_string(), json!(symbol_name.clone()));
+                if let Some(source_block) = doc.get_block_mut(source_id) {
+                    source_block.edges.push(edge);
+                }
+            }
+        }
+
+        for (source_path, target_path, raw_import) in pending_wildcard_reexport_edges {
+            let Some(source_id) = file_ids.get(&source_path) else {
+                continue;
+            };
+            let Some(target_symbols) = exported_top_level_symbol_ids.get(&target_path) else {
+                continue;
+            };
+
+            for (symbol_name, target_symbol_id) in target_symbols {
+                let mut edge = Edge::new(EdgeType::Custom("exports".to_string()), *target_symbol_id);
+                edge.metadata
+                    .custom
+                    .insert("relation".to_string(), json!("reexports"));
+                edge.metadata
+                    .custom
+                    .insert("raw_import".to_string(), json!(raw_import.clone()));
+                edge.metadata
+                    .custom
+                    .insert("symbol".to_string(), json!(symbol_name.clone()));
+                if let Some(source_block) = doc.get_block_mut(source_id) {
+                    source_block.edges.push(edge);
+                }
+            }
+        }
+    }
+
+    for (source_id, target_id, relation, raw_target) in pending_relationship_edges {
+        let mut edge = Edge::new(EdgeType::Custom(relation.clone()), target_id);
+        edge.metadata
+            .custom
+            .insert("relation".to_string(), json!(relation));
+        edge.metadata
+            .custom
+            .insert("raw_target".to_string(), json!(raw_target));
+        if let Some(source_block) = doc.get_block_mut(&source_id) {
             source_block.edges.push(edge);
         }
     }
@@ -834,6 +1065,9 @@ struct RepoFile {
 #[derive(Debug, Clone)]
 struct ExtractedSymbol {
     name: String,
+    qualified_name: String,
+    identity: String,
+    parent_identity: Option<String>,
     kind: String,
     exported: bool,
     start_line: usize,
@@ -845,12 +1079,39 @@ struct ExtractedSymbol {
 #[derive(Debug, Clone)]
 struct ExtractedImport {
     module: String,
+    symbols: Vec<String>,
+    bindings: Vec<ImportBinding>,
+    reexported: bool,
+    wildcard: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ImportBinding {
+    source_name: String,
+    local_name: String,
+}
+
+#[derive(Debug, Clone)]
+struct ExtractedRelationship {
+    source_identity: String,
+    relation: String,
+    target_expr: String,
+    target_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ImportResolution {
+    Resolved(String),
+    External,
+    Unresolved,
 }
 
 #[derive(Debug, Clone, Default)]
 struct FileAnalysis {
     symbols: Vec<ExtractedSymbol>,
     imports: Vec<ExtractedImport>,
+    relationships: Vec<ExtractedRelationship>,
+    exported_symbol_names: BTreeSet<String>,
     diagnostics: Vec<CodeGraphDiagnostic>,
 }
 
@@ -859,6 +1120,87 @@ struct FileAnalysisRecord {
     file: String,
     language: CodeLanguage,
     imports: Vec<ExtractedImport>,
+    relationships: Vec<ExtractedRelationship>,
+}
+
+impl ExtractedImport {
+    fn module(module: impl Into<String>) -> Self {
+        Self {
+            module: module.into(),
+            symbols: Vec::new(),
+            bindings: Vec::new(),
+            reexported: false,
+            wildcard: false,
+        }
+    }
+
+    fn symbol(module: impl Into<String>, symbol: impl Into<String>) -> Self {
+        let symbol = symbol.into();
+        Self {
+            module: module.into(),
+            symbols: vec![symbol.clone()],
+            bindings: vec![ImportBinding::same(symbol)],
+            reexported: false,
+            wildcard: false,
+        }
+    }
+
+    fn bindings(module: impl Into<String>, bindings: Vec<ImportBinding>) -> Self {
+        let mut symbols = bindings
+            .iter()
+            .map(|binding| binding.source_name.clone())
+            .collect::<Vec<_>>();
+        symbols.sort();
+        symbols.dedup();
+
+        Self {
+            module: module.into(),
+            symbols,
+            bindings,
+            reexported: false,
+            wildcard: false,
+        }
+    }
+
+    fn reexported(mut self) -> Self {
+        self.reexported = true;
+        self
+    }
+
+    fn wildcard(mut self) -> Self {
+        self.wildcard = true;
+        self
+    }
+}
+
+impl ImportBinding {
+    fn new(source_name: impl Into<String>, local_name: impl Into<String>) -> Self {
+        Self {
+            source_name: source_name.into(),
+            local_name: local_name.into(),
+        }
+    }
+
+    fn same(name: impl Into<String>) -> Self {
+        let name = name.into();
+        Self::new(name.clone(), name)
+    }
+}
+
+impl ExtractedRelationship {
+    fn new(
+        source_identity: impl Into<String>,
+        relation: impl Into<String>,
+        target_expr: impl Into<String>,
+        target_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            source_identity: source_identity.into(),
+            relation: relation.into(),
+            target_expr: target_expr.into(),
+            target_name: target_name.into(),
+        }
+    }
 }
 
 fn initialize_document_metadata(
@@ -1070,7 +1412,7 @@ fn analyze_file(path: &str, source: &str, language: CodeLanguage) -> FileAnalysi
         analysis.diagnostics.push(
             CodeGraphDiagnostic::info(
                 "CG2001",
-                format!("no top-level symbols extracted for {}", path),
+                format!("no symbols extracted for {}", path),
             )
             .with_path(path.to_string()),
         );
@@ -1091,46 +1433,86 @@ fn language_for(language: CodeLanguage) -> Language {
 fn analyze_rust_tree(source: &str, root: Node<'_>, analysis: &mut FileAnalysis) {
     let mut cursor = root.walk();
     for node in root.named_children(&mut cursor) {
-        match node.kind() {
-            "use_declaration" => {
-                let import_text = node_text(source, node)
-                    .trim()
-                    .trim_start_matches("pub ")
-                    .trim_start_matches("use ")
-                    .trim_end_matches(';')
-                    .trim()
-                    .to_string();
-                if !import_text.is_empty() {
-                    analysis.imports.push(ExtractedImport {
-                        module: import_text,
-                    });
-                }
-            }
-            "mod_item" => {
-                let text = node_text(source, node);
-                if text.trim().ends_with(';') {
-                    if let Some(name) = rust_symbol_name(node, source) {
-                        analysis.imports.push(ExtractedImport {
-                            module: format!("mod:{}", name),
-                        });
-                    }
-                }
-                if let Some(symbol) = rust_symbol_from_node(node, source) {
-                    analysis.symbols.push(symbol);
-                }
-            }
-            "function_item" | "struct_item" | "enum_item" | "trait_item" | "impl_item"
-            | "type_item" | "const_item" => {
-                if let Some(symbol) = rust_symbol_from_node(node, source) {
-                    analysis.symbols.push(symbol);
-                }
-            }
-            _ => {}
-        }
+        analyze_rust_node(source, node, analysis, &[], None);
     }
 }
 
-fn rust_symbol_from_node(node: Node<'_>, source: &str) -> Option<ExtractedSymbol> {
+fn analyze_rust_node(
+    source: &str,
+    node: Node<'_>,
+    analysis: &mut FileAnalysis,
+    scope: &[String],
+    parent_identity: Option<&str>,
+) {
+    if node.kind() == "use_declaration" {
+        let use_text = node_text(source, node);
+        let reexported = use_text.trim_start().starts_with("pub use ");
+        let wildcard = use_text.contains('*');
+        for module in expand_rust_use_declaration(use_text) {
+            let mut import = if wildcard {
+                ExtractedImport::module(module)
+            } else if let Some(symbol) = rust_imported_symbol_name(&module) {
+                ExtractedImport::symbol(module, symbol)
+            } else {
+                ExtractedImport::module(module)
+            };
+            if reexported {
+                import = import.reexported();
+            }
+            if wildcard {
+                import = import.wildcard();
+            }
+            analysis.imports.push(import);
+        }
+    }
+
+    if node.kind() == "mod_item" {
+        let text = node_text(source, node);
+        if text.trim().ends_with(';') {
+            if let Some(name) = rust_symbol_name(node, source) {
+                analysis
+                    .imports
+                    .push(ExtractedImport::module(format!("mod:{}", name)));
+            }
+        }
+    }
+
+    let mut child_scope = scope.to_vec();
+    let mut child_parent_identity = parent_identity.map(str::to_string);
+
+    if let Some(symbol) = rust_symbol_from_node(node, source, scope, parent_identity) {
+        analysis
+            .relationships
+            .extend(rust_symbol_relationships(node, source, &symbol));
+        child_scope.push(symbol.name.clone());
+        child_parent_identity = Some(symbol.identity.clone());
+        analysis.symbols.push(symbol);
+    }
+
+    let scope_ref = if child_scope.len() == scope.len() {
+        scope
+    } else {
+        &child_scope
+    };
+
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        analyze_rust_node(
+            source,
+            child,
+            analysis,
+            scope_ref,
+            child_parent_identity.as_deref(),
+        );
+    }
+}
+
+fn rust_symbol_from_node(
+    node: Node<'_>,
+    source: &str,
+    scope: &[String],
+    parent_identity: Option<&str>,
+) -> Option<ExtractedSymbol> {
     let kind = match node.kind() {
         "function_item" => "function",
         "struct_item" => "struct",
@@ -1144,18 +1526,16 @@ fn rust_symbol_from_node(node: Node<'_>, source: &str) -> Option<ExtractedSymbol
     };
 
     let name = rust_symbol_name(node, source)?;
-    let exported = node_text(source, node).trim_start().starts_with("pub");
-    let (start_line, start_col, end_line, end_col) = node_span(node);
+    let exported = scope.is_empty() && node_text(source, node).trim_start().starts_with("pub");
 
-    Some(ExtractedSymbol {
+    Some(make_extracted_symbol(
         name,
-        kind: kind.to_string(),
+        kind,
         exported,
-        start_line,
-        start_col,
-        end_line,
-        end_col,
-    })
+        scope,
+        parent_identity,
+        node,
+    ))
 }
 
 fn rust_symbol_name(node: Node<'_>, source: &str) -> Option<String> {
@@ -1178,60 +1558,384 @@ fn rust_symbol_name(node: Node<'_>, source: &str) -> Option<String> {
     first_named_identifier(node, source)
 }
 
+fn rust_imported_symbol_name(module: &str) -> Option<String> {
+    if module.starts_with("mod:") {
+        return None;
+    }
+
+    let stripped = module
+        .trim_start_matches("crate::")
+        .trim_start_matches("self::")
+        .trim_start_matches("super::");
+    let segments: Vec<&str> = stripped.split("::").filter(|segment| !segment.is_empty()).collect();
+
+    if module.starts_with("crate::") && segments.len() == 1 {
+        return segments.first().map(|segment| (*segment).to_string());
+    }
+
+    if segments.len() >= 2 {
+        segments.last().map(|segment| (*segment).to_string())
+    } else {
+        None
+    }
+}
+
+fn rust_symbol_relationships(
+    node: Node<'_>,
+    source: &str,
+    symbol: &ExtractedSymbol,
+) -> Vec<ExtractedRelationship> {
+    if node.kind() != "impl_item" {
+        return Vec::new();
+    }
+
+    let mut relationships = Vec::new();
+
+    if let Some(type_node) = node.child_by_field_name("type") {
+        if let Some((target_expr, target_name)) = rust_type_reference(type_node, source) {
+            relationships.push(ExtractedRelationship::new(
+                symbol.identity.clone(),
+                "for_type",
+                target_expr,
+                target_name,
+            ));
+        }
+    }
+
+    if let Some(trait_node) = node.child_by_field_name("trait") {
+        if let Some((target_expr, target_name)) = rust_type_reference(trait_node, source) {
+            relationships.push(ExtractedRelationship::new(
+                symbol.identity.clone(),
+                "implements",
+                target_expr,
+                target_name,
+            ));
+        }
+    }
+
+    relationships
+}
+
+fn rust_type_reference(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    let raw = node_text(source, node).trim();
+    let trimmed = raw.trim_start_matches('&').trim_start();
+    let trimmed = trimmed.strip_prefix("mut ").unwrap_or(trimmed).trim();
+    let core = trimmed.split('<').next().unwrap_or(trimmed).trim();
+    let name = rust_last_path_segment(core)?;
+    Some((core.to_string(), name))
+}
+
+fn rust_last_path_segment(path: &str) -> Option<String> {
+    let segment = path.rsplit("::").next().unwrap_or(path).trim();
+    if segment.is_empty() {
+        None
+    } else {
+        Some(segment.to_string())
+    }
+}
+
 fn analyze_python_tree(source: &str, root: Node<'_>, analysis: &mut FileAnalysis) {
     let mut cursor = root.walk();
     for node in root.named_children(&mut cursor) {
-        match node.kind() {
-            "import_statement" => {
-                let text = node_text(source, node).trim().to_string();
-                if let Some(list) = text.strip_prefix("import ") {
-                    for item in list.split(',') {
-                        let name = item.split_whitespace().next().unwrap_or("").trim();
-                        if !name.is_empty() {
-                            analysis.imports.push(ExtractedImport {
-                                module: name.to_string(),
-                            });
-                        }
+        analyze_python_node(source, node, analysis, &[], None);
+    }
+
+    apply_python_explicit_exports(analysis);
+}
+
+fn analyze_python_node(
+    source: &str,
+    node: Node<'_>,
+    analysis: &mut FileAnalysis,
+    scope: &[String],
+    parent_identity: Option<&str>,
+) {
+    match node.kind() {
+        "import_statement" => {
+            let text = node_text(source, node).trim().to_string();
+            if let Some(list) = text.strip_prefix("import ") {
+                for item in list.split(',') {
+                    let name = item.split_whitespace().next().unwrap_or("").trim();
+                    if !name.is_empty() {
+                        analysis.imports.push(ExtractedImport::module(name.to_string()));
                     }
                 }
             }
-            "import_from_statement" => {
-                let text = node_text(source, node).trim().to_string();
-                if let Some(rest) = text.strip_prefix("from ") {
-                    if let Some((module, _)) = rest.split_once(" import ") {
-                        let module_name = module.trim();
-                        if !module_name.is_empty() {
-                            analysis.imports.push(ExtractedImport {
-                                module: module_name.to_string(),
-                            });
-                        }
-                    }
+        }
+        "import_from_statement" => {
+            analysis
+                .imports
+                .extend(python_imports_from_from_statement(node, source));
+        }
+        "expression_statement" if scope.is_empty() => {
+            analysis
+                .exported_symbol_names
+                .extend(python_explicit_exports_from_statement(node, source));
+        }
+        _ => {}
+    }
+
+    let mut child_scope = scope.to_vec();
+    let mut child_parent_identity = parent_identity.map(str::to_string);
+
+    if let Some(symbol) = python_symbol_from_node(node, source, scope, parent_identity) {
+        analysis
+            .relationships
+            .extend(python_symbol_relationships(node, source, &symbol));
+        child_scope.push(symbol.name.clone());
+        child_parent_identity = Some(symbol.identity.clone());
+        analysis.symbols.push(symbol);
+    }
+
+    let scope_ref = if child_scope.len() == scope.len() {
+        scope
+    } else {
+        &child_scope
+    };
+
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        analyze_python_node(
+            source,
+            child,
+            analysis,
+            scope_ref,
+            child_parent_identity.as_deref(),
+        );
+    }
+}
+
+fn python_symbol_from_node(
+    node: Node<'_>,
+    source: &str,
+    scope: &[String],
+    parent_identity: Option<&str>,
+) -> Option<ExtractedSymbol> {
+    let kind = match node.kind() {
+        "class_definition" => "class",
+        "function_definition" => "function",
+        _ => return None,
+    };
+
+    let name_node = node
+        .child_by_field_name("name")
+        .or_else(|| node.child_by_field_name("property"))?;
+    let name = node_text(source, name_node).trim().to_string();
+    if name.is_empty() {
+        return None;
+    }
+
+    Some(make_extracted_symbol(
+        name.clone(),
+        kind,
+        scope.is_empty() && !name.starts_with('_'),
+        scope,
+        parent_identity,
+        node,
+    ))
+}
+
+fn python_symbol_relationships(
+    node: Node<'_>,
+    source: &str,
+    symbol: &ExtractedSymbol,
+) -> Vec<ExtractedRelationship> {
+    if node.kind() != "class_definition" {
+        return Vec::new();
+    }
+
+    let Some(superclasses) = node.child_by_field_name("superclasses") else {
+        return Vec::new();
+    };
+
+    let mut relationships = Vec::new();
+    let mut cursor = superclasses.walk();
+    for child in superclasses.named_children(&mut cursor) {
+        if let Some((target_expr, target_name)) = python_class_base_reference(child, source) {
+            relationships.push(ExtractedRelationship::new(
+                symbol.identity.clone(),
+                "extends",
+                target_expr,
+                target_name,
+            ));
+        }
+    }
+
+    relationships
+}
+
+fn python_class_base_reference(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    if matches!(node.kind(), "keyword_argument" | "list_splat" | "dictionary_splat") {
+        return None;
+    }
+
+    let text = node_text(source, node).trim();
+    let name = simple_symbol_reference_name(text)?;
+    Some((text.to_string(), name))
+}
+
+fn python_imports_from_from_statement(node: Node<'_>, source: &str) -> Vec<ExtractedImport> {
+    let module_name = node
+        .child_by_field_name("module_name")
+        .map(|module| node_text(source, module).trim().to_string())
+        .unwrap_or_default();
+    let imported_bindings = python_imported_bindings(node, source);
+    let wildcard = python_has_wildcard_import(node);
+
+    if module_name.is_empty() {
+        return Vec::new();
+    }
+
+    if module_name.chars().all(|ch| ch == '.') {
+        return imported_bindings
+            .into_iter()
+            .map(|binding| ExtractedImport::module(format!("{}{}", module_name, binding.source_name)))
+            .collect();
+    }
+
+    let mut import = ExtractedImport::bindings(module_name, imported_bindings);
+    if wildcard {
+        import = import.wildcard();
+    }
+    vec![import]
+}
+
+fn python_imported_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
+    let module_name = node.child_by_field_name("module_name");
+    let mut cursor = node.walk();
+    let mut bindings = Vec::new();
+
+    for child in node.named_children(&mut cursor) {
+        if Some(child) == module_name || child.kind() == "wildcard_import" {
+            continue;
+        }
+
+        let binding = match child.kind() {
+            "aliased_import" => {
+                let source_name = child
+                    .child_by_field_name("name")
+                    .map(|name_node| node_text(source, name_node).trim().to_string())
+                    .unwrap_or_default();
+                let local_name = child
+                    .child_by_field_name("alias")
+                    .map(|alias_node| node_text(source, alias_node).trim().to_string())
+                    .unwrap_or_default();
+                let source_name = source_name.rsplit('.').next().unwrap_or("").trim();
+                if source_name.is_empty() || local_name.is_empty() {
+                    None
+                } else {
+                    Some(ImportBinding::new(source_name, local_name))
                 }
             }
-            "function_definition" | "class_definition" => {
-                let Some(name_node) = node.child_by_field_name("name") else {
-                    continue;
-                };
-                let name = node_text(source, name_node).trim().to_string();
-                if name.is_empty() {
-                    continue;
+            _ => {
+                let source_name = node_text(source, child)
+                    .trim()
+                    .rsplit('.')
+                    .next()
+                    .unwrap_or("")
+                    .trim();
+                if source_name.is_empty() {
+                    None
+                } else {
+                    Some(ImportBinding::same(source_name))
                 }
-                let (start_line, start_col, end_line, end_col) = node_span(node);
-                analysis.symbols.push(ExtractedSymbol {
-                    name: name.clone(),
-                    kind: if node.kind() == "class_definition" {
-                        "class".to_string()
-                    } else {
-                        "function".to_string()
-                    },
-                    exported: !name.starts_with('_'),
-                    start_line,
-                    start_col,
-                    end_line,
-                    end_col,
-                });
             }
-            _ => {}
+        };
+
+        if let Some(binding) = binding {
+            bindings.push(binding);
+        }
+    }
+
+    bindings.sort();
+    bindings.dedup();
+    bindings
+}
+
+fn python_has_wildcard_import(node: Node<'_>) -> bool {
+    let mut cursor = node.walk();
+    let has_wildcard = node
+        .named_children(&mut cursor)
+        .any(|child| child.kind() == "wildcard_import");
+    has_wildcard
+}
+
+fn python_explicit_exports_from_statement(node: Node<'_>, source: &str) -> Vec<String> {
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        if child.kind() != "assignment" {
+            continue;
+        }
+
+        let Some(left) = child.child_by_field_name("left") else {
+            continue;
+        };
+        if node_text(source, left).trim() != "__all__" {
+            continue;
+        }
+
+        let Some(right) = child.child_by_field_name("right") else {
+            continue;
+        };
+        return python_string_sequence_values(right, source);
+    }
+
+    Vec::new()
+}
+
+fn python_string_sequence_values(node: Node<'_>, source: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut stack = vec![node];
+
+    while let Some(current) = stack.pop() {
+        if current.kind() == "string" {
+            if let Some(value) = python_string_literal_value(node_text(source, current)) {
+                values.push(value);
+            }
+            continue;
+        }
+
+        let mut cursor = current.walk();
+        for child in current.named_children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    values
+}
+
+fn python_string_literal_value(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    let quote_index = trimmed.find(['\'', '"'])?;
+    let quote = trimmed[quote_index..].chars().next()?;
+    let rest = &trimmed[quote_index + quote.len_utf8()..];
+    let end_index = rest.rfind(quote)?;
+    let value = rest[..end_index].trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
+fn apply_python_explicit_exports(analysis: &mut FileAnalysis) {
+    if analysis.exported_symbol_names.is_empty() {
+        return;
+    }
+
+    for symbol in analysis.symbols.iter_mut() {
+        if symbol.parent_identity.is_none() {
+            symbol.exported = analysis.exported_symbol_names.contains(&symbol.name);
+        }
+    }
+
+    for import in analysis.imports.iter_mut() {
+        if import
+            .symbols
+            .iter()
+            .any(|symbol| analysis.exported_symbol_names.contains(symbol))
+        {
+            import.reexported = true;
         }
     }
 }
@@ -1239,103 +1943,142 @@ fn analyze_python_tree(source: &str, root: Node<'_>, analysis: &mut FileAnalysis
 fn analyze_ts_tree(source: &str, root: Node<'_>, analysis: &mut FileAnalysis) {
     let mut cursor = root.walk();
     for node in root.named_children(&mut cursor) {
-        match node.kind() {
-            "import_statement" => {
-                if let Some(module) = extract_ts_module_from_text(node_text(source, node)) {
-                    analysis.imports.push(ExtractedImport { module });
-                }
-            }
-            "export_statement" => {
-                if let Some(module) = extract_ts_module_from_text(node_text(source, node)) {
-                    analysis.imports.push(ExtractedImport { module });
-                }
-                analysis
-                    .symbols
-                    .extend(ts_symbols_from_export_statement(node, source));
-            }
-            "function_declaration"
-            | "class_declaration"
-            | "interface_declaration"
-            | "type_alias_declaration"
-            | "enum_declaration"
-            | "module" => {
-                if let Some(symbol) = ts_symbol_from_declaration(node, source, false) {
-                    analysis.symbols.push(symbol);
-                }
-            }
-            "lexical_declaration" | "variable_statement" => {
-                analysis
-                    .symbols
-                    .extend(ts_variable_symbols(node, source, false));
-            }
-            _ => {}
-        }
+        analyze_ts_node(source, node, analysis, &[], None, false);
     }
+
+    mark_exported_symbols(&mut analysis.symbols, &analysis.exported_symbol_names);
 }
 
-fn ts_symbols_from_export_statement(node: Node<'_>, source: &str) -> Vec<ExtractedSymbol> {
-    let mut out = Vec::new();
+fn analyze_ts_node(
+    source: &str,
+    node: Node<'_>,
+    analysis: &mut FileAnalysis,
+    scope: &[String],
+    parent_identity: Option<&str>,
+    exported_context: bool,
+) {
+    match node.kind() {
+        "import_statement" => {
+            if let Some(module) = extract_ts_module_from_text(node_text(source, node)) {
+                let imported_bindings = ts_import_bindings(node, source);
+                analysis.imports.push(ExtractedImport::bindings(module, imported_bindings));
+            }
+        }
+        "export_statement" => {
+            if let Some(module) = extract_ts_module_from_text(node_text(source, node)) {
+                let export_bindings = ts_reexport_bindings(node, source);
+                let mut import = ExtractedImport::bindings(module, export_bindings).reexported();
+                if ts_is_wildcard_reexport(node, source) {
+                    import = import.wildcard();
+                }
+                analysis.imports.push(import);
+            }
+            collect_ts_local_export_names(node, source, &mut analysis.exported_symbol_names);
+
+            let mut cursor = node.walk();
+            for child in node.named_children(&mut cursor) {
+                analyze_ts_node(source, child, analysis, scope, parent_identity, true);
+            }
+            return;
+        }
+        "lexical_declaration" | "variable_statement" => {
+            analysis.symbols.extend(ts_variable_symbols(
+                node,
+                source,
+                exported_context,
+                scope,
+                parent_identity,
+            ));
+            return;
+        }
+        _ => {}
+    }
+
+    let mut child_scope = scope.to_vec();
+    let mut child_parent_identity = parent_identity.map(str::to_string);
+
+    if let Some(symbol) =
+        ts_symbol_from_declaration(node, source, exported_context, scope, parent_identity)
+    {
+        analysis
+            .relationships
+            .extend(ts_symbol_relationships(node, source, &symbol));
+        child_scope.push(symbol.name.clone());
+        child_parent_identity = Some(symbol.identity.clone());
+        analysis.symbols.push(symbol);
+    }
+
+    let scope_ref = if child_scope.len() == scope.len() {
+        scope
+    } else {
+        &child_scope
+    };
+
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
-        match child.kind() {
-            "function_declaration"
-            | "class_declaration"
-            | "interface_declaration"
-            | "type_alias_declaration"
-            | "enum_declaration"
-            | "module" => {
-                if let Some(symbol) = ts_symbol_from_declaration(child, source, true) {
-                    out.push(symbol);
-                }
-            }
-            "lexical_declaration" | "variable_statement" => {
-                out.extend(ts_variable_symbols(child, source, true));
-            }
-            _ => {}
-        }
+        analyze_ts_node(
+            source,
+            child,
+            analysis,
+            scope_ref,
+            child_parent_identity.as_deref(),
+            false,
+        );
     }
-    out
 }
 
 fn ts_symbol_from_declaration(
     node: Node<'_>,
     source: &str,
     exported_hint: bool,
+    scope: &[String],
+    parent_identity: Option<&str>,
 ) -> Option<ExtractedSymbol> {
     let kind = match node.kind() {
         "function_declaration" => "function",
+        "generator_function_declaration" => "function",
         "class_declaration" => "class",
         "interface_declaration" => "interface",
         "type_alias_declaration" => "type",
         "enum_declaration" => "enum",
         "module" => "namespace",
+        "method_definition" => "method",
+        "public_field_definition" => ts_public_field_kind(node),
+        "field_definition" => ts_public_field_kind(node),
         _ => return None,
     };
 
     let name = node
         .child_by_field_name("name")
+        .or_else(|| node.child_by_field_name("property"))
         .map(|n| node_text(source, n).trim().to_string())
         .or_else(|| first_named_identifier(node, source))?;
     if name.is_empty() {
         return None;
     }
-    let exported = exported_hint || node_text(source, node).trim_start().starts_with("export ");
-    let (start_line, start_col, end_line, end_col) = node_span(node);
+    let exported = scope.is_empty()
+        && (exported_hint || node_text(source, node).trim_start().starts_with("export "));
 
-    Some(ExtractedSymbol {
+    Some(make_extracted_symbol(
         name,
-        kind: kind.to_string(),
+        kind,
         exported,
-        start_line,
-        start_col,
-        end_line,
-        end_col,
-    })
+        scope,
+        parent_identity,
+        node,
+    ))
 }
 
-fn ts_variable_symbols(node: Node<'_>, source: &str, exported_hint: bool) -> Vec<ExtractedSymbol> {
+fn ts_variable_symbols(
+    node: Node<'_>,
+    source: &str,
+    exported_hint: bool,
+    scope: &[String],
+    parent_identity: Option<&str>,
+) -> Vec<ExtractedSymbol> {
     let mut out = Vec::new();
-    let exported = exported_hint || node_text(source, node).trim_start().starts_with("export ");
+    let exported = scope.is_empty()
+        && (exported_hint || node_text(source, node).trim_start().starts_with("export "));
 
     let mut stack = vec![node];
     while let Some(current) = stack.pop() {
@@ -1343,16 +2086,18 @@ fn ts_variable_symbols(node: Node<'_>, source: &str, exported_hint: bool) -> Vec
             if let Some(name_node) = current.child_by_field_name("name") {
                 let name = node_text(source, name_node).trim().to_string();
                 if !name.is_empty() {
-                    let (start_line, start_col, end_line, end_col) = node_span(current);
-                    out.push(ExtractedSymbol {
+                    let kind = ts_variable_symbol_kind(current);
+                    if !scope.is_empty() && kind == "variable" {
+                        continue;
+                    }
+                    out.push(make_extracted_symbol(
                         name,
-                        kind: "variable".to_string(),
+                        kind,
                         exported,
-                        start_line,
-                        start_col,
-                        end_line,
-                        end_col,
-                    });
+                        scope,
+                        parent_identity,
+                        current,
+                    ));
                 }
             }
             continue;
@@ -1365,6 +2110,264 @@ fn ts_variable_symbols(node: Node<'_>, source: &str, exported_hint: bool) -> Vec
     }
 
     out
+}
+
+fn ts_symbol_relationships(
+    node: Node<'_>,
+    source: &str,
+    symbol: &ExtractedSymbol,
+) -> Vec<ExtractedRelationship> {
+    if node.kind() != "class_declaration" {
+        return Vec::new();
+    }
+
+    let mut relationships = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        if child.kind() != "class_heritage" {
+            continue;
+        }
+
+        let mut heritage_cursor = child.walk();
+        for clause in child.named_children(&mut heritage_cursor) {
+            match clause.kind() {
+                "extends_clause" => {
+                    if let Some(value_node) = clause.child_by_field_name("value") {
+                        if let Some((target_expr, target_name)) = ts_type_reference(value_node, source)
+                        {
+                            relationships.push(ExtractedRelationship::new(
+                                symbol.identity.clone(),
+                                "extends",
+                                target_expr,
+                                target_name,
+                            ));
+                        }
+                    }
+                }
+                "implements_clause" => {
+                    let mut clause_cursor = clause.walk();
+                    for type_node in clause.named_children(&mut clause_cursor) {
+                        if let Some((target_expr, target_name)) = ts_type_reference(type_node, source)
+                        {
+                            relationships.push(ExtractedRelationship::new(
+                                symbol.identity.clone(),
+                                "implements",
+                                target_expr,
+                                target_name,
+                            ));
+                        }
+                    }
+                }
+                _ => {
+                    if let Some((target_expr, target_name)) = ts_type_reference(clause, source) {
+                        relationships.push(ExtractedRelationship::new(
+                            symbol.identity.clone(),
+                            "extends",
+                            target_expr,
+                            target_name,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    relationships
+}
+
+fn ts_type_reference(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    let raw = if node.kind() == "generic_type" {
+        node.child_by_field_name("type")
+            .map(|type_node| node_text(source, type_node).trim().to_string())
+            .unwrap_or_else(|| node_text(source, node).trim().to_string())
+    } else {
+        node_text(source, node).trim().to_string()
+    };
+    let name = simple_symbol_reference_name(&raw)?;
+    Some((raw, name))
+}
+
+fn ts_import_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
+    let mut bindings = Vec::new();
+    let mut stack = vec![node];
+
+    while let Some(current) = stack.pop() {
+        if current.kind() == "import_specifier" {
+            if let Some(name_node) = current.child_by_field_name("name") {
+                let source_name = node_text(source, name_node).trim().to_string();
+                if !source_name.is_empty() {
+                    let local_name = current
+                        .child_by_field_name("alias")
+                        .map(|alias_node| node_text(source, alias_node).trim().to_string())
+                        .filter(|alias| !alias.is_empty())
+                        .unwrap_or_else(|| source_name.clone());
+                    bindings.push(ImportBinding::new(source_name, local_name));
+                }
+            }
+            continue;
+        }
+
+        let mut cursor = current.walk();
+        for child in current.named_children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    bindings.sort();
+    bindings.dedup();
+    bindings
+}
+
+fn ts_reexport_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
+    let mut bindings = Vec::new();
+    let mut stack = vec![node];
+
+    while let Some(current) = stack.pop() {
+        if current.kind() == "export_specifier" {
+            if let Some(name_node) = current.child_by_field_name("name") {
+                let source_name = node_text(source, name_node).trim().to_string();
+                if !source_name.is_empty() {
+                    let local_name = current
+                        .child_by_field_name("alias")
+                        .map(|alias_node| node_text(source, alias_node).trim().to_string())
+                        .filter(|alias| !alias.is_empty())
+                        .unwrap_or_else(|| source_name.clone());
+                    bindings.push(ImportBinding::new(source_name, local_name));
+                }
+            }
+            continue;
+        }
+
+        let mut cursor = current.walk();
+        for child in current.named_children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    bindings.sort();
+    bindings.dedup();
+    bindings
+}
+
+fn ts_is_wildcard_reexport(node: Node<'_>, source: &str) -> bool {
+    let text = node_text(source, node);
+    text.contains("export *") && !text.contains('{')
+}
+
+fn mark_exported_symbols(symbols: &mut [ExtractedSymbol], exported_names: &BTreeSet<String>) {
+    if exported_names.is_empty() {
+        return;
+    }
+
+    for symbol in symbols.iter_mut() {
+        if symbol.parent_identity.is_none() && exported_names.contains(&symbol.name) {
+            symbol.exported = true;
+        }
+    }
+}
+
+fn collect_ts_local_export_names(
+    node: Node<'_>,
+    source: &str,
+    exported_names: &mut BTreeSet<String>,
+) {
+    if node.child_by_field_name("source").is_some() {
+        return;
+    }
+
+    for name in ts_local_export_names_from_text(node_text(source, node)) {
+        exported_names.insert(name);
+    }
+}
+
+fn ts_local_export_names_from_text(text: &str) -> Vec<String> {
+    let trimmed = text.trim().trim_end_matches(';').trim();
+    let mut names = Vec::new();
+
+    if let Some(rest) = trimmed.strip_prefix("export default ") {
+        let rest = rest.trim();
+        if !matches!(rest.split_whitespace().next(), Some("function" | "class" | "async")) {
+            if let Some(name) = leading_js_identifier(rest) {
+                names.push(name);
+            }
+        }
+    }
+
+    if let (Some(open), Some(close)) = (trimmed.find('{'), trimmed.rfind('}')) {
+        if close > open {
+            for item in split_top_level_commas(&trimmed[open + 1..close]) {
+                let local = item
+                    .split_once(" as ")
+                    .map(|(left, _)| left)
+                    .unwrap_or(item.as_str())
+                    .trim();
+                let local = local.strip_prefix("type ").unwrap_or(local).trim();
+                if let Some(name) = leading_js_identifier(local) {
+                    names.push(name);
+                }
+            }
+        }
+    }
+
+    names
+}
+
+fn leading_js_identifier(text: &str) -> Option<String> {
+    let mut chars = text.chars();
+    let first = chars.next()?;
+    if !(first == '_' || first == '$' || first.is_ascii_alphabetic()) {
+        return None;
+    }
+
+    let mut ident = String::from(first);
+    for ch in chars {
+        if ch == '_' || ch == '$' || ch.is_ascii_alphanumeric() {
+            ident.push(ch);
+        } else {
+            break;
+        }
+    }
+
+    Some(ident)
+}
+
+fn simple_symbol_reference_name(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    let trimmed = trimmed.strip_prefix("readonly ").unwrap_or(trimmed).trim();
+    let name = leading_js_identifier(trimmed)?;
+    let rest = trimmed[name.len()..].trim_start();
+    if rest.is_empty() || rest.starts_with('<') || rest.starts_with('[') || rest.starts_with('?')
+    {
+        Some(name)
+    } else {
+        None
+    }
+}
+
+fn ts_public_field_kind(node: Node<'_>) -> &'static str {
+    node.child_by_field_name("value")
+        .map(|value| {
+            if is_ts_function_like_kind(value.kind()) {
+                "method"
+            } else {
+                "field"
+            }
+        })
+        .unwrap_or("field")
+}
+
+fn ts_variable_symbol_kind(node: Node<'_>) -> &'static str {
+    node.child_by_field_name("value")
+        .map(|value| match value.kind() {
+            kind if is_ts_function_like_kind(kind) => "function",
+            "class" => "class",
+            _ => "variable",
+        })
+        .unwrap_or("variable")
+}
+
+fn is_ts_function_like_kind(kind: &str) -> bool {
+    matches!(kind, "arrow_function" | "function_expression" | "generator_function")
 }
 
 fn extract_ts_module_from_text(text: &str) -> Option<String> {
@@ -1415,12 +2418,101 @@ fn first_named_identifier(node: Node<'_>, source: &str) -> Option<String> {
     None
 }
 
+fn make_extracted_symbol(
+    name: String,
+    kind: &str,
+    exported: bool,
+    scope: &[String],
+    parent_identity: Option<&str>,
+    node: Node<'_>,
+) -> ExtractedSymbol {
+    let qualified_name = qualify_symbol_name(scope, &name);
+    let (start_line, start_col, end_line, end_col) = node_span(node);
+
+    ExtractedSymbol {
+        name,
+        qualified_name: qualified_name.clone(),
+        identity: format!("{}@{}:{}", qualified_name, start_line, start_col),
+        parent_identity: parent_identity.map(|s| s.to_string()),
+        kind: kind.to_string(),
+        exported,
+        start_line,
+        start_col,
+        end_line,
+        end_col,
+    }
+}
+
+fn qualify_symbol_name(scope: &[String], name: &str) -> String {
+    if scope.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}::{}", scope.join("::"), name)
+    }
+}
+
+fn compare_extracted_symbols(a: &ExtractedSymbol, b: &ExtractedSymbol) -> std::cmp::Ordering {
+    a.start_line
+        .cmp(&b.start_line)
+        .then_with(|| a.start_col.cmp(&b.start_col))
+        .then_with(|| b.end_line.cmp(&a.end_line))
+        .then_with(|| b.end_col.cmp(&a.end_col))
+        .then_with(|| a.qualified_name.cmp(&b.qualified_name))
+}
+
+fn resolve_relationship_target_ids(
+    source_file: &str,
+    language: CodeLanguage,
+    relationship: &ExtractedRelationship,
+    top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
+    imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
+    known_files: &BTreeSet<String>,
+) -> Vec<BlockId> {
+    let mut target_ids = Vec::new();
+
+    if let Some(local_ids) = top_level_symbol_ids
+        .get(&(source_file.to_string(), relationship.target_name.clone()))
+    {
+        target_ids.extend(local_ids.iter().copied());
+    }
+
+    if let Some(imported_ids) = imported_symbol_targets_by_file
+        .get(source_file)
+        .and_then(|bindings| bindings.get(&relationship.target_name))
+    {
+        target_ids.extend(imported_ids.iter().copied());
+    }
+
+    if language == CodeLanguage::Rust && relationship.target_expr.contains("::") {
+        if let ImportResolution::Resolved(target_file) = resolve_import(
+            source_file,
+            &language,
+            &relationship.target_expr,
+            known_files,
+        ) {
+            if let Some(name) = rust_last_path_segment(&relationship.target_expr) {
+                if let Some(ids) = top_level_symbol_ids.get(&(target_file, name)) {
+                    target_ids.extend(ids.iter().copied());
+                }
+            }
+        }
+    }
+
+    let mut unique_ids = Vec::new();
+    for target_id in target_ids {
+        if !unique_ids.contains(&target_id) {
+            unique_ids.push(target_id);
+        }
+    }
+    unique_ids
+}
+
 fn resolve_import(
     source_file: &str,
     language: &CodeLanguage,
     module: &str,
     known_files: &BTreeSet<String>,
-) -> Option<String> {
+) -> ImportResolution {
     match language {
         CodeLanguage::Rust => resolve_rust_import(source_file, module, known_files),
         CodeLanguage::Python => resolve_python_import(source_file, module, known_files),
@@ -1434,17 +2526,17 @@ fn resolve_ts_import(
     source_file: &str,
     module: &str,
     known_files: &BTreeSet<String>,
-) -> Option<String> {
+) -> ImportResolution {
     if !module.starts_with('.') {
-        return None;
+        return ImportResolution::External;
     }
 
     let source_dir = parent_directory(source_file);
     let joined = normalize_relative_join(&source_dir, module);
 
-    ts_candidates(&joined)
-        .into_iter()
-        .find(|candidate| known_files.contains(candidate))
+    find_known_candidate(ts_candidates(&joined), known_files)
+        .map(ImportResolution::Resolved)
+        .unwrap_or(ImportResolution::Unresolved)
 }
 
 fn ts_candidates(base: &str) -> Vec<String> {
@@ -1469,7 +2561,7 @@ fn resolve_python_import(
     source_file: &str,
     module: &str,
     known_files: &BTreeSet<String>,
-) -> Option<String> {
+) -> ImportResolution {
     let source_dir = parent_directory(source_file);
     let mut dots = 0usize;
     for ch in module.chars() {
@@ -1498,9 +2590,11 @@ fn resolve_python_import(
         format!("{}/{}", base_dir, module_path)
     };
 
-    py_candidates(&joined)
-        .into_iter()
-        .find(|candidate| known_files.contains(candidate))
+    match find_known_candidate(py_candidates(&joined), known_files) {
+        Some(candidate) => ImportResolution::Resolved(candidate),
+        None if dots == 0 => ImportResolution::External,
+        None => ImportResolution::Unresolved,
+    }
 }
 
 fn py_candidates(base: &str) -> Vec<String> {
@@ -1519,28 +2613,32 @@ fn resolve_rust_import(
     source_file: &str,
     module: &str,
     known_files: &BTreeSet<String>,
-) -> Option<String> {
+) -> ImportResolution {
     if module.starts_with("std::") || module.starts_with("core::") || module.starts_with("alloc::")
     {
-        return None;
+        return ImportResolution::External;
     }
 
     if let Some(name) = module.strip_prefix("mod:") {
         let source_dir = parent_directory(source_file);
         let local = normalize_relative_join(&source_dir, name);
-        for candidate in [format!("{}.rs", local), format!("{}/mod.rs", local)] {
-            if known_files.contains(&candidate) {
-                return Some(candidate);
-            }
-        }
-        return None;
+        return find_known_candidate(
+            [format!("{}.rs", local), format!("{}/mod.rs", local)],
+            known_files,
+        )
+        .map(ImportResolution::Resolved)
+        .unwrap_or(ImportResolution::Unresolved);
     }
 
     let source_dir = parent_directory(source_file);
+    let crate_root = rust_module_root(source_file);
+    let explicitly_local = module.starts_with("crate::")
+        || module.starts_with("self::")
+        || module.starts_with("super::");
 
     let (base_dir, path_segments) = if let Some(rest) = module.strip_prefix("crate::") {
         (
-            "src".to_string(),
+            crate_root.clone(),
             rest.split("::").map(|s| s.to_string()).collect::<Vec<_>>(),
         )
     } else if let Some(rest) = module.strip_prefix("self::") {
@@ -1561,7 +2659,7 @@ fn resolve_rust_import(
         )
     } else {
         (
-            "src".to_string(),
+            crate_root.clone(),
             module
                 .split("::")
                 .map(|s| s.to_string())
@@ -1569,28 +2667,211 @@ fn resolve_rust_import(
         )
     };
 
-    for trimmed in (1..=path_segments.len()).rev() {
-        let joined = path_segments[..trimmed].join("/");
-        if joined.is_empty() {
-            continue;
-        }
-        let candidate_base = if base_dir.is_empty() {
-            joined
-        } else {
-            format!("{}/{}", base_dir, joined)
-        };
-
-        for candidate in [
-            format!("{}.rs", candidate_base),
-            format!("{}/mod.rs", candidate_base),
-        ] {
-            if known_files.contains(&candidate) {
-                return Some(candidate);
+    if let Some(candidate) = find_known_candidate(
+        (1..=path_segments.len()).rev().flat_map(|trimmed| {
+            let joined = path_segments[..trimmed].join("/");
+            if joined.is_empty() {
+                return Vec::new();
             }
+            let candidate_base = if base_dir.is_empty() {
+                joined
+            } else {
+                format!("{}/{}", base_dir, joined)
+            };
+            vec![
+                format!("{}.rs", candidate_base),
+                format!("{}/mod.rs", candidate_base),
+            ]
+        }),
+        known_files,
+    ) {
+        return ImportResolution::Resolved(candidate);
+    }
+
+    if module.starts_with("crate::") && path_segments.len() == 1 {
+        if let Some(entry_file) = rust_crate_entry_file(&crate_root, known_files) {
+            return ImportResolution::Resolved(entry_file);
         }
     }
 
+    if explicitly_local {
+        return ImportResolution::Unresolved;
+    }
+
+    let first_segment = path_segments.first().map(|s| s.as_str()).unwrap_or_default();
+    if rust_root_module_exists(&crate_root, first_segment, known_files) {
+        ImportResolution::Unresolved
+    } else {
+        ImportResolution::External
+    }
+}
+
+fn find_known_candidate<I>(candidates: I, known_files: &BTreeSet<String>) -> Option<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    candidates.into_iter().find(|candidate| known_files.contains(candidate))
+}
+
+fn rust_crate_entry_file(crate_root: &str, known_files: &BTreeSet<String>) -> Option<String> {
+    find_known_candidate(
+        [
+            format!("{}/lib.rs", crate_root),
+            format!("{}/main.rs", crate_root),
+            format!("{}/mod.rs", crate_root),
+        ],
+        known_files,
+    )
+}
+
+fn rust_module_root(source_file: &str) -> String {
+    let parts: Vec<&str> = source_file.split('/').collect();
+    if let Some((index, _)) = parts.iter().enumerate().rfind(|(_, part)| **part == "src") {
+        return parts[..=index].join("/");
+    }
+
+    parent_directory(source_file)
+}
+
+fn rust_root_module_exists(crate_root: &str, segment: &str, known_files: &BTreeSet<String>) -> bool {
+    if segment.is_empty() {
+        return false;
+    }
+
+    [
+        format!("{}/{}.rs", crate_root, segment),
+        format!("{}/{}/mod.rs", crate_root, segment),
+    ]
+    .into_iter()
+    .any(|candidate| known_files.contains(&candidate))
+}
+
+fn expand_rust_use_declaration(text: &str) -> Vec<String> {
+    let trimmed = text.trim();
+    let Some(use_index) = trimmed.find("use ") else {
+        return Vec::new();
+    };
+
+    let expr = trimmed[use_index + 4..].trim().trim_end_matches(';').trim();
+    expand_rust_use_tree("", expr)
+}
+
+fn expand_rust_use_tree(prefix: &str, expr: &str) -> Vec<String> {
+    let trimmed = expr.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        return split_top_level_commas(&trimmed[1..trimmed.len() - 1])
+            .into_iter()
+            .flat_map(|part| expand_rust_use_tree(prefix, &part))
+            .collect();
+    }
+
+    if let Some(open_idx) = find_top_level_char(trimmed, '{') {
+        let prefix_part = trimmed[..open_idx].trim().trim_end_matches("::");
+        let close_idx = matching_brace_index(trimmed, open_idx).unwrap_or(trimmed.len() - 1);
+        let inner = &trimmed[open_idx + 1..close_idx];
+        let combined_prefix = join_rust_use_prefix(prefix, prefix_part);
+        return split_top_level_commas(inner)
+            .into_iter()
+            .flat_map(|part| expand_rust_use_tree(&combined_prefix, &part))
+            .collect();
+    }
+
+    let segment = strip_rust_use_alias(trimmed)
+        .trim_end_matches("::*")
+        .trim_start_matches("::")
+        .trim();
+    if segment.is_empty() {
+        return Vec::new();
+    }
+
+    if segment == "self" || segment == "*" {
+        return if prefix.is_empty() {
+            Vec::new()
+        } else {
+            vec![prefix.to_string()]
+        };
+    }
+
+    vec![join_rust_use_prefix(prefix, segment)]
+}
+
+fn split_top_level_commas(input: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0usize;
+
+    for (index, ch) in input.char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                let part = input[start..index].trim();
+                if !part.is_empty() {
+                    out.push(part.to_string());
+                }
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+
+    let tail = input[start..].trim();
+    if !tail.is_empty() {
+        out.push(tail.to_string());
+    }
+
+    out
+}
+
+fn find_top_level_char(input: &str, needle: char) -> Option<usize> {
+    let mut depth = 0usize;
+    for (index, ch) in input.char_indices() {
+        match ch {
+            '{' if ch == needle && depth == 0 => return Some(index),
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
     None
+}
+
+fn matching_brace_index(input: &str, open_idx: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (index, ch) in input.char_indices().skip_while(|(idx, _)| *idx < open_idx) {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn strip_rust_use_alias(segment: &str) -> &str {
+    segment.rsplit_once(" as ").map(|(left, _)| left).unwrap_or(segment)
+}
+
+fn join_rust_use_prefix(prefix: &str, segment: &str) -> String {
+    let clean_prefix = prefix.trim().trim_end_matches("::").trim_start_matches("::");
+    let clean_segment = segment.trim().trim_end_matches("::").trim_start_matches("::");
+
+    if clean_prefix.is_empty() {
+        clean_segment.to_string()
+    } else if clean_segment.is_empty() {
+        clean_prefix.to_string()
+    } else {
+        format!("{}::{}", clean_prefix, clean_segment)
+    }
 }
 
 fn has_known_extension(path: &str, exts: &[&str]) -> bool {
@@ -2283,8 +3564,127 @@ fn glob_to_regex(glob: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
     use std::io::Write;
     use tempfile::tempdir;
+
+    fn symbol_logical_keys(doc: &Document) -> Vec<String> {
+        let mut out: Vec<_> = doc
+            .blocks
+            .values()
+            .filter(|block| node_class(block).as_deref() == Some("symbol"))
+            .filter_map(block_logical_key)
+            .collect();
+        out.sort();
+        out
+    }
+
+    fn logical_key_to_block_id(doc: &Document) -> BTreeMap<String, BlockId> {
+        doc.blocks
+            .iter()
+            .filter_map(|(id, block)| block_logical_key(block).map(|key| (key, *id)))
+            .collect()
+    }
+
+    fn symbol_block_by_prefix<'a>(doc: &'a Document, prefix: &str) -> Option<&'a Block> {
+        doc.blocks
+            .values()
+            .filter(|block| node_class(block).as_deref() == Some("symbol"))
+            .filter_map(|block| block_logical_key(block).map(|key| (key, block)))
+            .find(|(key, _)| *key == prefix)
+            .map(|(_, block)| block)
+            .or_else(|| {
+                doc.blocks.values().find(|block| {
+                    node_class(block).as_deref() == Some("symbol")
+                        && block_logical_key(block)
+                            .map(|key| key.starts_with(prefix))
+                            .unwrap_or(false)
+                })
+            })
+    }
+
+    fn symbol_exported(doc: &Document, prefix: &str) -> bool {
+        symbol_block_by_prefix(doc, prefix)
+            .and_then(|block| block.metadata.custom.get(META_EXPORTED))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false)
+    }
+
+    fn symbol_kind(doc: &Document, prefix: &str) -> Option<String> {
+        symbol_block_by_prefix(doc, prefix)
+            .and_then(|block| block.metadata.custom.get(META_SYMBOL_KIND))
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string())
+    }
+
+    fn file_block_by_key<'a>(doc: &'a Document, logical_key: &str) -> Option<&'a Block> {
+        doc.blocks.values().find(|block| {
+            node_class(block).as_deref() == Some("file")
+                && block_logical_key(block).as_deref() == Some(logical_key)
+        })
+    }
+
+    fn block_logical_key_by_id(doc: &Document, block_id: BlockId) -> Option<String> {
+        doc.blocks.get(&block_id).and_then(block_logical_key)
+    }
+
+    fn file_has_edge_to_symbol(
+        doc: &Document,
+        file_key: &str,
+        edge_type: &str,
+        relation: &str,
+        symbol_prefix: &str,
+    ) -> bool {
+        let Some(block) = file_block_by_key(doc, file_key) else {
+            return false;
+        };
+
+        block.edges.iter().any(|edge| {
+            edge_type_name(&edge.edge_type) == edge_type
+                && edge
+                    .metadata
+                    .custom
+                    .get("relation")
+                    .and_then(|value| value.as_str())
+                    == Some(relation)
+                && block_logical_key_by_id(doc, edge.target)
+                    .map(|key| key.starts_with(symbol_prefix))
+                    .unwrap_or(false)
+        })
+    }
+
+    fn symbol_has_edge_to_symbol(
+        doc: &Document,
+        source_prefix: &str,
+        edge_type: &str,
+        relation: &str,
+        target_prefix: &str,
+    ) -> bool {
+        let Some(block) = symbol_block_by_prefix(doc, source_prefix) else {
+            return false;
+        };
+
+        block.edges.iter().any(|edge| {
+            edge_type_name(&edge.edge_type) == edge_type
+                && edge
+                    .metadata
+                    .custom
+                    .get("relation")
+                    .and_then(|value| value.as_str())
+                    == Some(relation)
+                && block_logical_key_by_id(doc, edge.target)
+                    .map(|key| key.starts_with(target_prefix))
+                    .unwrap_or(false)
+        })
+    }
+
+    fn edge_type_name(edge_type: &EdgeType) -> String {
+        match edge_type {
+            EdgeType::References => "references".to_string(),
+            EdgeType::Custom(name) => name.clone(),
+            other => format!("{other:?}"),
+        }
+    }
 
     #[test]
     fn test_validate_profile_detects_missing_markers() {
@@ -2389,7 +3789,366 @@ mod tests {
         known.insert("src/util.ts".to_string());
 
         let resolved = resolve_ts_import("src/main.ts", "./util", &known);
-        assert_eq!(resolved.as_deref(), Some("src/util.ts"));
+        assert_eq!(resolved, ImportResolution::Resolved("src/util.ts".to_string()));
+    }
+
+    #[test]
+    fn test_rust_use_group_expansion() {
+        let imports = expand_rust_use_declaration(
+            "use crate::{block::{Block, BlockState}, edge::Edge, util::{self, helper as helper_fn}};",
+        );
+
+        assert_eq!(
+            imports,
+            vec![
+                "crate::block::Block".to_string(),
+                "crate::block::BlockState".to_string(),
+                "crate::edge::Edge".to_string(),
+                "crate::util".to_string(),
+                "crate::util::helper".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_workspace_rust_imports_resolve_without_external_warnings() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("crates/demo/src")).unwrap();
+        fs::write(
+            dir.path().join("crates/demo/src/lib.rs"),
+            "use anyhow::Result;\nuse crate::block::{helper, Thing};\npub fn run() -> Result<()> { helper(); let _ = Thing; Ok(()) }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("crates/demo/src/block.rs"),
+            "pub struct Thing;\npub fn helper() {}\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "workspace-imports".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!build.diagnostics.iter().any(|d| d.code == "CG2006"));
+        assert!(build.stats.reference_edges >= 1);
+    }
+
+    #[test]
+    fn test_rust_crate_root_symbol_imports_resolve_to_entry_file() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "pub struct Document;\npub type Result<T> = std::result::Result<T, ()>;\nmod inner;\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("src/inner.rs"),
+            "use crate::Document;\nuse crate::Result;\npub fn run() {}\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "crate-root-symbols".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!build.diagnostics.iter().any(|d| d.code == "CG2006"));
+        assert!(build.stats.reference_edges >= 1);
+    }
+
+    #[test]
+    fn test_python_relative_module_import_and_symbol_edges_are_captured() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("pkg")).unwrap();
+        fs::write(dir.path().join("pkg/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("pkg/mod.py"),
+            "from . import helper\nfrom .helper import helper as helper_fn\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "python-relative-imports".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!build.diagnostics.iter().any(|d| d.code == "CG2006"));
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:pkg/mod.py",
+            "imports_symbol",
+            "imports_symbol",
+            "symbol:pkg/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_python_all_marks_reexported_package_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("pkg")).unwrap();
+        fs::write(dir.path().join("pkg/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("pkg/__init__.py"),
+            "from .helper import helper\n__all__ = [\"helper\"]\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "python-all-reexports".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:pkg/__init__.py",
+            "exports",
+            "reexports",
+            "symbol:pkg/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_rust_and_ts_reexports_point_to_target_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::write(dir.path().join("src/helper.rs"), "pub fn helper() {}\n").unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "pub mod helper;\npub use helper::helper;\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/helper.ts"),
+            "export function helper() { return 1; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/mod.ts"),
+            "export { helper } from './helper';\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "reexports".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:src/lib.rs",
+            "exports",
+            "reexports",
+            "symbol:src/helper.rs::helper",
+        ));
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:web/mod.ts",
+            "exports",
+            "reexports",
+            "symbol:web/helper.ts::helper",
+        ));
+        assert!(file_has_edge_to_symbol(
+            &build.document,
+            "file:web/mod.ts",
+            "imports_symbol",
+            "imports_symbol",
+            "symbol:web/helper.ts::helper",
+        ));
+    }
+
+    #[test]
+    fn test_explicit_type_relationship_edges_resolve_across_supported_languages() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/base.ts"),
+            "export class Base {}\nexport interface Face {}\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/app.ts"),
+            "import { Base as ImportedBase, Face as ImportedFace } from './base';\nclass Child extends ImportedBase implements ImportedFace {}\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/base.py"), "class Base:\n    pass\n").unwrap();
+        fs::write(
+            dir.path().join("py/app.py"),
+            "from .base import Base as ImportedBase\nclass Child(ImportedBase):\n    pass\n",
+        )
+        .unwrap();
+
+        fs::write(
+            dir.path().join("src/base.rs"),
+            "pub trait Face {}\npub struct Thing;\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod base;\nuse crate::base::Face;\nstruct Thing;\nimpl Face for Thing {}\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "type-relationships".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/app.ts::Child",
+            "extends",
+            "extends",
+            "symbol:web/base.ts::Base",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/app.ts::Child",
+            "implements",
+            "implements",
+            "symbol:web/base.ts::Face",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/app.py::Child",
+            "extends",
+            "extends",
+            "symbol:py/base.py::Base",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::Thing#",
+            "implements",
+            "implements",
+            "symbol:src/base.rs::Face",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::Thing#",
+            "for_type",
+            "for_type",
+            "symbol:src/lib.rs::Thing",
+        ));
+    }
+
+    #[test]
+    fn test_nested_symbols_are_captured_and_nested_in_structure() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::create_dir_all(dir.path().join("pkg")).unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "pub struct Thing;\nimpl Thing { pub fn method(&self) {} }\npub fn top() { fn inner() {} inner(); }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("pkg/mod.py"),
+            "class Thing:\n    def method(self):\n        return 1\n\ndef top():\n    def inner():\n        return 2\n    return inner()\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/mod.ts"),
+            "export class Thing {\n  method() { return 1; }\n}\nexport function top() {\n  function inner() { return 2; }\n  return inner();\n}\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "nested-symbols".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        let keys = symbol_logical_keys(&build.document);
+        assert!(keys.iter().any(|k| k.starts_with("symbol:src/lib.rs::Thing::method")));
+        assert!(keys.iter().any(|k| k.starts_with("symbol:src/lib.rs::top::inner")));
+        assert!(keys.iter().any(|k| k.starts_with("symbol:pkg/mod.py::Thing::method")));
+        assert!(keys.iter().any(|k| k.starts_with("symbol:pkg/mod.py::top::inner")));
+        assert!(keys.iter().any(|k| k.starts_with("symbol:web/mod.ts::Thing::method")));
+        assert!(keys.iter().any(|k| k.starts_with("symbol:web/mod.ts::top::inner")));
+
+        let key_index = logical_key_to_block_id(&build.document);
+        let rust_method_id = key_index
+            .iter()
+            .find(|(key, _)| key.starts_with("symbol:src/lib.rs::Thing::method"))
+            .map(|(_, id)| *id)
+            .unwrap();
+        let rust_parent_id = build
+            .document
+            .structure
+            .iter()
+            .find(|(_, children)| children.contains(&rust_method_id))
+            .map(|(id, _)| *id)
+            .unwrap();
+
+        let rust_parent_key = key_index
+            .iter()
+            .find(|(_, id)| **id == rust_parent_id)
+            .map(|(key, _)| key.as_str())
+            .unwrap();
+
+        assert!(rust_parent_key.starts_with("symbol:src/lib.rs::Thing"));
+    }
+
+    #[test]
+    fn test_ts_js_export_aliases_generators_and_function_like_members_are_captured() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+
+        fs::write(
+            dir.path().join("src/mod.ts"),
+            "function internal() { return 1; }\nexport { internal };\nexport function* gen() { yield 1; }\nexport const arrow = () => 1;\nclass Example {\n  handler = () => 1;\n}\nexport default Example;\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("src/mod.js"),
+            "function internalJs() { return 1; }\nexport { internalJs };\nexport function* jsGen() { yield 1; }\nclass JsExample {\n  handler = () => 1;\n}\nexport default JsExample;\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "ts-js-coverage".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        let keys = symbol_logical_keys(&build.document);
+        assert!(keys.iter().any(|k| k.starts_with("symbol:src/mod.ts::gen")));
+        assert!(keys.iter().any(|k| k.starts_with("symbol:src/mod.ts::Example::handler")));
+        assert!(keys.iter().any(|k| k.starts_with("symbol:src/mod.js::jsGen")));
+        assert!(keys.iter().any(|k| k.starts_with("symbol:src/mod.js::JsExample::handler")));
+
+        assert!(symbol_exported(&build.document, "symbol:src/mod.ts::internal"));
+        assert!(symbol_exported(&build.document, "symbol:src/mod.ts::Example"));
+        assert!(symbol_exported(&build.document, "symbol:src/mod.js::internalJs"));
+        assert!(symbol_exported(&build.document, "symbol:src/mod.js::JsExample"));
+
+        assert_eq!(symbol_kind(&build.document, "symbol:src/mod.ts::arrow").as_deref(), Some("function"));
+        assert_eq!(
+            symbol_kind(&build.document, "symbol:src/mod.ts::Example::handler").as_deref(),
+            Some("method")
+        );
     }
 
     #[test]
