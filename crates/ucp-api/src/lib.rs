@@ -34,9 +34,9 @@ pub use ucp_codegraph::{
     build_code_graph, canonical_codegraph_json, canonical_fingerprint, codegraph_prompt_projection,
     codegraph_prompt_projection_with_config, validate_code_graph_profile, CodeGraphBuildInput,
     CodeGraphBuildResult, CodeGraphBuildStatus, CodeGraphDiagnostic, CodeGraphExtractorConfig,
-    CodeGraphPromptProjectionConfig, CodeGraphSeverity, CodeGraphStats,
-    CodeGraphValidationResult, PortableDocument, CODEGRAPH_EXTRACTOR_VERSION,
-    CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
+    CodeGraphPromptProjectionConfig, CodeGraphSeverity, CodeGraphStats, CodeGraphValidationResult,
+    PortableDocument, CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER,
+    CODEGRAPH_PROFILE_VERSION,
 };
 
 /// UCP client for document manipulation

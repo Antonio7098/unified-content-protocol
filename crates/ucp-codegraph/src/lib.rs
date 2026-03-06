@@ -8,7 +8,8 @@ pub use legacy::{
 pub use model::{
     CodeGraphBuildInput, CodeGraphBuildResult, CodeGraphBuildStatus, CodeGraphDiagnostic,
     CodeGraphExtractorConfig, CodeGraphSeverity, CodeGraphStats, CodeGraphValidationResult,
-    PortableDocument, CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
+    PortableDocument, CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER,
+    CODEGRAPH_PROFILE_VERSION,
 };
 pub use projection::{
     codegraph_prompt_projection, codegraph_prompt_projection_with_config,

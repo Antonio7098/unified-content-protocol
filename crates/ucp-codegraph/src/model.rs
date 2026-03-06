@@ -268,7 +268,6 @@ impl PortableDocument {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CodeLanguage {
     Rust,

@@ -158,7 +158,9 @@ fn render_symbol(
         .unwrap_or_else(|| block_logical_key(block).unwrap_or_else(|| "symbol".to_string()));
     let modifiers = format_symbol_modifiers(block);
     let _ = writeln!(out, "{}- {}{} @ {}", pad, label, modifiers, coderef);
-    if let Some(description) = content_string(block, "description").or_else(|| block.metadata.summary.clone()) {
+    if let Some(description) =
+        content_string(block, "description").or_else(|| block.metadata.summary.clone())
+    {
         let _ = writeln!(out, "{}  docs: {}", pad, description);
     }
 
@@ -408,7 +410,11 @@ mod tests {
     fn prompt_projection_renders_compact_codegraph_view() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
-        fs::write(dir.path().join("src/util.rs"), "pub fn util() -> i32 { 1 }\n").unwrap();
+        fs::write(
+            dir.path().join("src/util.rs"),
+            "pub fn util() -> i32 { 1 }\n",
+        )
+        .unwrap();
         fs::write(
             dir.path().join("src/lib.rs"),
             "mod util;\n/// Add values.\npub async fn add(a: i32, b: i32) -> i32 { util::util() + a + b }\n",
