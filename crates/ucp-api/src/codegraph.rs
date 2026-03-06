@@ -381,6 +381,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             mut symbols,
             imports,
             relationships,
+            usages,
             diagnostics: analysis_diagnostics,
             ..
         } = analyze_file(&file.relative_path, &source, file.language);
@@ -448,6 +449,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             language: file.language,
             imports,
             relationships,
+            usages,
         });
     }
 
@@ -463,6 +465,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     let mut pending_wildcard_reexport_edges: BTreeSet<(String, String, String, Vec<String>)> =
         BTreeSet::new();
     let mut pending_relationship_edges: Vec<(BlockId, BlockId, String, String)> = Vec::new();
+    let mut pending_usage_edges: Vec<(BlockId, BlockId, String)> = Vec::new();
 
     for record in &file_analyses {
         for import in &record.imports {
@@ -582,6 +585,30 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 );
                 if !pending_relationship_edges.contains(&edge) {
                     pending_relationship_edges.push(edge);
+                }
+            }
+        }
+    }
+
+    for record in &file_analyses {
+        for usage in &record.usages {
+            let Some(source_id) = symbol_ids_by_file_identity
+                .get(&(record.file.clone(), usage.source_identity.clone()))
+            else {
+                continue;
+            };
+
+            for target_id in resolve_usage_target_ids(
+                &record.file,
+                record.language,
+                usage,
+                &top_level_symbol_ids,
+                &imported_symbol_targets_by_file,
+                &known_files,
+            ) {
+                let edge = (*source_id, target_id, usage.target_expr.clone());
+                if !pending_usage_edges.contains(&edge) {
+                    pending_usage_edges.push(edge);
                 }
             }
         }
@@ -721,6 +748,19 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         edge.metadata
             .custom
             .insert("relation".to_string(), json!(relation));
+        edge.metadata
+            .custom
+            .insert("raw_target".to_string(), json!(raw_target));
+        if let Some(source_block) = doc.get_block_mut(&source_id) {
+            source_block.edges.push(edge);
+        }
+    }
+
+    for (source_id, target_id, raw_target) in pending_usage_edges {
+        let mut edge = Edge::new(EdgeType::Custom("uses_symbol".to_string()), target_id);
+        edge.metadata
+            .custom
+            .insert("relation".to_string(), json!("uses_symbol"));
         edge.metadata
             .custom
             .insert("raw_target".to_string(), json!(raw_target));
@@ -1138,6 +1178,13 @@ struct ExtractedRelationship {
     target_name: String,
 }
 
+#[derive(Debug, Clone)]
+struct ExtractedUsage {
+    source_identity: String,
+    target_expr: String,
+    target_name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ImportResolution {
     Resolved(String),
@@ -1150,6 +1197,7 @@ struct FileAnalysis {
     symbols: Vec<ExtractedSymbol>,
     imports: Vec<ExtractedImport>,
     relationships: Vec<ExtractedRelationship>,
+    usages: Vec<ExtractedUsage>,
     exported_symbol_names: BTreeSet<String>,
     diagnostics: Vec<CodeGraphDiagnostic>,
 }
@@ -1160,6 +1208,7 @@ struct FileAnalysisRecord {
     language: CodeLanguage,
     imports: Vec<ExtractedImport>,
     relationships: Vec<ExtractedRelationship>,
+    usages: Vec<ExtractedUsage>,
 }
 
 impl ExtractedImport {
@@ -1236,6 +1285,20 @@ impl ExtractedRelationship {
         Self {
             source_identity: source_identity.into(),
             relation: relation.into(),
+            target_expr: target_expr.into(),
+            target_name: target_name.into(),
+        }
+    }
+}
+
+impl ExtractedUsage {
+    fn new(
+        source_identity: impl Into<String>,
+        target_expr: impl Into<String>,
+        target_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            source_identity: source_identity.into(),
             target_expr: target_expr.into(),
             target_name: target_name.into(),
         }
@@ -1483,6 +1546,16 @@ fn analyze_rust_node(
     scope: &[String],
     parent_identity: Option<&str>,
 ) {
+    if let Some(source_identity) = parent_identity {
+        if let Some((target_expr, target_name)) = rust_call_target(node, source) {
+            analysis.usages.push(ExtractedUsage::new(
+                source_identity,
+                target_expr,
+                target_name,
+            ));
+        }
+    }
+
     if node.kind() == "use_declaration" {
         let use_text = node_text(source, node);
         let reexported = use_text.trim_start().starts_with("pub use ");
@@ -1664,6 +1737,26 @@ fn rust_type_reference(node: Node<'_>, source: &str) -> Option<(String, String)>
     Some((core.to_string(), name))
 }
 
+fn rust_call_target(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    if node.kind() != "call_expression" {
+        return None;
+    }
+
+    let function_node = node.child_by_field_name("function")?;
+    rust_callable_reference(function_node, source)
+}
+
+fn rust_callable_reference(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    let raw = match node.kind() {
+        "identifier" | "scoped_identifier" => node_text(source, node).trim().to_string(),
+        "generic_function" => node_text(source, node).trim().to_string(),
+        _ => return None,
+    };
+    let core = raw.split('<').next().unwrap_or(raw.as_str()).trim();
+    let name = rust_last_path_segment(core)?;
+    Some((core.to_string(), name))
+}
+
 fn rust_last_path_segment(path: &str) -> Option<String> {
     let segment = path.rsplit("::").next().unwrap_or(path).trim();
     if segment.is_empty() {
@@ -1689,6 +1782,16 @@ fn analyze_python_node(
     scope: &[String],
     parent_identity: Option<&str>,
 ) {
+    if let Some(source_identity) = parent_identity {
+        if let Some((target_expr, target_name)) = python_call_target(node, source) {
+            analysis.usages.push(ExtractedUsage::new(
+                source_identity,
+                target_expr,
+                target_name,
+            ));
+        }
+    }
+
     match node.kind() {
         "import_statement" => {
             let text = node_text(source, node).trim().to_string();
@@ -1811,6 +1914,24 @@ fn python_class_base_reference(node: Node<'_>, source: &str) -> Option<(String, 
     let text = node_text(source, node).trim();
     let name = simple_symbol_reference_name(text)?;
     Some((text.to_string(), name))
+}
+
+fn python_call_target(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    if node.kind() != "call" {
+        return None;
+    }
+
+    let function_node = node.child_by_field_name("function")?;
+    if function_node.kind() != "identifier" {
+        return None;
+    }
+
+    let target_expr = node_text(source, function_node).trim().to_string();
+    if target_expr.is_empty() {
+        return None;
+    }
+
+    Some((target_expr.clone(), target_expr))
 }
 
 fn python_imports_from_from_statement(node: Node<'_>, source: &str) -> Vec<ExtractedImport> {
@@ -2001,6 +2122,16 @@ fn analyze_ts_node(
     parent_identity: Option<&str>,
     exported_context: bool,
 ) {
+    if let Some(source_identity) = parent_identity {
+        if let Some((target_expr, target_name)) = ts_call_target(node, source) {
+            analysis.usages.push(ExtractedUsage::new(
+                source_identity,
+                target_expr,
+                target_name,
+            ));
+        }
+    }
+
     match node.kind() {
         "import_statement" => {
             if let Some(module) = extract_ts_module_from_text(node_text(source, node)) {
@@ -2229,6 +2360,25 @@ fn ts_type_reference(node: Node<'_>, source: &str) -> Option<(String, String)> {
     };
     let name = simple_symbol_reference_name(&raw)?;
     Some((raw, name))
+}
+
+fn ts_call_target(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    let callable = match node.kind() {
+        "call_expression" => node.child_by_field_name("function")?,
+        "new_expression" => node.child_by_field_name("constructor")?,
+        _ => return None,
+    };
+
+    if callable.kind() != "identifier" {
+        return None;
+    }
+
+    let target_expr = node_text(source, callable).trim().to_string();
+    if target_expr.is_empty() {
+        return None;
+    }
+
+    Some((target_expr.clone(), target_expr))
 }
 
 fn ts_import_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
@@ -2535,6 +2685,51 @@ fn resolve_relationship_target_ids(
             known_files,
         ) {
             if let Some(name) = rust_last_path_segment(&relationship.target_expr) {
+                if let Some(ids) = top_level_symbol_ids.get(&(target_file, name)) {
+                    target_ids.extend(ids.iter().copied());
+                }
+            }
+        }
+    }
+
+    let mut unique_ids = Vec::new();
+    for target_id in target_ids {
+        if !unique_ids.contains(&target_id) {
+            unique_ids.push(target_id);
+        }
+    }
+    unique_ids
+}
+
+fn resolve_usage_target_ids(
+    source_file: &str,
+    language: CodeLanguage,
+    usage: &ExtractedUsage,
+    top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
+    imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
+    known_files: &BTreeSet<String>,
+) -> Vec<BlockId> {
+    let mut target_ids = Vec::new();
+
+    if let Some(local_ids) = top_level_symbol_ids.get(&(source_file.to_string(), usage.target_name.clone())) {
+        target_ids.extend(local_ids.iter().copied());
+    }
+
+    if let Some(imported_ids) = imported_symbol_targets_by_file
+        .get(source_file)
+        .and_then(|bindings| bindings.get(&usage.target_name))
+    {
+        target_ids.extend(imported_ids.iter().copied());
+    }
+
+    if language == CodeLanguage::Rust && usage.target_expr.contains("::") {
+        if let ImportResolution::Resolved(target_file) = resolve_import(
+            source_file,
+            &language,
+            &usage.target_expr,
+            known_files,
+        ) {
+            if let Some(name) = rust_last_path_segment(&usage.target_expr) {
                 if let Some(ids) = top_level_symbol_ids.get(&(target_file, name)) {
                     target_ids.extend(ids.iter().copied());
                 }
@@ -4190,6 +4385,72 @@ mod tests {
             "for_type",
             "for_type",
             "symbol:src/lib.rs::Thing",
+        ));
+    }
+
+    #[test]
+    fn test_call_sites_resolve_to_same_file_and_imported_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("src/util.rs"),
+            "pub fn greet() -> String { \"hi\".to_string() }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod util;\npub fn run() -> String { util::greet() }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .helper import helper\ndef execute():\n    return helper()\n",
+        )
+        .unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { util } from './util';\nexport function run() { return util(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "call-sites".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/util.rs::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
         ));
     }
 
