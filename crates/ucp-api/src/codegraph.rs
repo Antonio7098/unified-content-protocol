@@ -382,6 +382,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             imports,
             relationships,
             usages,
+            aliases,
             diagnostics: analysis_diagnostics,
             ..
         } = analyze_file(&file.relative_path, &source, file.language);
@@ -450,6 +451,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             imports,
             relationships,
             usages,
+            aliases,
         });
     }
 
@@ -457,6 +459,8 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     let mut imported_symbol_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<BlockId>>> =
         BTreeMap::new();
     let mut imported_module_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<String>>> =
+        BTreeMap::new();
+    let mut aliased_symbol_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<BlockId>>> =
         BTreeMap::new();
     let mut pending_reference_edges: BTreeSet<(String, String, String)> = BTreeSet::new();
     let mut pending_symbol_reference_edges: BTreeSet<(String, String, String, String)> =
@@ -580,6 +584,41 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
     }
 
     for record in &file_analyses {
+        for alias in &record.aliases {
+            let target_ids = resolve_alias_target_ids(
+                &record.file,
+                record.language,
+                alias,
+                &top_level_symbol_ids,
+                &imported_symbol_targets_by_file,
+                &imported_module_targets_by_file,
+            );
+            if target_ids.is_empty() {
+                continue;
+            }
+
+            aliased_symbol_targets_by_file
+                .entry(record.file.clone())
+                .or_default()
+                .entry(alias.name.clone())
+                .or_default()
+                .extend(target_ids);
+        }
+    }
+
+    for targets in aliased_symbol_targets_by_file.values_mut() {
+        for symbol_ids in targets.values_mut() {
+            let mut unique_ids = Vec::new();
+            for symbol_id in symbol_ids.drain(..) {
+                if !unique_ids.contains(&symbol_id) {
+                    unique_ids.push(symbol_id);
+                }
+            }
+            *symbol_ids = unique_ids;
+        }
+    }
+
+    for record in &file_analyses {
         for relationship in &record.relationships {
             let Some(source_id) = symbol_ids_by_file_identity
                 .get(&(record.file.clone(), relationship.source_identity.clone()))
@@ -626,6 +665,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 &top_level_symbol_ids,
                 &imported_symbol_targets_by_file,
                 &imported_module_targets_by_file,
+                &aliased_symbol_targets_by_file,
                 &known_files,
             ) {
                 let edge = (*source_id, target_id, usage.target_expr.clone());
@@ -1208,6 +1248,13 @@ struct ExtractedUsage {
     target_name: String,
 }
 
+#[derive(Debug, Clone)]
+struct ExtractedAlias {
+    name: String,
+    target_expr: String,
+    target_name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ImportResolution {
     Resolved(String),
@@ -1221,6 +1268,7 @@ struct FileAnalysis {
     imports: Vec<ExtractedImport>,
     relationships: Vec<ExtractedRelationship>,
     usages: Vec<ExtractedUsage>,
+    aliases: Vec<ExtractedAlias>,
     exported_symbol_names: BTreeSet<String>,
     diagnostics: Vec<CodeGraphDiagnostic>,
 }
@@ -1232,6 +1280,7 @@ struct FileAnalysisRecord {
     imports: Vec<ExtractedImport>,
     relationships: Vec<ExtractedRelationship>,
     usages: Vec<ExtractedUsage>,
+    aliases: Vec<ExtractedAlias>,
 }
 
 impl ExtractedImport {
@@ -1333,6 +1382,20 @@ impl ExtractedUsage {
     ) -> Self {
         Self {
             source_identity: source_identity.into(),
+            target_expr: target_expr.into(),
+            target_name: target_name.into(),
+        }
+    }
+}
+
+impl ExtractedAlias {
+    fn new(
+        name: impl Into<String>,
+        target_expr: impl Into<String>,
+        target_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
             target_expr: target_expr.into(),
             target_name: target_name.into(),
         }
@@ -1857,6 +1920,7 @@ fn analyze_python_node(
             analysis
                 .exported_symbol_names
                 .extend(python_explicit_exports_from_statement(node, source));
+            analysis.aliases.extend(python_aliases_from_statement(node, source));
         }
         _ => {}
     }
@@ -2024,6 +2088,69 @@ fn python_imports_from_import_statement(node: Node<'_>, source: &str) -> Vec<Ext
         }
     }
     imports
+}
+
+fn python_aliases_from_statement(node: Node<'_>, source: &str) -> Vec<ExtractedAlias> {
+    if node.kind() != "expression_statement" {
+        return Vec::new();
+    }
+
+    let mut aliases = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        if child.kind() != "assignment" {
+            continue;
+        }
+
+        let Some(left) = child.child_by_field_name("left") else {
+            continue;
+        };
+        let Some(right) = child.child_by_field_name("right") else {
+            continue;
+        };
+        if left.kind() != "identifier" {
+            continue;
+        }
+
+        let alias_name = node_text(source, left).trim().to_string();
+        if alias_name.is_empty() {
+            continue;
+        }
+
+        if let Some((target_expr, target_name)) = python_alias_reference(right, source) {
+            aliases.push(ExtractedAlias::new(alias_name, target_expr, target_name));
+        }
+    }
+
+    aliases
+}
+
+fn python_alias_reference(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    match node.kind() {
+        "identifier" => {
+            let text = node_text(source, node).trim().to_string();
+            if text.is_empty() {
+                None
+            } else {
+                Some((text.clone(), text))
+            }
+        }
+        "attribute" => {
+            let object = node.child_by_field_name("object")?;
+            let attribute = node.child_by_field_name("attribute")?;
+            if object.kind() != "identifier" {
+                return None;
+            }
+            let object_name = node_text(source, object).trim().to_string();
+            let attr_name = node_text(source, attribute).trim().to_string();
+            if object_name.is_empty() || attr_name.is_empty() {
+                None
+            } else {
+                Some((format!("{object_name}.{attr_name}"), attr_name))
+            }
+        }
+        _ => None,
+    }
 }
 
 fn python_imports_from_from_statement(node: Node<'_>, source: &str) -> Vec<ExtractedImport> {
@@ -2266,6 +2393,9 @@ fn analyze_ts_node(
                 scope,
                 parent_identity,
             ));
+            if scope.is_empty() {
+                analysis.aliases.extend(ts_aliases_from_variable_statement(node, source));
+            }
             return;
         }
         _ => {}
@@ -2573,6 +2703,70 @@ fn ts_namespace_import_aliases(node: Node<'_>, source: &str) -> Vec<String> {
     aliases
 }
 
+fn ts_aliases_from_variable_statement(node: Node<'_>, source: &str) -> Vec<ExtractedAlias> {
+    let mut aliases = Vec::new();
+    let mut stack = vec![node];
+
+    while let Some(current) = stack.pop() {
+        if current.kind() == "variable_declarator" {
+            let Some(name_node) = current.child_by_field_name("name") else {
+                continue;
+            };
+            let Some(value_node) = current.child_by_field_name("value") else {
+                continue;
+            };
+            if name_node.kind() != "identifier" {
+                continue;
+            }
+
+            let alias_name = node_text(source, name_node).trim().to_string();
+            if alias_name.is_empty() {
+                continue;
+            }
+
+            if let Some((target_expr, target_name)) = ts_alias_reference(value_node, source) {
+                aliases.push(ExtractedAlias::new(alias_name, target_expr, target_name));
+            }
+            continue;
+        }
+
+        let mut cursor = current.walk();
+        for child in current.named_children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    aliases
+}
+
+fn ts_alias_reference(node: Node<'_>, source: &str) -> Option<(String, String)> {
+    match node.kind() {
+        "identifier" => {
+            let text = node_text(source, node).trim().to_string();
+            if text.is_empty() {
+                None
+            } else {
+                Some((text.clone(), text))
+            }
+        }
+        "member_expression" => {
+            let object = node.child_by_field_name("object")?;
+            let property = node.child_by_field_name("property")?;
+            if object.kind() != "identifier" {
+                return None;
+            }
+            let object_name = node_text(source, object).trim().to_string();
+            let property_name = node_text(source, property).trim().to_string();
+            if object_name.is_empty() || property_name.is_empty() {
+                None
+            } else {
+                Some((format!("{object_name}.{property_name}"), property_name))
+            }
+        }
+        _ => None,
+    }
+}
+
 fn ts_reexport_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
     let mut bindings = Vec::new();
     let mut stack = vec![node];
@@ -2862,6 +3056,49 @@ fn resolve_relationship_target_ids(
     unique_ids
 }
 
+fn resolve_alias_target_ids(
+    source_file: &str,
+    _language: CodeLanguage,
+    alias: &ExtractedAlias,
+    top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
+    imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
+    imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+) -> Vec<BlockId> {
+    let mut target_ids = Vec::new();
+
+    if let Some(local_ids) = top_level_symbol_ids.get(&(source_file.to_string(), alias.target_name.clone())) {
+        target_ids.extend(local_ids.iter().copied());
+    }
+
+    if let Some(imported_ids) = imported_symbol_targets_by_file
+        .get(source_file)
+        .and_then(|bindings| bindings.get(&alias.target_name))
+    {
+        target_ids.extend(imported_ids.iter().copied());
+    }
+
+    if let Some((module_alias, member_name)) = member_usage_parts(&alias.target_expr) {
+        if let Some(target_files) = imported_module_targets_by_file
+            .get(source_file)
+            .and_then(|aliases| aliases.get(&module_alias))
+        {
+            for target_file in target_files {
+                if let Some(ids) = top_level_symbol_ids.get(&(target_file.clone(), member_name.clone())) {
+                    target_ids.extend(ids.iter().copied());
+                }
+            }
+        }
+    }
+
+    let mut unique_ids = Vec::new();
+    for target_id in target_ids {
+        if !unique_ids.contains(&target_id) {
+            unique_ids.push(target_id);
+        }
+    }
+    unique_ids
+}
+
 fn resolve_usage_target_ids(
     source_file: &str,
     language: CodeLanguage,
@@ -2869,8 +3106,18 @@ fn resolve_usage_target_ids(
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    aliased_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     known_files: &BTreeSet<String>,
 ) -> Vec<BlockId> {
+    if usage.target_expr == usage.target_name {
+        if let Some(alias_ids) = aliased_symbol_targets_by_file
+            .get(source_file)
+            .and_then(|aliases| aliases.get(&usage.target_name))
+        {
+            return alias_ids.clone();
+        }
+    }
+
     let mut target_ids = Vec::new();
 
     if let Some(local_ids) = top_level_symbol_ids.get(&(source_file.to_string(), usage.target_name.clone())) {
@@ -4709,6 +4956,53 @@ mod tests {
         let build = build_code_graph(&CodeGraphBuildInput {
             repository_path: dir.path().to_path_buf(),
             commit_hash: "member-call-sites".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_top_level_aliases_resolve_call_sites_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { util } from './util';\nconst alias = util;\nexport function run() { return alias(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .helper import helper\nalias = helper\ndef execute():\n    return alias()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "top-level-aliases".to_string(),
             config: CodeGraphExtractorConfig::default(),
         })
         .unwrap();
