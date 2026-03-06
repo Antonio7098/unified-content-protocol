@@ -26,6 +26,7 @@ const META_LANGUAGE: &str = "language";
 const META_SYMBOL_KIND: &str = "symbol_kind";
 const META_SYMBOL_NAME: &str = "name";
 const META_SPAN: &str = "span";
+const META_LINE_RANGE: &str = "line_range";
 const META_EXPORTED: &str = "exported";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -374,11 +375,8 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             continue;
         }
 
-        let file_block = make_file_block(&file.relative_path, file.language.as_str());
-        let file_block_id = doc.add_block(file_block, &parent_id)?;
-        file_ids.insert(file.relative_path.clone(), file_block_id);
-
         let FileAnalysis {
+            file_description,
             mut symbols,
             imports,
             relationships,
@@ -389,6 +387,15 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             diagnostics: analysis_diagnostics,
             ..
         } = analyze_file(&file.relative_path, &source, file.language);
+
+        let file_block = make_file_block(
+            &file.relative_path,
+            file.language.as_str(),
+            file_description.as_deref(),
+        );
+        let file_block_id = doc.add_block(file_block, &parent_id)?;
+        file_ids.insert(file.relative_path.clone(), file_block_id);
+
         for diag in &analysis_diagnostics {
             diagnostics.push(diag.clone().with_path(file.relative_path.clone()));
         }
@@ -1388,6 +1395,7 @@ struct ExtractedSymbol {
     identity: String,
     parent_identity: Option<String>,
     kind: String,
+    helper: Option<String>,
     exported: bool,
     start_line: usize,
     start_col: usize,
@@ -1443,6 +1451,7 @@ enum ImportResolution {
 
 #[derive(Debug, Clone, Default)]
 struct FileAnalysis {
+    file_description: Option<String>,
     symbols: Vec<ExtractedSymbol>,
     imports: Vec<ExtractedImport>,
     relationships: Vec<ExtractedRelationship>,
@@ -1662,15 +1671,20 @@ fn make_directory_block(path: &str) -> Block {
     block
 }
 
-fn make_file_block(path: &str, language: &str) -> Block {
+fn make_file_block(path: &str, language: &str, description: Option<&str>) -> Block {
+    let mut content = serde_json::Map::new();
+    content.insert("path".to_string(), json!(path));
+    content.insert("language".to_string(), json!(language));
+    if let Some(description) = description {
+        content.insert("description".to_string(), json!(description));
+    }
+
     let mut block = Block::new(
-        Content::json(json!({
-            "path": path,
-            "language": language,
-        })),
+        Content::json(serde_json::Value::Object(content)),
         Some("custom.file"),
     );
     block.metadata.label = Some(path.to_string());
+    block.metadata.summary = description.map(|value| value.to_string());
     block
         .metadata
         .custom
@@ -1696,6 +1710,7 @@ fn make_symbol_block(
     language: &str,
     symbol: &ExtractedSymbol,
 ) -> Block {
+    let line_range = format_line_range(symbol.start_line, symbol.end_line);
     let span = json!({
         "start_line": symbol.start_line,
         "start_col": symbol.start_col,
@@ -1703,18 +1718,24 @@ fn make_symbol_block(
         "end_col": symbol.end_col,
     });
 
+    let mut content = serde_json::Map::new();
+    content.insert("name".to_string(), json!(symbol.name));
+    content.insert("kind".to_string(), json!(symbol.kind));
+    content.insert("path".to_string(), json!(path));
+    content.insert("span".to_string(), span.clone());
+    content.insert("line_range".to_string(), json!(line_range));
+    content.insert("exported".to_string(), json!(symbol.exported));
+    if let Some(helper) = &symbol.helper {
+        content.insert("helper".to_string(), json!(helper));
+    }
+
     let mut block = Block::new(
-        Content::json(json!({
-            "name": symbol.name,
-            "kind": symbol.kind,
-            "path": path,
-            "span": span,
-            "exported": symbol.exported,
-        })),
+        Content::json(serde_json::Value::Object(content)),
         Some("custom.symbol"),
     );
 
     block.metadata.label = Some(symbol.name.clone());
+    block.metadata.summary = symbol.helper.clone();
     block
         .metadata
         .custom
@@ -1743,12 +1764,17 @@ fn make_symbol_block(
     block
         .metadata
         .custom
+        .insert(META_LINE_RANGE.to_string(), json!(line_range));
+    block
+        .metadata
+        .custom
         .insert(META_EXPORTED.to_string(), json!(symbol.exported));
     block
 }
 
 fn analyze_file(path: &str, source: &str, language: CodeLanguage) -> FileAnalysis {
     let mut analysis = FileAnalysis::default();
+    analysis.file_description = extract_file_description(source, language);
     let mut parser = Parser::new();
     if parser.set_language(language_for(language)).is_err() {
         analysis.diagnostics.push(
@@ -1948,6 +1974,7 @@ fn rust_symbol_from_node(
         exported,
         scope,
         parent_identity,
+        source,
         node,
     ))
 }
@@ -2228,6 +2255,7 @@ fn python_symbol_from_node(
         scope.is_empty() && !name.starts_with('_'),
         scope,
         parent_identity,
+        source,
         node,
     ))
 }
@@ -2741,6 +2769,7 @@ fn ts_symbol_from_declaration(
         exported,
         scope,
         parent_identity,
+        source,
         node,
     ))
 }
@@ -2775,6 +2804,7 @@ fn ts_variable_symbols(
                         exported,
                         scope,
                         parent_identity,
+                        source,
                         current,
                     ));
                 }
@@ -3200,7 +3230,7 @@ fn ts_commonjs_symbol_from_expression(
             }
         })?;
 
-    Some(make_extracted_symbol(name, kind, true, &[], None, node))
+    Some(make_extracted_symbol(name, kind, true, &[], None, source, node))
 }
 
 fn ts_import_bindings(node: Node<'_>, source: &str) -> Vec<ImportBinding> {
@@ -3561,6 +3591,206 @@ fn node_text<'a>(source: &'a str, node: Node<'_>) -> &'a str {
     &source[start..end]
 }
 
+fn extract_symbol_helper(source: &str, node: Node<'_>) -> Option<String> {
+    summarize_code_snippet(node_text(source, node), 160)
+}
+
+fn extract_file_description(source: &str, language: CodeLanguage) -> Option<String> {
+    let lines: Vec<&str> = source.lines().collect();
+    let mut index = 0usize;
+
+    if lines.first().map(|line| line.starts_with("#!")).unwrap_or(false) {
+        index += 1;
+    }
+
+    while index < lines.len() && lines[index].trim().is_empty() {
+        index += 1;
+    }
+
+    let remaining = &lines[index..];
+    if remaining.is_empty() {
+        return None;
+    }
+
+    if language == CodeLanguage::Python {
+        if let Some(description) = extract_python_module_docstring(remaining) {
+            return Some(description);
+        }
+    }
+
+    extract_leading_block_comment(remaining)
+        .or_else(|| extract_leading_line_comment_block(remaining, language))
+}
+
+fn extract_python_module_docstring(lines: &[&str]) -> Option<String> {
+    let first = lines.first()?.trim_start();
+    let quote = if first.starts_with("\"\"\"") {
+        "\"\"\""
+    } else if first.starts_with("'''") {
+        "'''"
+    } else {
+        return None;
+    };
+
+    let mut raw = String::new();
+    let rest = &first[quote.len()..];
+    if let Some(end) = rest.find(quote) {
+        raw.push_str(&rest[..end]);
+        return normalize_description_text(&raw);
+    }
+
+    raw.push_str(rest);
+    for line in &lines[1..] {
+        raw.push('\n');
+        if let Some(end) = line.find(quote) {
+            raw.push_str(&line[..end]);
+            return normalize_description_text(&raw);
+        }
+        raw.push_str(line);
+    }
+
+    normalize_description_text(&raw)
+}
+
+fn extract_leading_block_comment(lines: &[&str]) -> Option<String> {
+    let first = lines.first()?.trim_start();
+    let rest = if let Some(rest) = first.strip_prefix("/**") {
+        rest
+    } else if let Some(rest) = first.strip_prefix("/*") {
+        rest
+    } else {
+        return None;
+    };
+
+    let mut raw = String::new();
+    if let Some(end) = rest.find("*/") {
+        raw.push_str(&rest[..end]);
+        return normalize_description_text(&raw);
+    }
+
+    raw.push_str(rest);
+    for line in &lines[1..] {
+        raw.push('\n');
+        if let Some(end) = line.find("*/") {
+            raw.push_str(&line[..end]);
+            return normalize_description_text(&raw);
+        }
+        raw.push_str(line);
+    }
+
+    normalize_description_text(&raw)
+}
+
+fn extract_leading_line_comment_block(lines: &[&str], language: CodeLanguage) -> Option<String> {
+    let mut collected = Vec::new();
+
+    for line in lines {
+        let trimmed = line.trim_start();
+        let Some(rest) = strip_line_comment_prefix(trimmed, language) else {
+            break;
+        };
+        let content = rest.trim();
+        if content.starts_with("<reference") {
+            return None;
+        }
+        collected.push(content.to_string());
+    }
+
+    if collected.is_empty() {
+        None
+    } else {
+        normalize_description_text(&collected.join("\n"))
+    }
+}
+
+fn strip_line_comment_prefix<'a>(line: &'a str, language: CodeLanguage) -> Option<&'a str> {
+    match language {
+        CodeLanguage::Rust => line
+            .strip_prefix("//!")
+            .or_else(|| line.strip_prefix("///"))
+            .or_else(|| line.strip_prefix("//")),
+        CodeLanguage::Python => line.strip_prefix('#'),
+        CodeLanguage::TypeScript | CodeLanguage::JavaScript => line.strip_prefix("//"),
+    }
+}
+
+fn normalize_description_text(raw: &str) -> Option<String> {
+    let mut lines = Vec::new();
+    for line in raw.lines() {
+        let cleaned = line.trim().trim_start_matches('*').trim();
+        if cleaned.is_empty() {
+            continue;
+        }
+        lines.push(cleaned);
+    }
+
+    if lines.is_empty() {
+        return None;
+    }
+
+    truncate_text(&lines.join(" "), 200)
+}
+
+fn summarize_code_snippet(raw: &str, max_len: usize) -> Option<String> {
+    let mut lines = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        lines.push(trimmed);
+        if trimmed.contains('{') || trimmed.ends_with(':') || trimmed.ends_with(';') || lines.len() >= 3 {
+            break;
+        }
+    }
+
+    if lines.is_empty() {
+        return None;
+    }
+
+    let joined = lines.join(" ");
+    let trimmed = joined
+        .split('{')
+        .next()
+        .unwrap_or(joined.as_str())
+        .trim()
+        .trim_end_matches('{')
+        .trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    truncate_text(trimmed, max_len)
+}
+
+fn truncate_text(raw: &str, max_len: usize) -> Option<String> {
+    let collapsed = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() {
+        return None;
+    }
+    if collapsed.chars().count() <= max_len {
+        return Some(collapsed);
+    }
+
+    let mut end = 0usize;
+    for (count, (idx, ch)) in collapsed.char_indices().enumerate() {
+        if count >= max_len.saturating_sub(1) {
+            break;
+        }
+        end = idx + ch.len_utf8();
+    }
+
+    Some(format!("{}…", collapsed[..end].trim_end()))
+}
+
+fn format_line_range(start_line: usize, end_line: usize) -> String {
+    if start_line == end_line {
+        format!("L{}", start_line)
+    } else {
+        format!("L{}-L{}", start_line, end_line)
+    }
+}
+
 fn node_span(node: Node<'_>) -> (usize, usize, usize, usize) {
     let start = node.start_position();
     let end = node.end_position();
@@ -3591,6 +3821,7 @@ fn make_extracted_symbol(
     exported: bool,
     scope: &[String],
     parent_identity: Option<&str>,
+    source: &str,
     node: Node<'_>,
 ) -> ExtractedSymbol {
     let qualified_name = qualify_symbol_name(scope, &name);
@@ -3602,6 +3833,7 @@ fn make_extracted_symbol(
         identity: format!("{}@{}:{}", qualified_name, start_line, start_col),
         parent_identity: parent_identity.map(|s| s.to_string()),
         kind: kind.to_string(),
+        helper: extract_symbol_helper(source, node),
         exported,
         start_line,
         start_col,
@@ -5144,11 +5376,27 @@ mod tests {
             .map(|value| value.to_string())
     }
 
+    fn symbol_summary(doc: &Document, prefix: &str) -> Option<String> {
+        symbol_block_by_prefix(doc, prefix)
+            .and_then(|block| block.metadata.summary.clone())
+    }
+
+    fn symbol_line_range(doc: &Document, prefix: &str) -> Option<String> {
+        symbol_block_by_prefix(doc, prefix)
+            .and_then(|block| block.metadata.custom.get(META_LINE_RANGE))
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string())
+    }
+
     fn file_block_by_key<'a>(doc: &'a Document, logical_key: &str) -> Option<&'a Block> {
         doc.blocks.values().find(|block| {
             node_class(block).as_deref() == Some("file")
                 && block_logical_key(block).as_deref() == Some(logical_key)
         })
+    }
+
+    fn file_summary(doc: &Document, logical_key: &str) -> Option<String> {
+        file_block_by_key(doc, logical_key).and_then(|block| block.metadata.summary.clone())
     }
 
     fn block_logical_key_by_id(doc: &Document, block_id: BlockId) -> Option<String> {
@@ -7639,6 +7887,87 @@ mod tests {
         assert_eq!(
             symbol_kind(&build.document, "symbol:src/mod.ts::Example::handler").as_deref(),
             Some("method")
+        );
+    }
+
+    #[test]
+    fn test_file_descriptions_and_symbol_helpers_are_extracted() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "//! Rust module summary\npub fn helper(value: i32) -> i32 { value }\npub struct Thing;\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("py/mod.py"),
+            "\"\"\"Python module summary.\"\"\"\ndef helper(value: int) -> int:\n    return value\n\nclass Thing:\n    pass\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/mod.ts"),
+            "/** TS module summary */\nexport function helper(value: number): number { return value; }\nexport class Thing {}\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "file-description-and-symbol-helpers".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            file_summary(&build.document, "file:src/lib.rs").as_deref(),
+            Some("Rust module summary")
+        );
+        assert_eq!(
+            file_summary(&build.document, "file:py/mod.py").as_deref(),
+            Some("Python module summary.")
+        );
+        assert_eq!(
+            file_summary(&build.document, "file:web/mod.ts").as_deref(),
+            Some("TS module summary")
+        );
+
+        assert_eq!(
+            symbol_summary(&build.document, "symbol:src/lib.rs::helper").as_deref(),
+            Some("pub fn helper(value: i32) -> i32")
+        );
+        assert_eq!(
+            symbol_line_range(&build.document, "symbol:src/lib.rs::helper").as_deref(),
+            Some("L2")
+        );
+        assert_eq!(
+            symbol_summary(&build.document, "symbol:src/lib.rs::Thing").as_deref(),
+            Some("pub struct Thing;")
+        );
+        assert_eq!(
+            symbol_summary(&build.document, "symbol:py/mod.py::helper").as_deref(),
+            Some("def helper(value: int) -> int:")
+        );
+        assert_eq!(
+            symbol_line_range(&build.document, "symbol:py/mod.py::helper").as_deref(),
+            Some("L2-L3")
+        );
+        assert_eq!(
+            symbol_summary(&build.document, "symbol:py/mod.py::Thing").as_deref(),
+            Some("class Thing:")
+        );
+        assert_eq!(
+            symbol_summary(&build.document, "symbol:web/mod.ts::helper").as_deref(),
+            Some("function helper(value: number): number")
+        );
+        assert_eq!(
+            symbol_line_range(&build.document, "symbol:web/mod.ts::helper").as_deref(),
+            Some("L2")
+        );
+        assert_eq!(
+            symbol_summary(&build.document, "symbol:web/mod.ts::Thing").as_deref(),
+            Some("class Thing")
         );
     }
 
