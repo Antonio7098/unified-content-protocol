@@ -1734,13 +1734,19 @@ fn make_symbol_block(
         "end_line": symbol.end_line,
         "end_col": symbol.end_col,
     });
+    let coderef = json!({
+        "path": path,
+        "start_line": symbol.start_line,
+        "start_col": symbol.start_col,
+        "end_line": symbol.end_line,
+        "end_col": symbol.end_col,
+        "display": format_coderef(path, &line_range),
+    });
 
     let mut content = serde_json::Map::new();
     content.insert("name".to_string(), json!(symbol.name));
     content.insert("kind".to_string(), json!(symbol.kind));
-    content.insert("path".to_string(), json!(path));
-    content.insert("span".to_string(), span.clone());
-    content.insert("line_range".to_string(), json!(line_range));
+    content.insert("coderef".to_string(), coderef);
     content.insert("exported".to_string(), json!(symbol.exported));
     if let Some(description) = &symbol.description {
         content.insert("description".to_string(), json!(description));
@@ -4343,6 +4349,10 @@ fn format_line_range(start_line: usize, end_line: usize) -> String {
     }
 }
 
+fn format_coderef(path: &str, line_range: &str) -> String {
+    format!("{}#{}", path, line_range)
+}
+
 fn node_span(node: Node<'_>) -> (usize, usize, usize, usize) {
     let start = node.start_position();
     let end = node.end_position();
@@ -5956,6 +5966,15 @@ mod tests {
             return None;
         };
         value.get(field).cloned()
+    }
+
+    fn symbol_content_json_subfield(
+        doc: &Document,
+        prefix: &str,
+        field: &str,
+        subfield: &str,
+    ) -> Option<serde_json::Value> {
+        symbol_content_json_field(doc, prefix, field)?.get(subfield).cloned()
     }
 
     fn symbol_line_range(doc: &Document, prefix: &str) -> Option<String> {
@@ -8534,6 +8553,34 @@ mod tests {
             Some(json!([{"name": "value", "type": "i32"}]))
         );
         assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:src/lib.rs::helper", "coderef", "path"),
+            Some(json!("src/lib.rs"))
+        );
+        assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:src/lib.rs::helper", "coderef", "display"),
+            Some(json!("src/lib.rs#L4"))
+        );
+        assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:src/lib.rs::helper", "coderef", "start_line"),
+            Some(json!(4))
+        );
+        assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:src/lib.rs::helper", "coderef", "end_line"),
+            Some(json!(4))
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:src/lib.rs::helper", "path"),
+            None
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:src/lib.rs::helper", "line_range"),
+            None
+        );
+        assert_eq!(
+            symbol_content_json_field(&build.document, "symbol:src/lib.rs::helper", "span"),
+            None
+        );
+        assert_eq!(
             symbol_content_string_field(&build.document, "symbol:src/lib.rs::helper", "output")
                 .as_deref(),
             Some("i32")
@@ -8558,6 +8605,14 @@ mod tests {
         assert_eq!(
             symbol_content_json_field(&build.document, "symbol:py/mod.py::helper", "inputs"),
             Some(json!([{"name": "value", "type": "int"}]))
+        );
+        assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:py/mod.py::helper", "coderef", "path"),
+            Some(json!("py/mod.py"))
+        );
+        assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:py/mod.py::helper", "coderef", "display"),
+            Some(json!("py/mod.py#L4-L6"))
         );
         assert_eq!(
             symbol_content_string_field(&build.document, "symbol:py/mod.py::helper", "output")
@@ -8613,6 +8668,14 @@ mod tests {
             ]))
         );
         assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:web/mod.ts::helper", "coderef", "path"),
+            Some(json!("web/mod.ts"))
+        );
+        assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:web/mod.ts::helper", "coderef", "display"),
+            Some(json!("web/mod.ts#L3"))
+        );
+        assert_eq!(
             symbol_content_string_field(&build.document, "symbol:web/mod.ts::helper", "output")
                 .as_deref(),
             Some("number")
@@ -8640,6 +8703,14 @@ mod tests {
                 {"name": "value"},
                 {"name": "label"}
             ]))
+        );
+        assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:web/mod.js::helper", "coderef", "path"),
+            Some(json!("web/mod.js"))
+        );
+        assert_eq!(
+            symbol_content_json_subfield(&build.document, "symbol:web/mod.js::helper", "coderef", "display"),
+            Some(json!("web/mod.js#L2"))
         );
     }
 
