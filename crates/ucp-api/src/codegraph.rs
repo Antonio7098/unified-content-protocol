@@ -460,6 +460,9 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         BTreeMap::new();
     let mut imported_module_targets_by_file: BTreeMap<String, BTreeMap<String, Vec<String>>> =
         BTreeMap::new();
+    let mut imported_module_paths_by_file: BTreeMap<String, BTreeMap<String, Vec<String>>> =
+        BTreeMap::new();
+    let mut alias_names_by_scope: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
     let mut aliased_symbol_targets_by_scope: BTreeMap<(String, String), BTreeMap<String, Vec<BlockId>>> =
         BTreeMap::new();
     let mut pending_reference_edges: BTreeSet<(String, String, String)> = BTreeSet::new();
@@ -522,6 +525,16 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                     }
 
                     if !import.module_aliases.is_empty() {
+                        let path_entry = imported_module_paths_by_file
+                            .entry(record.file.clone())
+                            .or_default();
+                        for alias in &import.module_aliases {
+                            let paths = path_entry.entry(alias.clone()).or_default();
+                            if !paths.contains(&import.module) {
+                                paths.push(import.module.clone());
+                            }
+                        }
+
                         let entry = imported_module_targets_by_file
                             .entry(record.file.clone())
                             .or_default();
@@ -583,6 +596,22 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
         }
     }
 
+    for targets in imported_module_paths_by_file.values_mut() {
+        for module_paths in targets.values_mut() {
+            module_paths.sort();
+            module_paths.dedup();
+        }
+    }
+
+    for record in &file_analyses {
+        for alias in &record.aliases {
+            alias_names_by_scope
+                .entry((record.file.clone(), alias_scope_key(alias.owner_identity.as_deref())))
+                .or_default()
+                .insert(alias.name.clone());
+        }
+    }
+
     let mut unresolved_aliases = file_analyses
         .iter()
         .flat_map(|record| {
@@ -606,7 +635,10 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 &top_level_symbol_ids,
                 &imported_symbol_targets_by_file,
                 &imported_module_targets_by_file,
+                &imported_module_paths_by_file,
+                &alias_names_by_scope,
                 &aliased_symbol_targets_by_scope,
+                &known_files,
             );
             if target_ids.is_empty() {
                 next_unresolved.push((file, language, alias));
@@ -687,6 +719,8 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 &top_level_symbol_ids,
                 &imported_symbol_targets_by_file,
                 &imported_module_targets_by_file,
+                &imported_module_paths_by_file,
+                &alias_names_by_scope,
                 &aliased_symbol_targets_by_scope,
                 &known_files,
             ) {
@@ -1681,10 +1715,19 @@ fn analyze_rust_node(
     if node.kind() == "use_declaration" {
         let use_text = node_text(source, node);
         let reexported = use_text.trim_start().starts_with("pub use ");
-        let wildcard = use_text.contains('*');
-        for module in expand_rust_use_declaration(use_text) {
+        for (module, local_alias, wildcard) in expand_rust_use_declaration_items(use_text) {
             let mut import = if wildcard {
                 ExtractedImport::module(module)
+            } else if let Some(local_name) = local_alias {
+                if let Some(source_name) = rust_imported_symbol_name(&module) {
+                    ExtractedImport::bindings(
+                        module,
+                        vec![ImportBinding::new(source_name, local_name.clone())],
+                    )
+                    .with_module_alias(local_name)
+                } else {
+                    ExtractedImport::module(module).with_module_alias(local_name)
+                }
             } else if let Some(symbol) = rust_imported_symbol_name(&module) {
                 ExtractedImport::symbol(module, symbol)
             } else {
@@ -1697,6 +1740,14 @@ fn analyze_rust_node(
                 import = import.wildcard();
             }
             analysis.imports.push(import);
+        }
+    }
+
+    if node.kind() == "let_declaration" {
+        if let Some(source_identity) = parent_identity {
+            analysis
+                .aliases
+                .extend(rust_aliases_from_let_declaration(node, source, source_identity));
         }
     }
 
@@ -1882,6 +1933,36 @@ fn rust_call_target(node: Node<'_>, source: &str) -> Option<(String, String)> {
 
     let function_node = node.child_by_field_name("function")?;
     rust_callable_reference(function_node, source)
+}
+
+fn rust_aliases_from_let_declaration(
+    node: Node<'_>,
+    source: &str,
+    owner_identity: &str,
+) -> Vec<ExtractedAlias> {
+    let Some(pattern_node) = node.child_by_field_name("pattern") else {
+        return Vec::new();
+    };
+    if pattern_node.kind() != "identifier" {
+        return Vec::new();
+    }
+
+    let alias_name = node_text(source, pattern_node).trim().to_string();
+    if alias_name.is_empty() {
+        return Vec::new();
+    }
+
+    let (target_expr, target_name) = node
+        .child_by_field_name("value")
+        .and_then(|value_node| rust_callable_reference(value_node, source))
+        .unwrap_or_else(|| (String::new(), String::new()));
+
+    vec![ExtractedAlias::new(
+        alias_name,
+        target_expr,
+        target_name,
+        Some(owner_identity),
+    )]
 }
 
 fn rust_callable_reference(node: Node<'_>, source: &str) -> Option<(String, String)> {
@@ -2152,14 +2233,14 @@ fn python_aliases_from_statement(
             continue;
         }
 
-        if let Some((target_expr, target_name)) = python_alias_reference(right, source) {
-            aliases.push(ExtractedAlias::new(
-                alias_name,
-                target_expr,
-                target_name,
-                owner_identity,
-            ));
-        }
+        let (target_expr, target_name) =
+            python_alias_reference(right, source).unwrap_or_else(|| (String::new(), String::new()));
+        aliases.push(ExtractedAlias::new(
+            alias_name,
+            target_expr,
+            target_name,
+            owner_identity,
+        ));
     }
 
     aliases
@@ -2770,14 +2851,14 @@ fn ts_aliases_from_variable_statement(
                 continue;
             }
 
-            if let Some((target_expr, target_name)) = ts_alias_reference(value_node, source) {
-                aliases.push(ExtractedAlias::new(
-                    alias_name,
-                    target_expr,
-                    target_name,
-                    owner_identity,
-                ));
-            }
+            let (target_expr, target_name) =
+                ts_alias_reference(value_node, source).unwrap_or_else(|| (String::new(), String::new()));
+            aliases.push(ExtractedAlias::new(
+                alias_name,
+                target_expr,
+                target_name,
+                owner_identity,
+            ));
             continue;
         }
 
@@ -3109,29 +3190,46 @@ fn resolve_relationship_target_ids(
 
 fn resolve_alias_target_ids(
     source_file: &str,
-    _language: CodeLanguage,
+    language: CodeLanguage,
     alias: &ExtractedAlias,
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    imported_module_paths_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    alias_names_by_scope: &BTreeMap<(String, String), BTreeSet<String>>,
     aliased_symbol_targets_by_scope: &BTreeMap<(String, String), BTreeMap<String, Vec<BlockId>>>,
+    known_files: &BTreeSet<String>,
 ) -> Vec<BlockId> {
     let mut target_ids = Vec::new();
 
     if alias.target_expr == alias.target_name {
-        for scope_key in [
-            alias_scope_key(alias.owner_identity.as_deref()),
-            alias_scope_key(None),
-        ] {
-            if let Some(alias_ids) = aliased_symbol_targets_by_scope
-                .get(&(source_file.to_string(), scope_key.clone()))
-                .and_then(|aliases| aliases.get(&alias.target_name))
-            {
-                return alias_ids.clone();
-            }
-            if scope_key.is_empty() {
-                break;
-            }
+        let local_scope_key = alias_scope_key(alias.owner_identity.as_deref());
+        if let Some(alias_ids) = aliased_symbol_targets_by_scope
+            .get(&(source_file.to_string(), local_scope_key.clone()))
+            .and_then(|aliases| aliases.get(&alias.target_name))
+        {
+            return alias_ids.clone();
+        }
+        if !local_scope_key.is_empty()
+            && alias_names_by_scope
+                .get(&(source_file.to_string(), local_scope_key))
+                .is_some_and(|aliases| aliases.contains(&alias.target_name))
+        {
+            return Vec::new();
+        }
+
+        let top_scope_key = alias_scope_key(None);
+        if let Some(alias_ids) = aliased_symbol_targets_by_scope
+            .get(&(source_file.to_string(), top_scope_key.clone()))
+            .and_then(|aliases| aliases.get(&alias.target_name))
+        {
+            return alias_ids.clone();
+        }
+        if alias_names_by_scope
+            .get(&(source_file.to_string(), top_scope_key))
+            .is_some_and(|aliases| aliases.contains(&alias.target_name))
+        {
+            return Vec::new();
         }
     }
 
@@ -3159,6 +3257,44 @@ fn resolve_alias_target_ids(
         }
     }
 
+    if language == CodeLanguage::Rust && alias.target_expr.contains("::") {
+        if let Some((module_alias, remainder)) = rust_alias_path_parts(&alias.target_expr) {
+            if let Some(module_paths) = imported_module_paths_by_file
+                .get(source_file)
+                .and_then(|aliases| aliases.get(&module_alias))
+            {
+                for module_path in module_paths {
+                    let expanded_expr = format!("{module_path}::{remainder}");
+                    if let ImportResolution::Resolved(target_file) = resolve_import(
+                        source_file,
+                        &language,
+                        &expanded_expr,
+                        known_files,
+                    ) {
+                        if let Some(name) = rust_last_path_segment(&expanded_expr) {
+                            if let Some(ids) = top_level_symbol_ids.get(&(target_file, name)) {
+                                target_ids.extend(ids.iter().copied());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if let ImportResolution::Resolved(target_file) = resolve_import(
+            source_file,
+            &language,
+            &alias.target_expr,
+            known_files,
+        ) {
+            if let Some(name) = rust_last_path_segment(&alias.target_expr) {
+                if let Some(ids) = top_level_symbol_ids.get(&(target_file, name)) {
+                    target_ids.extend(ids.iter().copied());
+                }
+            }
+        }
+    }
+
     let mut unique_ids = Vec::new();
     for target_id in target_ids {
         if !unique_ids.contains(&target_id) {
@@ -3175,23 +3311,38 @@ fn resolve_usage_target_ids(
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    imported_module_paths_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    alias_names_by_scope: &BTreeMap<(String, String), BTreeSet<String>>,
     aliased_symbol_targets_by_scope: &BTreeMap<(String, String), BTreeMap<String, Vec<BlockId>>>,
     known_files: &BTreeSet<String>,
 ) -> Vec<BlockId> {
     if usage.target_expr == usage.target_name {
-        for scope_key in [
-            alias_scope_key(Some(&usage.source_identity)),
-            alias_scope_key(None),
-        ] {
-            if let Some(alias_ids) = aliased_symbol_targets_by_scope
-                .get(&(source_file.to_string(), scope_key.clone()))
-                .and_then(|aliases| aliases.get(&usage.target_name))
-            {
-                return alias_ids.clone();
-            }
-            if scope_key.is_empty() {
-                break;
-            }
+        let local_scope_key = alias_scope_key(Some(&usage.source_identity));
+        if let Some(alias_ids) = aliased_symbol_targets_by_scope
+            .get(&(source_file.to_string(), local_scope_key.clone()))
+            .and_then(|aliases| aliases.get(&usage.target_name))
+        {
+            return alias_ids.clone();
+        }
+        if alias_names_by_scope
+            .get(&(source_file.to_string(), local_scope_key.clone()))
+            .is_some_and(|aliases| aliases.contains(&usage.target_name))
+        {
+            return Vec::new();
+        }
+
+        let top_scope_key = alias_scope_key(None);
+        if let Some(alias_ids) = aliased_symbol_targets_by_scope
+            .get(&(source_file.to_string(), top_scope_key.clone()))
+            .and_then(|aliases| aliases.get(&usage.target_name))
+        {
+            return alias_ids.clone();
+        }
+        if alias_names_by_scope
+            .get(&(source_file.to_string(), top_scope_key))
+            .is_some_and(|aliases| aliases.contains(&usage.target_name))
+        {
+            return Vec::new();
         }
     }
 
@@ -3222,6 +3373,29 @@ fn resolve_usage_target_ids(
     }
 
     if language == CodeLanguage::Rust && usage.target_expr.contains("::") {
+        if let Some((module_alias, remainder)) = rust_alias_path_parts(&usage.target_expr) {
+            if let Some(module_paths) = imported_module_paths_by_file
+                .get(source_file)
+                .and_then(|aliases| aliases.get(&module_alias))
+            {
+                for module_path in module_paths {
+                    let expanded_expr = format!("{module_path}::{remainder}");
+                    if let ImportResolution::Resolved(target_file) = resolve_import(
+                        source_file,
+                        &language,
+                        &expanded_expr,
+                        known_files,
+                    ) {
+                        if let Some(name) = rust_last_path_segment(&expanded_expr) {
+                            if let Some(ids) = top_level_symbol_ids.get(&(target_file, name)) {
+                                target_ids.extend(ids.iter().copied());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if let ImportResolution::Resolved(target_file) = resolve_import(
             source_file,
             &language,
@@ -3247,6 +3421,17 @@ fn resolve_usage_target_ids(
 
 fn member_usage_parts(text: &str) -> Option<(String, String)> {
     let (left, right) = text.split_once('.')?;
+    let left = left.trim();
+    let right = right.trim();
+    if left.is_empty() || right.is_empty() {
+        None
+    } else {
+        Some((left.to_string(), right.to_string()))
+    }
+}
+
+fn rust_alias_path_parts(text: &str) -> Option<(String, String)> {
+    let (left, right) = text.split_once("::")?;
     let left = left.trim();
     let right = right.trim();
     if left.is_empty() || right.is_empty() {
@@ -3499,17 +3684,25 @@ fn rust_root_module_exists(crate_root: &str, segment: &str, known_files: &BTreeS
     .any(|candidate| known_files.contains(&candidate))
 }
 
+#[cfg(test)]
 fn expand_rust_use_declaration(text: &str) -> Vec<String> {
+    expand_rust_use_declaration_items(text)
+        .into_iter()
+        .map(|(module, _, _)| module)
+        .collect()
+}
+
+fn expand_rust_use_declaration_items(text: &str) -> Vec<(String, Option<String>, bool)> {
     let trimmed = text.trim();
     let Some(use_index) = trimmed.find("use ") else {
         return Vec::new();
     };
 
     let expr = trimmed[use_index + 4..].trim().trim_end_matches(';').trim();
-    expand_rust_use_tree("", expr)
+    expand_rust_use_tree_items("", expr)
 }
 
-fn expand_rust_use_tree(prefix: &str, expr: &str) -> Vec<String> {
+fn expand_rust_use_tree_items(prefix: &str, expr: &str) -> Vec<(String, Option<String>, bool)> {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
         return Vec::new();
@@ -3518,7 +3711,7 @@ fn expand_rust_use_tree(prefix: &str, expr: &str) -> Vec<String> {
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         return split_top_level_commas(&trimmed[1..trimmed.len() - 1])
             .into_iter()
-            .flat_map(|part| expand_rust_use_tree(prefix, &part))
+            .flat_map(|part| expand_rust_use_tree_items(prefix, &part))
             .collect();
     }
 
@@ -3529,11 +3722,16 @@ fn expand_rust_use_tree(prefix: &str, expr: &str) -> Vec<String> {
         let combined_prefix = join_rust_use_prefix(prefix, prefix_part);
         return split_top_level_commas(inner)
             .into_iter()
-            .flat_map(|part| expand_rust_use_tree(&combined_prefix, &part))
+            .flat_map(|part| expand_rust_use_tree_items(&combined_prefix, &part))
             .collect();
     }
 
-    let segment = strip_rust_use_alias(trimmed)
+    let wildcard = trimmed == "*" || trimmed.ends_with("::*");
+    let (raw_segment, local_alias) = trimmed
+        .rsplit_once(" as ")
+        .map(|(left, right)| (left.trim(), Some(right.trim().to_string())))
+        .unwrap_or((trimmed, None));
+    let segment = raw_segment
         .trim_end_matches("::*")
         .trim_start_matches("::")
         .trim();
@@ -3545,11 +3743,11 @@ fn expand_rust_use_tree(prefix: &str, expr: &str) -> Vec<String> {
         return if prefix.is_empty() {
             Vec::new()
         } else {
-            vec![prefix.to_string()]
+            vec![(prefix.to_string(), local_alias, wildcard || segment == "*")]
         };
     }
 
-    vec![join_rust_use_prefix(prefix, segment)]
+    vec![(join_rust_use_prefix(prefix, segment), local_alias, wildcard)]
 }
 
 fn split_top_level_commas(input: &str) -> Vec<String> {
@@ -3608,10 +3806,6 @@ fn matching_brace_index(input: &str, open_idx: usize) -> Option<usize> {
         }
     }
     None
-}
-
-fn strip_rust_use_alias(segment: &str) -> &str {
-    segment.rsplit_once(" as ").map(|(left, _)| left).unwrap_or(segment)
 }
 
 fn join_rust_use_prefix(prefix: &str, segment: &str) -> String {
@@ -4969,6 +5163,149 @@ mod tests {
     }
 
     #[test]
+    fn test_ts_constructor_aliases_resolve_to_class_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+
+        fs::write(dir.path().join("web/thing.ts"), "export class Thing {}\n").unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { Thing } from './thing';\nconst Ctor = Thing;\nexport function make() { return new Ctor(); }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/member.ts"),
+            "import * as ns from './thing';\nconst First = ns.Thing;\nconst Second = First;\nexport function build() { return new Second(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "ts-constructor-aliases".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::make",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/thing.ts::Thing",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/member.ts::build",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/thing.ts::Thing",
+        ));
+    }
+
+    #[test]
+    fn test_rust_import_aliases_and_nested_paths_resolve_to_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src/nested")).unwrap();
+
+        fs::write(dir.path().join("src/util.rs"), "pub fn greet() {}\n").unwrap();
+        fs::write(dir.path().join("src/nested/mod.rs"), "pub mod util;\n").unwrap();
+        fs::write(dir.path().join("src/nested/util.rs"), "pub fn wave() {}\n").unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod util;\nmod nested;\nuse util::greet as hello;\npub fn run() { hello(); nested::util::wave(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "rust-import-alias-and-nested-paths".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/util.rs::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/nested/util.rs::wave",
+        ));
+    }
+
+    #[test]
+    fn test_rust_module_alias_paths_resolve_to_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src/nested")).unwrap();
+
+        fs::write(dir.path().join("src/nested/mod.rs"), "pub mod util;\n").unwrap();
+        fs::write(dir.path().join("src/nested/util.rs"), "pub fn wave() {}\n").unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod nested;\nuse nested::util as util_mod;\nuse nested::util::{self as util_mod_two};\npub fn run() { util_mod::wave(); util_mod_two::wave(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "rust-module-alias-paths".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/nested/util.rs::wave",
+        ));
+    }
+
+    #[test]
+    fn test_rust_function_local_aliases_resolve_to_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src/nested")).unwrap();
+
+        fs::write(dir.path().join("src/util.rs"), "pub fn greet() {}\n").unwrap();
+        fs::write(dir.path().join("src/nested/mod.rs"), "pub mod util;\n").unwrap();
+        fs::write(dir.path().join("src/nested/util.rs"), "pub fn wave() {}\n").unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod util;\nmod nested;\nuse util::greet;\nuse nested::util as util_mod;\npub fn run() { let first = greet; let second = first; let wave_alias = util_mod::wave; second(); wave_alias(); }\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "rust-function-local-aliases".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/util.rs::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:src/lib.rs::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:src/nested/util.rs::wave",
+        ));
+    }
+
+    #[test]
     fn test_interface_and_trait_inheritance_edges_are_emitted() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
@@ -5242,6 +5579,234 @@ mod tests {
             "uses_symbol",
             "uses_symbol",
             "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_mixed_scope_member_aliases_resolve_call_sites_to_underlying_symbols() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/util.ts"),
+            "export function util() { return 42; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import * as utilns from './util';\nconst top = utilns.util;\nexport function run() { const local = top; return local(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/helper.py"), "def helper():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from . import helper as helper_mod\ntop = helper_mod.helper\ndef execute():\n    local = top\n    return local()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "mixed-scope-member-aliases".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/util.ts::util",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/helper.py::helper",
+        ));
+    }
+
+    #[test]
+    fn test_local_aliases_shadow_top_level_aliases_of_same_name() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/one.ts"),
+            "export function one() { return 1; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/two.ts"),
+            "export function two() { return 2; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { one } from './one';\nimport { two } from './two';\nconst alias = one;\nexport function run() { const alias = two; return alias(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/one.py"), "def one():\n    return 1\n").unwrap();
+        fs::write(dir.path().join("py/two.py"), "def two():\n    return 2\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .one import one\nfrom .two import two\nalias = one\ndef execute():\n    alias = two\n    return alias()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "alias-shadowing".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/two.ts::two",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/two.py::two",
+        ));
+    }
+
+    #[test]
+    fn test_unresolved_or_unsupported_local_shadowing_does_not_fall_back_to_top_level_aliases() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/one.ts"),
+            "export function one() { return 1; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { one } from './one';\nconst alias = one;\nexport function run_missing() { const alias = missing; return alias(); }\nexport function run_expr() { const alias = true ? one : one; return alias(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/one.py"), "def one():\n    return 1\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .one import one\nalias = one\ndef execute_missing():\n    alias = missing\n    return alias()\ndef execute_expr():\n    alias = 1 if True else one\n    return alias()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "shadowing-no-fallback".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run_missing",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/one.ts::one",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::run_expr",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/one.ts::one",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute_missing",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/one.py::one",
+        ));
+        assert!(!symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::execute_expr",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/one.py::one",
+        ));
+    }
+
+    #[test]
+    fn test_local_aliases_are_isolated_to_their_own_enclosing_symbol() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web")).unwrap();
+        fs::create_dir_all(dir.path().join("py")).unwrap();
+
+        fs::write(
+            dir.path().join("web/one.ts"),
+            "export function one() { return 1; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/two.ts"),
+            "export function two() { return 2; }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/main.ts"),
+            "import { one } from './one';\nimport { two } from './two';\nexport function first() { const alias = one; return alias(); }\nexport function second() { return two(); }\n",
+        )
+        .unwrap();
+
+        fs::write(dir.path().join("py/one.py"), "def one():\n    return 1\n").unwrap();
+        fs::write(dir.path().join("py/two.py"), "def two():\n    return 2\n").unwrap();
+        fs::write(
+            dir.path().join("py/main.py"),
+            "from .one import one\nfrom .two import two\ndef first():\n    alias = one\n    return alias()\ndef second():\n    return two()\n",
+        )
+        .unwrap();
+
+        let build = build_code_graph(&CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "alias-scope-isolation".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        })
+        .unwrap();
+
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::first",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/one.ts::one",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.ts::second",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/two.ts::two",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::first",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/one.py::one",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:py/main.py::second",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:py/two.py::two",
         ));
     }
 
