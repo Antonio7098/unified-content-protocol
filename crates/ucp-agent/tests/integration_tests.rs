@@ -1,11 +1,14 @@
 //! Integration tests for the agent graph traversal system.
 
+use std::fs;
 use std::sync::Arc;
+use tempfile::tempdir;
 use ucm_core::{Block, BlockId, Content, Document};
 use ucp_agent::{
     AgentCapabilities, AgentError, AgentTraversal, ExpandDirection, ExpandOptions, GlobalLimits,
     MockRagProvider, RagProvider, SearchOptions, SessionConfig, SessionLimits, ViewMode,
 };
+use ucp_codegraph::{build_code_graph, CodeGraphBuildInput, CodeGraphExtractorConfig};
 
 /// Helper to create a test document with a known structure.
 fn create_test_document() -> Document {
@@ -66,6 +69,28 @@ fn fake_block_id() -> BlockId {
     BlockId::from_bytes([
         0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
     ])
+}
+
+fn create_codegraph_document() -> Document {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(dir.path().join("src/util.rs"), "pub fn util() -> i32 { 1 }\n").unwrap();
+    fs::write(
+        dir.path().join("src/lib.rs"),
+        "mod util;\npub fn add(a: i32, b: i32) -> i32 { util::util() + a + b }\n",
+    )
+    .unwrap();
+
+    let repository_path = dir.path().to_path_buf();
+    std::mem::forget(dir);
+
+    build_code_graph(&CodeGraphBuildInput {
+        repository_path,
+        commit_hash: "agent-context-tests".to_string(),
+        config: CodeGraphExtractorConfig::default(),
+    })
+    .unwrap()
+    .document
 }
 
 // ==================== Session Management Tests ====================
@@ -617,6 +642,42 @@ fn test_context_focus() {
     assert!(result.is_ok());
 
     traversal.close_session(&session_id).unwrap();
+}
+
+#[test]
+fn test_codegraph_context_session_operations_are_stateful() {
+    let doc = create_codegraph_document();
+    let traversal = AgentTraversal::new(doc.clone());
+    let session_id = traversal.create_session(SessionConfig::default()).unwrap();
+
+    let overview = traversal.codegraph_seed_overview(&session_id).unwrap();
+    assert!(overview.focus.is_some());
+
+    let file_id = ucp_codegraph::resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
+    traversal.codegraph_expand_file(&session_id, file_id).unwrap();
+
+    let add_id = ucp_codegraph::resolve_codegraph_selector(&doc, "symbol:src/lib.rs::add").unwrap();
+    let util_id = ucp_codegraph::resolve_codegraph_selector(&doc, "symbol:src/util.rs::util").unwrap();
+    traversal
+        .codegraph_expand_dependencies(&session_id, add_id, Some("uses_symbol"))
+        .unwrap();
+    traversal
+        .codegraph_expand_dependents(&session_id, util_id, Some("uses_symbol"))
+        .unwrap();
+    traversal.codegraph_hydrate_source(&session_id, add_id, 1).unwrap();
+
+    let rendered = traversal
+        .render_codegraph_context(&session_id, ucp_codegraph::CodeGraphRenderConfig::default())
+        .unwrap();
+    assert!(rendered.contains("CodeGraph working set"));
+    assert!(rendered.contains("uses_symbol"));
+
+    let sessions = traversal.get_session(&session_id).unwrap();
+    let session = sessions.get(&session_id).unwrap();
+    assert!(session.context_blocks.contains(&file_id));
+    assert!(session.context_blocks.contains(&add_id));
+    assert!(session.context_blocks.contains(&util_id));
+    assert!(session.codegraph_context.is_some());
 }
 
 #[test]

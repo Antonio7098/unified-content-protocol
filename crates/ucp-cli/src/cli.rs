@@ -859,6 +859,17 @@ pub enum AgentSessionCommands {
 
 #[derive(Subcommand)]
 pub enum AgentContextCommands {
+    /// Seed a codegraph context session with overview-first working set
+    Seed {
+        /// Input file path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+    },
+
     /// Add blocks to context window
     Add {
         /// Input file path
@@ -869,7 +880,7 @@ pub enum AgentContextCommands {
         #[arg(short, long)]
         session: String,
 
-        /// Block IDs to add (comma-separated)
+        /// Block IDs or codegraph selectors to add (comma-separated)
         ids: String,
     },
 
@@ -883,12 +894,116 @@ pub enum AgentContextCommands {
         #[arg(short, long)]
         session: String,
 
-        /// Block IDs to remove (comma-separated)
+        /// Block IDs or codegraph selectors to remove (comma-separated)
         ids: String,
+    },
+
+    /// Set or clear the focused block in the context session
+    Focus {
+        /// Input file path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or codegraph selector. Omit to clear focus.
+        target: Option<String>,
+    },
+
+    /// Expand a codegraph context session
+    Expand {
+        /// Input file path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or codegraph selector to expand
+        target: String,
+
+        /// Expansion mode: file, dependencies, dependents
+        #[arg(long, default_value = "dependencies")]
+        mode: String,
+
+        /// Optional edge relation filter (e.g. uses_symbol)
+        #[arg(long)]
+        relation: Option<String>,
+    },
+
+    /// Hydrate source for a selected codegraph block via coderef
+    Hydrate {
+        /// Input file path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or codegraph selector to hydrate
+        target: String,
+
+        /// Extra lines of context on either side of the coderef span
+        #[arg(long, default_value = "2")]
+        padding: usize,
+    },
+
+    /// Collapse a selected block from the codegraph context session
+    Collapse {
+        /// Input file path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or codegraph selector to collapse
+        target: String,
+
+        /// Also remove descendant symbol nodes
+        #[arg(long)]
+        descendants: bool,
+    },
+
+    /// Pin a selected block so collapse/prune keeps it
+    Pin {
+        /// Input file path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or codegraph selector to pin
+        target: String,
+    },
+
+    /// Unpin a selected block
+    Unpin {
+        /// Input file path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or codegraph selector to unpin
+        target: String,
     },
 
     /// Clear context window
     Clear {
+        /// Input file path
+        #[arg(short, long)]
+        input: Option<String>,
+
         /// Session ID
         #[arg(short, long)]
         session: String,
@@ -953,6 +1068,10 @@ pub enum LlmCommands {
         /// Input file path
         #[arg(short, long)]
         input: Option<String>,
+
+        /// Optional persisted agent session ID for codegraph working-set rendering
+        #[arg(short, long)]
+        session: Option<String>,
 
         /// Maximum tokens
         #[arg(long, default_value = "4000")]
@@ -1022,6 +1141,187 @@ pub enum CodegraphCommands {
         /// Output file path (prints to stdout if omitted)
         #[arg(short, long)]
         output: Option<String>,
+    },
+
+    /// Stateful codegraph working-set context operations
+    #[command(subcommand)]
+    Context(CodegraphContextCommands),
+}
+
+#[derive(Subcommand)]
+pub enum CodegraphContextCommands {
+    /// Create a codegraph context session and seed it with overview-first context
+    Init {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Optional session name
+        #[arg(long)]
+        name: Option<String>,
+
+        /// Maximum selected nodes before automatic prune/demotion
+        #[arg(long, default_value = "48")]
+        max_selected: usize,
+    },
+
+    /// Show the current codegraph working set
+    Show {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Maximum tokens to target in rendered output
+        #[arg(long, default_value = "4000")]
+        max_tokens: usize,
+    },
+
+    /// Export the current working set as structured JSON with frontier metadata
+    Export {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Maximum tokens to target in rendered output
+        #[arg(long, default_value = "4000")]
+        max_tokens: usize,
+    },
+
+    /// Add one or more blocks/selectors into the working set
+    Add {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Comma-separated block IDs or selectors
+        selectors: String,
+    },
+
+    /// Set or clear focus within the working set
+    Focus {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or selector. Omit to clear focus.
+        target: Option<String>,
+    },
+
+    /// Expand a file/dependency/dependent neighborhood
+    Expand {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or selector
+        target: String,
+
+        /// Expansion mode: file, dependencies, dependents
+        #[arg(long, default_value = "dependencies")]
+        mode: String,
+
+        /// Optional relation filter
+        #[arg(long)]
+        relation: Option<String>,
+    },
+
+    /// Hydrate source from coderef for a selected block
+    Hydrate {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or selector
+        target: String,
+
+        /// Extra lines of context around the coderef span
+        #[arg(long, default_value = "2")]
+        padding: usize,
+    },
+
+    /// Collapse a block or subtree from the working set
+    Collapse {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or selector
+        target: String,
+
+        /// Also collapse descendant symbols
+        #[arg(long)]
+        descendants: bool,
+    },
+
+    /// Pin a block in the working set
+    Pin {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or selector
+        target: String,
+    },
+
+    /// Unpin a block in the working set
+    Unpin {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Block ID or selector
+        target: String,
+    },
+
+    /// Apply prune policy now, optionally updating the node limit
+    Prune {
+        /// Input document path
+        #[arg(short, long)]
+        input: Option<String>,
+
+        /// Session ID
+        #[arg(short, long)]
+        session: String,
+
+        /// Optional new maximum selected node count
+        #[arg(long)]
+        max_selected: Option<usize>,
     },
 }
 

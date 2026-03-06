@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use ucm_core::{BlockId, EdgeType};
+use ucp_codegraph::CodeGraphContextSession;
 
 /// Session state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,8 +151,12 @@ pub struct AgentSession {
     pub last_active: DateTime<Utc>,
     /// Last search/find results for CTX ADD RESULTS.
     pub last_results: Vec<BlockId>,
+    /// Generic selected blocks in the context window.
+    pub context_blocks: HashSet<BlockId>,
     /// Focus block for context (protected from pruning).
     pub focus_block: Option<BlockId>,
+    /// Codegraph-specific working set state when the active document is a codegraph.
+    pub codegraph_context: Option<CodeGraphContextSession>,
 }
 
 impl AgentSession {
@@ -169,7 +174,9 @@ impl AgentSession {
             created_at: now,
             last_active: now,
             last_results: Vec::new(),
+            context_blocks: HashSet::new(),
             focus_block: None,
+            codegraph_context: None,
         }
     }
 
@@ -282,6 +289,11 @@ impl AgentSession {
         self.focus_block = block_id;
     }
 
+    pub fn ensure_codegraph_context(&mut self) -> &mut CodeGraphContextSession {
+        self.codegraph_context
+            .get_or_insert_with(CodeGraphContextSession::new)
+    }
+
     /// Get session info as serializable struct.
     pub fn info(&self) -> SessionInfo {
         SessionInfo {
@@ -293,6 +305,8 @@ impl AgentSession {
             last_active: self.last_active,
             history_depth: self.cursor.history_depth(),
             metrics: self.metrics.snapshot(),
+            context_blocks: self.context_blocks.len(),
+            has_codegraph_context: self.codegraph_context.is_some(),
         }
     }
 }
@@ -308,6 +322,8 @@ pub struct SessionInfo {
     pub last_active: DateTime<Utc>,
     pub history_depth: usize,
     pub metrics: crate::metrics::MetricsSnapshot,
+    pub context_blocks: usize,
+    pub has_codegraph_context: bool,
 }
 
 #[cfg(test)]

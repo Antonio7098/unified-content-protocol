@@ -1,7 +1,16 @@
+mod context;
 mod legacy;
 mod model;
 mod projection;
 
+pub use context::{
+    approximate_prompt_tokens, export_codegraph_context, is_codegraph_document,
+    render_codegraph_context_prompt, resolve_codegraph_selector, CodeGraphCoderef,
+    CodeGraphContextEdgeExport, CodeGraphContextExport, CodeGraphContextFrontierAction,
+    CodeGraphContextNodeExport, CodeGraphContextSession, CodeGraphContextSummary,
+    CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphPrunePolicy, CodeGraphRenderConfig,
+    CodeGraphSelectionOrigin, CodeGraphSelectionOriginKind, HydratedSourceExcerpt,
+};
 pub use legacy::{
     build_code_graph, canonical_codegraph_json, canonical_fingerprint, validate_code_graph_profile,
 };

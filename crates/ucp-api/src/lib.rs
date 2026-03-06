@@ -31,10 +31,17 @@ use ucm_engine::{Engine, Operation, OperationResult};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use ucp_codegraph::{
-    build_code_graph, canonical_codegraph_json, canonical_fingerprint, codegraph_prompt_projection,
-    codegraph_prompt_projection_with_config, validate_code_graph_profile, CodeGraphBuildInput,
-    CodeGraphBuildResult, CodeGraphBuildStatus, CodeGraphDiagnostic, CodeGraphExtractorConfig,
-    CodeGraphPromptProjectionConfig, CodeGraphSeverity, CodeGraphStats, CodeGraphValidationResult,
+    approximate_prompt_tokens, build_code_graph, canonical_codegraph_json,
+    canonical_fingerprint, codegraph_prompt_projection, codegraph_prompt_projection_with_config,
+    is_codegraph_document, render_codegraph_context_prompt, resolve_codegraph_selector,
+    export_codegraph_context, validate_code_graph_profile, CodeGraphBuildInput,
+    CodeGraphBuildResult, CodeGraphBuildStatus, CodeGraphCoderef, CodeGraphContextEdgeExport,
+    CodeGraphContextExport, CodeGraphContextFrontierAction, CodeGraphContextNodeExport,
+    CodeGraphContextSession, CodeGraphContextSummary, CodeGraphContextUpdate,
+    CodeGraphDetailLevel, CodeGraphDiagnostic, CodeGraphExtractorConfig,
+    CodeGraphPromptProjectionConfig, CodeGraphPrunePolicy, CodeGraphRenderConfig,
+    CodeGraphSelectionOrigin, CodeGraphSelectionOriginKind, CodeGraphSeverity,
+    CodeGraphStats, CodeGraphValidationResult, HydratedSourceExcerpt,
     PortableDocument, CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER,
     CODEGRAPH_PROFILE_VERSION,
 };

@@ -615,6 +615,330 @@ mod workflow_tests {
         assert!(projection.contains("- file src/lib.rs [rust]"));
         assert!(projection.contains("function add(a: i32, b: i32) -> i32"));
     }
+
+    #[test]
+    fn test_codegraph_context_session_workflow() {
+        use tempfile::tempdir;
+
+        let repo = tempdir().expect("temp repo");
+        let src = repo.path().join("src");
+        std::fs::create_dir_all(&src).expect("create src");
+        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n")
+            .expect("write util.rs");
+        std::fs::write(
+            src.join("lib.rs"),
+            "mod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
+        )
+        .expect("write lib.rs");
+
+        let doc_out = tempfile::NamedTempFile::new().expect("doc output");
+        let doc_path = doc_out.path().to_str().unwrap().to_string();
+        let repo_path = repo.path().to_str().unwrap().to_string();
+
+        let build = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "context-workflow",
+            "--output",
+            doc_path.as_str(),
+            "--allow-partial",
+            "--format",
+            "json",
+        ]);
+        assert!(build.status.success(), "build failed: {}", stderr(&build));
+
+        let create = run_cli(&[
+            "agent",
+            "session",
+            "create",
+            "--input",
+            doc_path.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(create.status.success(), "session create failed: {}", stderr(&create));
+        let create_json: serde_json::Value = serde_json::from_str(&stdout(&create)).unwrap();
+        let session_id = create_json
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+
+        for args in [
+            vec![
+                "agent",
+                "context",
+                "seed",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "--format",
+                "json",
+            ],
+            vec![
+                "agent",
+                "context",
+                "expand",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "src/lib.rs",
+                "--mode",
+                "file",
+                "--format",
+                "json",
+            ],
+            vec![
+                "agent",
+                "context",
+                "expand",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "symbol:src/lib.rs::add",
+                "--mode",
+                "dependencies",
+                "--relation",
+                "uses_symbol",
+                "--format",
+                "json",
+            ],
+            vec![
+                "agent",
+                "context",
+                "hydrate",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "symbol:src/lib.rs::add",
+                "--format",
+                "json",
+            ],
+        ] {
+            let output = run_cli(&args);
+            assert!(output.status.success(), "command failed: {}", stderr(&output));
+        }
+
+        let show = run_cli(&[
+            "agent",
+            "context",
+            "show",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(show.status.success(), "context show failed: {}", stderr(&show));
+        let show_json: serde_json::Value = serde_json::from_str(&stdout(&show)).unwrap();
+        let rendered = show_json.get("rendered").and_then(|v| v.as_str()).unwrap();
+        assert!(rendered.contains("CodeGraph working set"));
+        assert!(rendered.contains("uses_symbol"));
+        assert!(rendered.contains("source:"));
+
+        let llm = run_cli(&[
+            "llm",
+            "context",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(llm.status.success(), "llm context failed: {}", stderr(&llm));
+        let llm_json: serde_json::Value = serde_json::from_str(&stdout(&llm)).unwrap();
+        assert_eq!(llm_json.get("mode").and_then(|v| v.as_str()), Some("codegraph_context"));
+        assert!(llm_json
+            .get("rendered")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .contains("CodeGraph working set"));
+    }
+
+    #[test]
+    fn test_dedicated_codegraph_context_commands_and_prune_policy() {
+        use tempfile::tempdir;
+
+        let repo = tempdir().expect("temp repo");
+        let src = repo.path().join("src");
+        std::fs::create_dir_all(&src).expect("create src");
+        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n")
+            .expect("write util.rs");
+        std::fs::write(
+            src.join("lib.rs"),
+            "mod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
+        )
+        .expect("write lib.rs");
+
+        let doc_out = tempfile::NamedTempFile::new().expect("doc output");
+        let doc_path = doc_out.path().to_str().unwrap().to_string();
+        let repo_path = repo.path().to_str().unwrap().to_string();
+
+        let build = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "context-prune-workflow",
+            "--output",
+            doc_path.as_str(),
+            "--allow-partial",
+            "--format",
+            "json",
+        ]);
+        assert!(build.status.success(), "build failed: {}", stderr(&build));
+
+        let init = run_cli(&[
+            "codegraph",
+            "context",
+            "init",
+            "--input",
+            doc_path.as_str(),
+            "--max-selected",
+            "10",
+            "--format",
+            "json",
+        ]);
+        assert!(init.status.success(), "context init failed: {}", stderr(&init));
+        let init_json: serde_json::Value = serde_json::from_str(&stdout(&init)).unwrap();
+        let session_id = init_json
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+
+        for args in [
+            vec![
+                "codegraph",
+                "context",
+                "expand",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "src/lib.rs",
+                "--mode",
+                "file",
+                "--format",
+                "json",
+            ],
+            vec![
+                "codegraph",
+                "context",
+                "expand",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "symbol:src/lib.rs::add",
+                "--mode",
+                "dependencies",
+                "--relation",
+                "uses_symbol",
+                "--format",
+                "json",
+            ],
+            vec![
+                "codegraph",
+                "context",
+                "hydrate",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "symbol:src/lib.rs::add",
+                "--format",
+                "json",
+            ],
+            vec![
+                "codegraph",
+                "context",
+                "focus",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "src/lib.rs",
+                "--format",
+                "json",
+            ],
+            vec![
+                "codegraph",
+                "context",
+                "prune",
+                "--input",
+                doc_path.as_str(),
+                "--session",
+                session_id.as_str(),
+                "--max-selected",
+                "4",
+                "--format",
+                "json",
+            ],
+        ] {
+            let output = run_cli(&args);
+            assert!(output.status.success(), "command failed: {}", stderr(&output));
+        }
+
+        let show = run_cli(&[
+            "codegraph",
+            "context",
+            "show",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(show.status.success(), "context show failed: {}", stderr(&show));
+        let show_json: serde_json::Value = serde_json::from_str(&stdout(&show)).unwrap();
+        assert_eq!(
+            show_json
+                .get("summary")
+                .and_then(|v| v.get("max_selected"))
+                .and_then(|v| v.as_u64()),
+            Some(4)
+        );
+        let rendered = show_json.get("rendered").and_then(|v| v.as_str()).unwrap();
+        assert!(rendered.contains("selected=4/4"));
+        assert!(rendered.contains("prune policy: max_selected=4"));
+        assert!(!rendered.contains("source:"));
+        assert!(show_json.get("nodes").and_then(|v| v.as_array()).is_some());
+        assert!(show_json.get("frontier").and_then(|v| v.as_array()).is_some());
+
+        let export = run_cli(&[
+            "codegraph",
+            "context",
+            "export",
+            "--input",
+            doc_path.as_str(),
+            "--session",
+            session_id.as_str(),
+            "--format",
+            "json",
+        ]);
+        assert!(export.status.success(), "context export failed: {}", stderr(&export));
+        let export_json: serde_json::Value = serde_json::from_str(&stdout(&export)).unwrap();
+        assert!(export_json
+            .get("frontier")
+            .and_then(|v| v.as_array())
+            .map(|items| !items.is_empty())
+            .unwrap_or(false));
+        assert!(export_json
+            .get("nodes")
+            .and_then(|v| v.as_array())
+            .map(|nodes| nodes.iter().any(|node| node.get("origin").is_some()))
+            .unwrap_or(false));
+    }
 }
 
 mod error_handling_tests {

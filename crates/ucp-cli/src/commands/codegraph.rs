@@ -3,15 +3,23 @@ use colored::Colorize;
 use serde::Serialize;
 use std::path::PathBuf;
 use std::process::Command;
+use std::str::FromStr;
 use ucp_api::{
     build_code_graph, canonical_fingerprint, codegraph_prompt_projection,
+    export_codegraph_context, is_codegraph_document, render_codegraph_context_prompt,
+    resolve_codegraph_selector,
     validate_code_graph_profile, CodeGraphBuildInput, CodeGraphBuildStatus,
-    CodeGraphExtractorConfig, CodeGraphSeverity,
+    CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphExtractorConfig,
+    CodeGraphPrunePolicy, CodeGraphRenderConfig, CodeGraphSeverity,
 };
+use ucm_core::{BlockId, Document};
 
-use crate::cli::{CodegraphCommands, OutputFormat};
+use crate::cli::{CodegraphCommands, CodegraphContextCommands, OutputFormat};
 use crate::output::{
     print_error, print_success, print_warning, read_document, write_output, DocumentJson,
+};
+use crate::state::{
+    read_stateful_document, write_stateful_document, AgentSessionState, StatefulDocument,
 };
 
 pub fn handle(cmd: CodegraphCommands, format: OutputFormat) -> Result<()> {
@@ -40,6 +48,7 @@ pub fn handle(cmd: CodegraphCommands, format: OutputFormat) -> Result<()> {
         ),
         CodegraphCommands::Inspect { input } => inspect(input, format),
         CodegraphCommands::Prompt { input, output } => prompt(input, output, format),
+        CodegraphCommands::Context(cmd) => context(cmd, format),
     }
 }
 
@@ -259,6 +268,455 @@ fn prompt(input: Option<String>, output: Option<String>, format: OutputFormat) -
     }
 
     Ok(())
+}
+
+fn context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> {
+    match cmd {
+        CodegraphContextCommands::Init {
+            input,
+            name,
+            max_selected,
+        } => context_init(input, name, max_selected, format),
+        CodegraphContextCommands::Show {
+            input,
+            session,
+            max_tokens,
+        } => context_show(input, session, max_tokens, format),
+        CodegraphContextCommands::Export {
+            input,
+            session,
+            max_tokens,
+        } => context_export(input, session, max_tokens, format),
+        CodegraphContextCommands::Add {
+            input,
+            session,
+            selectors,
+        } => context_add(input, session, selectors, format),
+        CodegraphContextCommands::Focus {
+            input,
+            session,
+            target,
+        } => context_focus(input, session, target, format),
+        CodegraphContextCommands::Expand {
+            input,
+            session,
+            target,
+            mode,
+            relation,
+        } => context_expand(input, session, target, mode, relation, format),
+        CodegraphContextCommands::Hydrate {
+            input,
+            session,
+            target,
+            padding,
+        } => context_hydrate(input, session, target, padding, format),
+        CodegraphContextCommands::Collapse {
+            input,
+            session,
+            target,
+            descendants,
+        } => context_collapse(input, session, target, descendants, format),
+        CodegraphContextCommands::Pin {
+            input,
+            session,
+            target,
+        } => context_pin(input, session, target, true, format),
+        CodegraphContextCommands::Unpin {
+            input,
+            session,
+            target,
+        } => context_pin(input, session, target, false, format),
+        CodegraphContextCommands::Prune {
+            input,
+            session,
+            max_selected,
+        } => context_prune(input, session, max_selected, format),
+    }
+}
+
+fn context_init(
+    input: Option<String>,
+    name: Option<String>,
+    max_selected: usize,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+
+    let session_id = format!("cgctx_{}", uuid_short());
+    let mut session = AgentSessionState::new(session_id.clone(), name.clone(), None);
+    {
+        let context = session.ensure_codegraph_context();
+        context.set_prune_policy(CodeGraphPrunePolicy {
+            max_selected: max_selected.max(1),
+            ..CodeGraphPrunePolicy::default()
+        });
+        let update = context.seed_overview(&stateful.document);
+        session.current_block = update.focus.map(|id| id.to_string());
+        session.sync_context_blocks_from_codegraph();
+    }
+    stateful
+        .state_mut()
+        .sessions
+        .insert(session_id.clone(), session.clone());
+
+    match format {
+        OutputFormat::Json => {
+            let rendered = render_codegraph_context_prompt(
+                &stateful.document,
+                session.codegraph_context.as_ref().expect("context seeded"),
+                &CodeGraphRenderConfig::default(),
+            );
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "session_id": session_id,
+                    "name": name,
+                    "summary": session.codegraph_context.as_ref().map(|ctx| ctx.summary(&stateful.document)),
+                    "rendered": rendered,
+                }))?
+            );
+        }
+        OutputFormat::Text => {
+            print_success(&format!("Initialized codegraph context session: {}", session_id));
+        }
+    }
+
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn context_show(
+    input: Option<String>,
+    session: String,
+    max_tokens: usize,
+    format: OutputFormat,
+) -> Result<()> {
+    let stateful = read_stateful_document(input)?;
+    ensure_codegraph_document(&stateful.document)?;
+    let sess = get_session(&stateful, &session)?;
+    let context = sess
+        .codegraph_context
+        .as_ref()
+        .ok_or_else(|| anyhow!("Session has no codegraph context: {}", session))?;
+    let config = CodeGraphRenderConfig::for_max_tokens(max_tokens);
+    let export = export_codegraph_context(&stateful.document, context, &config);
+
+    match format {
+        OutputFormat::Json => {
+            let mut value = serde_json::to_value(&export)?;
+            if let Some(object) = value.as_object_mut() {
+                object.insert("session".to_string(), serde_json::Value::String(session));
+            }
+            println!("{}", serde_json::to_string_pretty(&value)?);
+        }
+        OutputFormat::Text => println!("{}", export.rendered),
+    }
+
+    Ok(())
+}
+
+fn context_export(
+    input: Option<String>,
+    session: String,
+    max_tokens: usize,
+    format: OutputFormat,
+) -> Result<()> {
+    let stateful = read_stateful_document(input)?;
+    ensure_codegraph_document(&stateful.document)?;
+    let sess = get_session(&stateful, &session)?;
+    let context = sess
+        .codegraph_context
+        .as_ref()
+        .ok_or_else(|| anyhow!("Session has no codegraph context: {}", session))?;
+    let config = CodeGraphRenderConfig::for_max_tokens(max_tokens);
+    let export = export_codegraph_context(&stateful.document, context, &config);
+
+    match format {
+        OutputFormat::Json => {
+            let mut value = serde_json::to_value(&export)?;
+            if let Some(object) = value.as_object_mut() {
+                object.insert("session".to_string(), serde_json::Value::String(session));
+            }
+            println!("{}", serde_json::to_string_pretty(&value)?);
+        }
+        OutputFormat::Text => println!("{}", serde_json::to_string_pretty(&export)?),
+    }
+
+    Ok(())
+}
+
+fn context_add(
+    input: Option<String>,
+    session: String,
+    selectors: String,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+    let document = stateful.document.clone();
+    let block_ids = resolve_selectors(&document, &selectors)?;
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let mut update = CodeGraphContextUpdate::default();
+    {
+        let context = sess.ensure_codegraph_context();
+        for block_id in block_ids {
+            merge_updates(
+                &mut update,
+                context.select_block(&document, block_id, CodeGraphDetailLevel::SymbolCard),
+            );
+        }
+    }
+    sess.sync_context_blocks_from_codegraph();
+    sess.current_block = update.focus.map(|id| id.to_string()).or_else(|| sess.current_block.clone());
+
+    print_context_update(format, &session, &update, sess)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn context_focus(
+    input: Option<String>,
+    session: String,
+    target: Option<String>,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+    let document = stateful.document.clone();
+    let target_id = target
+        .as_deref()
+        .map(|selector| resolve_selector(&document, selector))
+        .transpose()?;
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let update = sess.ensure_codegraph_context().set_focus(&document, target_id);
+    sess.sync_context_blocks_from_codegraph();
+    sess.current_block = update.focus.map(|id| id.to_string());
+
+    print_context_update(format, &session, &update, sess)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn context_expand(
+    input: Option<String>,
+    session: String,
+    target: String,
+    mode: String,
+    relation: Option<String>,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+    let document = stateful.document.clone();
+    let block_id = resolve_selector(&document, &target)?;
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let update = match mode.as_str() {
+        "file" => sess.ensure_codegraph_context().expand_file(&document, block_id),
+        "dependencies" => sess
+            .ensure_codegraph_context()
+            .expand_dependencies(&document, block_id, relation.as_deref()),
+        "dependents" => sess
+            .ensure_codegraph_context()
+            .expand_dependents(&document, block_id, relation.as_deref()),
+        other => return Err(anyhow!("Unsupported expand mode: {}", other)),
+    };
+    sess.sync_context_blocks_from_codegraph();
+    sess.current_block = update.focus.map(|id| id.to_string());
+
+    print_context_update(format, &session, &update, sess)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn context_hydrate(
+    input: Option<String>,
+    session: String,
+    target: String,
+    padding: usize,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+    let document = stateful.document.clone();
+    let block_id = resolve_selector(&document, &target)?;
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let update = sess
+        .ensure_codegraph_context()
+        .hydrate_source(&document, block_id, padding);
+    sess.sync_context_blocks_from_codegraph();
+    sess.current_block = update.focus.map(|id| id.to_string());
+
+    print_context_update(format, &session, &update, sess)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn context_collapse(
+    input: Option<String>,
+    session: String,
+    target: String,
+    descendants: bool,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+    let document = stateful.document.clone();
+    let block_id = resolve_selector(&document, &target)?;
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let update = sess
+        .ensure_codegraph_context()
+        .collapse(&document, block_id, descendants);
+    sess.sync_context_blocks_from_codegraph();
+    sess.current_block = update.focus.map(|id| id.to_string());
+
+    print_context_update(format, &session, &update, sess)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn context_pin(
+    input: Option<String>,
+    session: String,
+    target: String,
+    pinned: bool,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+    let document = stateful.document.clone();
+    let block_id = resolve_selector(&document, &target)?;
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let update = sess.ensure_codegraph_context().pin(block_id, pinned);
+    sess.sync_context_blocks_from_codegraph();
+
+    print_context_update(format, &session, &update, sess)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn context_prune(
+    input: Option<String>,
+    session: String,
+    max_selected: Option<usize>,
+    format: OutputFormat,
+) -> Result<()> {
+    let mut stateful = read_stateful_document(input.clone())?;
+    ensure_codegraph_document(&stateful.document)?;
+    let document = stateful.document.clone();
+
+    let sess = get_session_mut(&mut stateful, &session)?;
+    let update = sess.ensure_codegraph_context().prune(&document, max_selected);
+    sess.sync_context_blocks_from_codegraph();
+    sess.current_block = update.focus.map(|id| id.to_string()).or_else(|| sess.current_block.clone());
+
+    print_context_update(format, &session, &update, sess)?;
+    write_stateful_document(&stateful, input)?;
+    Ok(())
+}
+
+fn ensure_codegraph_document(doc: &Document) -> Result<()> {
+    if is_codegraph_document(doc) {
+        Ok(())
+    } else {
+        Err(anyhow!("document is not a codegraph"))
+    }
+}
+
+fn resolve_selectors(doc: &Document, selectors: &str) -> Result<Vec<BlockId>> {
+    selectors
+        .split(',')
+        .map(|selector| resolve_selector(doc, selector.trim()))
+        .collect()
+}
+
+fn resolve_selector(doc: &Document, selector: &str) -> Result<BlockId> {
+    BlockId::from_str(selector)
+        .ok()
+        .or_else(|| resolve_codegraph_selector(doc, selector))
+        .ok_or_else(|| anyhow!("Could not resolve selector: {}", selector))
+}
+
+fn get_session<'a>(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState> {
+    stateful
+        .state()
+        .sessions
+        .get(session)
+        .ok_or_else(|| anyhow!("Session not found: {}", session))
+}
+
+fn get_session_mut<'a>(
+    stateful: &'a mut StatefulDocument,
+    session: &str,
+) -> Result<&'a mut AgentSessionState> {
+    stateful
+        .state_mut()
+        .sessions
+        .get_mut(session)
+        .ok_or_else(|| anyhow!("Session not found: {}", session))
+}
+
+fn merge_updates(into: &mut CodeGraphContextUpdate, next: CodeGraphContextUpdate) {
+    into.added.extend(next.added);
+    into.removed.extend(next.removed);
+    into.changed.extend(next.changed);
+    into.focus = next.focus.or(into.focus);
+    into.warnings.extend(next.warnings);
+}
+
+fn print_context_update(
+    format: OutputFormat,
+    session_id: &str,
+    update: &CodeGraphContextUpdate,
+    session: &AgentSessionState,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "session": session_id,
+                    "added": update.added.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "removed": update.removed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "changed": update.changed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "focus": update.focus.map(|id| id.to_string()),
+                    "warnings": update.warnings,
+                    "total": session.context_blocks.len(),
+                }))?
+            );
+        }
+        OutputFormat::Text => {
+            print_success(&format!(
+                "Updated codegraph context {} (added {}, removed {}, changed {}, total {})",
+                session_id,
+                update.added.len(),
+                update.removed.len(),
+                update.changed.len(),
+                session.context_blocks.len()
+            ));
+            for warning in &update.warnings {
+                print_warning(warning);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn uuid_short() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    format!("{:x}", now % 0xFFFFFFFF)
 }
 
 fn detect_commit_hash(repo: &PathBuf) -> Result<String> {
