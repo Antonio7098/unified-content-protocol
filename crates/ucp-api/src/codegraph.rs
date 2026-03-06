@@ -384,6 +384,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             relationships,
             usages,
             aliases,
+            export_bindings,
             default_exported_symbol_names,
             diagnostics: analysis_diagnostics,
             ..
@@ -460,6 +461,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             relationships,
             usages,
             aliases,
+            export_bindings,
         });
     }
 
@@ -501,6 +503,14 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
             .entry("default".to_string())
             .or_default()
             .extend(ids.iter().copied());
+    }
+    for record in &file_analyses {
+        let entry = exported_symbol_targets_by_file.entry(record.file.clone()).or_default();
+        for binding in &record.export_bindings {
+            if let Some(ids) = top_level_symbol_ids.get(&(record.file.clone(), binding.local_name.clone())) {
+                extend_unique_block_ids(entry.entry(binding.source_name.clone()).or_default(), ids.iter().copied());
+            }
+        }
     }
 
     for targets in exported_symbol_targets_by_file.values_mut() {
@@ -742,6 +752,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 language,
                 &alias,
                 &top_level_symbol_ids,
+                &exported_symbol_targets_by_file,
                 &imported_symbol_targets_by_file,
                 &imported_module_targets_by_file,
                 &imported_module_paths_by_file,
@@ -826,6 +837,7 @@ pub fn build_code_graph(input: &CodeGraphBuildInput) -> Result<CodeGraphBuildRes
                 record.language,
                 usage,
                 &top_level_symbol_ids,
+                &exported_symbol_targets_by_file,
                 &imported_symbol_targets_by_file,
                 &imported_module_targets_by_file,
                 &imported_module_paths_by_file,
@@ -1436,6 +1448,7 @@ struct FileAnalysis {
     relationships: Vec<ExtractedRelationship>,
     usages: Vec<ExtractedUsage>,
     aliases: Vec<ExtractedAlias>,
+    export_bindings: Vec<ImportBinding>,
     exported_symbol_names: BTreeSet<String>,
     default_exported_symbol_names: BTreeSet<String>,
     diagnostics: Vec<CodeGraphDiagnostic>,
@@ -1449,6 +1462,7 @@ struct FileAnalysisRecord {
     relationships: Vec<ExtractedRelationship>,
     usages: Vec<ExtractedUsage>,
     aliases: Vec<ExtractedAlias>,
+    export_bindings: Vec<ImportBinding>,
 }
 
 impl ExtractedImport {
@@ -3031,9 +3045,14 @@ fn collect_ts_commonjs_exports(node: Node<'_>, source: &str, analysis: &mut File
     };
 
     if export_name == "default" {
-        let object_export_names = ts_commonjs_object_export_names(right, source);
-        if !object_export_names.is_empty() {
-            analysis.exported_symbol_names.extend(object_export_names);
+        let object_export_bindings = ts_commonjs_object_export_bindings(right, source, analysis);
+        if !object_export_bindings.is_empty() {
+            for binding in object_export_bindings {
+                if binding.source_name == binding.local_name {
+                    analysis.exported_symbol_names.insert(binding.local_name.clone());
+                }
+                analysis.export_bindings.push(binding);
+            }
             return;
         }
     }
@@ -3057,39 +3076,70 @@ fn collect_ts_commonjs_exports(node: Node<'_>, source: &str, analysis: &mut File
     }
 }
 
-fn ts_commonjs_object_export_names(node: Node<'_>, source: &str) -> Vec<String> {
+fn ts_commonjs_object_export_bindings(
+    node: Node<'_>,
+    source: &str,
+    analysis: &mut FileAnalysis,
+) -> Vec<ImportBinding> {
     if node.kind() != "object" {
         return Vec::new();
     }
 
-    let text = node_text(source, node).trim();
-    let Some(inner) = text.strip_prefix('{').and_then(|rest| rest.strip_suffix('}')) else {
-        return Vec::new();
-    };
-
-    let mut names = Vec::new();
-    for part in inner.split(',') {
-        let property = part.trim();
-        if property.is_empty() || property.starts_with("...") {
-            continue;
-        }
-        let property = property.split('=').next().unwrap_or(property).trim();
-        let mut pieces = property.split(':').map(str::trim);
-        let Some(export_name) = pieces.next() else {
+    let mut bindings = Vec::new();
+    let mut cursor = node.walk();
+    for property in node.named_children(&mut cursor) {
+        let Some(export_name) = ts_commonjs_object_property_name(property, source) else {
             continue;
         };
-        let target_name = pieces.next().unwrap_or(export_name);
-        if !export_name.is_empty()
-            && export_name == target_name
-            && leading_js_identifier(export_name).as_deref() == Some(export_name)
-        {
-            names.push(export_name.to_string());
+
+        let local_name = if let Some(value) = property.child_by_field_name("value") {
+            if value.kind() == "identifier" {
+                let name = node_text(source, value).trim().to_string();
+                if name.is_empty() {
+                    None
+                } else {
+                    Some(name)
+                }
+            } else if let Some(symbol) = ts_commonjs_symbol_from_expression(value, source, &export_name) {
+                let name = symbol.name.clone();
+                analysis.symbols.push(symbol);
+                Some(name)
+            } else {
+                None
+            }
+        } else if let Some(name) = leading_js_identifier(node_text(source, property).trim()) {
+            Some(name)
+        } else {
+            None
+        };
+
+        if let Some(local_name) = local_name {
+            bindings.push(ImportBinding::new(export_name, local_name));
         }
     }
 
-    names.sort();
-    names.dedup();
-    names
+    bindings.sort();
+    bindings.dedup();
+    bindings
+}
+
+fn ts_commonjs_object_property_name(node: Node<'_>, source: &str) -> Option<String> {
+    let key = node
+        .child_by_field_name("key")
+        .or_else(|| node.child_by_field_name("name"))
+        .or_else(|| node.child_by_field_name("property"));
+
+    let raw = key
+        .map(|key| node_text(source, key).trim().to_string())
+        .filter(|text| !text.is_empty())
+        .or_else(|| leading_js_identifier(node_text(source, node).trim()))?;
+
+    let normalized = raw.trim_matches(|c| c == '\'' || c == '"').to_string();
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
 }
 
 fn ts_commonjs_export_name(node: Node<'_>, source: &str) -> Option<String> {
@@ -3629,6 +3679,7 @@ fn resolve_alias_target_ids(
     language: CodeLanguage,
     alias: &ExtractedAlias,
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
+    exported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
     imported_module_paths_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
@@ -3686,7 +3737,10 @@ fn resolve_alias_target_ids(
             .and_then(|aliases| aliases.get(&module_alias))
         {
             for target_file in target_files {
-                if let Some(ids) = top_level_symbol_ids.get(&(target_file.clone(), member_name.clone())) {
+                if let Some(ids) = exported_symbol_targets_by_file
+                    .get(target_file)
+                    .and_then(|exports| exports.get(&member_name))
+                {
                     target_ids.extend(ids.iter().copied());
                 }
             }
@@ -3745,6 +3799,7 @@ fn resolve_usage_target_ids(
     language: CodeLanguage,
     usage: &ExtractedUsage,
     top_level_symbol_ids: &BTreeMap<(String, String), Vec<BlockId>>,
+    exported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_symbol_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<BlockId>>>,
     imported_module_targets_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
     imported_module_paths_by_file: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
@@ -3806,7 +3861,10 @@ fn resolve_usage_target_ids(
             alias_records_by_scope,
         );
         for target_file in target_files {
-            if let Some(ids) = top_level_symbol_ids.get(&(target_file, member_name.clone())) {
+            if let Some(ids) = exported_symbol_targets_by_file
+                .get(&target_file)
+                .and_then(|exports| exports.get(&member_name))
+            {
                 target_ids.extend(ids.iter().copied());
             }
         }
@@ -5985,8 +6043,23 @@ mod tests {
         )
         .unwrap();
         fs::write(
+            dir.path().join("web/object_renamed_util.js"),
+            "function greet() { return 42; }\nmodule.exports = { hi: greet };\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/object_inline_util.js"),
+            "module.exports = { greet: function greet() { return 42; } };\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("web/object_class_util.js"),
+            "class Thing {}\nmodule.exports = { Alias: Thing };\n",
+        )
+        .unwrap();
+        fs::write(
             dir.path().join("web/main.js"),
-            "const util = require('./default_util');\nconst { greet } = require('./named_util');\nconst named = require('./named_util');\nconst { greet: object_greet } = require('./object_util');\nexport function run_default() { return util(); }\nexport function run_named() { return greet(); }\nexport function run_member() { return named.greet(); }\nexport function run_object_named() { return object_greet(); }\n",
+            "const util = require('./default_util');\nconst { greet } = require('./named_util');\nconst named = require('./named_util');\nconst { greet: object_greet } = require('./object_util');\nconst renamed = require('./object_renamed_util');\nconst inline_named = require('./object_inline_util');\nconst { hi } = require('./object_renamed_util');\nconst { greet: inline_greet } = require('./object_inline_util');\nconst { Alias } = require('./object_class_util');\nconst class_mod = require('./object_class_util');\nexport function run_default() { return util(); }\nexport function run_named() { return greet(); }\nexport function run_member() { return named.greet(); }\nexport function run_object_named() { return object_greet(); }\nexport function run_object_renamed() { return hi(); }\nexport function run_object_inline() { return inline_greet(); }\nexport function run_object_member_renamed() { return renamed.hi(); }\nexport function run_object_member_inline() { return inline_named.greet(); }\nexport function make_object_class() { return new Alias(); }\nexport function make_object_class_member() { return new class_mod.Alias(); }\n",
         )
         .unwrap();
 
@@ -6024,6 +6097,48 @@ mod tests {
             "uses_symbol",
             "uses_symbol",
             "symbol:web/object_util.js::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::run_object_renamed",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/object_renamed_util.js::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::run_object_inline",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/object_inline_util.js::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::run_object_member_renamed",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/object_renamed_util.js::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::run_object_member_inline",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/object_inline_util.js::greet",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::make_object_class",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/object_class_util.js::Thing",
+        ));
+        assert!(symbol_has_edge_to_symbol(
+            &build.document,
+            "symbol:web/main.js::make_object_class_member",
+            "uses_symbol",
+            "uses_symbol",
+            "symbol:web/object_class_util.js::Thing",
         ));
     }
 
