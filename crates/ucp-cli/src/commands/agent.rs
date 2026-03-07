@@ -655,7 +655,9 @@ fn context_seed(input: Option<String>, session: String, format: OutputFormat) ->
     let mut stateful = read_stateful_document(input.clone())?;
     let document = stateful.document.clone();
     if !is_codegraph_document(&document) {
-        return Err(anyhow!("context seed currently requires a codegraph document"));
+        return Err(anyhow!(
+            "context seed currently requires a codegraph document"
+        ));
     }
 
     let sess = get_session_mut(&mut stateful, &session)?;
@@ -663,7 +665,13 @@ fn context_seed(input: Option<String>, session: String, format: OutputFormat) ->
     sess.sync_context_blocks_from_codegraph();
     sess.current_block = update.focus.map(|id| id.to_string());
 
-    print_context_update(format, &session, &update, sess.context_blocks.len(), "Seeded overview")?;
+    print_context_update(
+        format,
+        &session,
+        &update,
+        sess.context_blocks.len(),
+        "Seeded overview",
+    )?;
     write_stateful_document(&stateful, input)?;
     Ok(())
 }
@@ -685,8 +693,11 @@ fn context_add(
     for id in &block_ids {
         sess.add_to_context(id);
         if codegraph {
-            sess.ensure_codegraph_context()
-                .select_block(&document, *id, CodeGraphDetailLevel::SymbolCard);
+            sess.ensure_codegraph_context().select_block(
+                &document,
+                *id,
+                CodeGraphDetailLevel::SymbolCard,
+            );
         }
     }
     if codegraph {
@@ -790,15 +801,26 @@ fn context_focus(
     let sess = get_session_mut(&mut stateful, &session)?;
     sess.current_block = target_id.map(|id| id.to_string());
     if codegraph {
-        let update = sess.ensure_codegraph_context().set_focus(&document, target_id);
+        let update = sess
+            .ensure_codegraph_context()
+            .set_focus(&document, target_id);
         sess.sync_context_blocks_from_codegraph();
-        print_context_update(format, &session, &update, sess.context_blocks.len(), "Updated focus")?;
+        print_context_update(
+            format,
+            &session,
+            &update,
+            sess.context_blocks.len(),
+            "Updated focus",
+        )?;
     } else {
         match format {
-            OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                "success": true,
-                "focus": target_id.map(|id| id.to_string())
-            }))?),
+            OutputFormat::Json => println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "focus": target_id.map(|id| id.to_string())
+                }))?
+            ),
             OutputFormat::Text => print_success("Updated focus"),
         }
     }
@@ -818,25 +840,39 @@ fn context_expand(
     let mut stateful = read_stateful_document(input.clone())?;
     let document = stateful.document.clone();
     if !is_codegraph_document(&document) {
-        return Err(anyhow!("context expand currently requires a codegraph document"));
+        return Err(anyhow!(
+            "context expand currently requires a codegraph document"
+        ));
     }
     let block_id = resolve_selector(&document, &target)?;
 
     let sess = get_session_mut(&mut stateful, &session)?;
     let update = match mode.as_str() {
-        "file" => sess.ensure_codegraph_context().expand_file(&document, block_id),
-        "dependencies" => sess
+        "file" => sess
             .ensure_codegraph_context()
-            .expand_dependencies(&document, block_id, relation.as_deref()),
-        "dependents" => sess
-            .ensure_codegraph_context()
-            .expand_dependents(&document, block_id, relation.as_deref()),
+            .expand_file(&document, block_id),
+        "dependencies" => sess.ensure_codegraph_context().expand_dependencies(
+            &document,
+            block_id,
+            relation.as_deref(),
+        ),
+        "dependents" => sess.ensure_codegraph_context().expand_dependents(
+            &document,
+            block_id,
+            relation.as_deref(),
+        ),
         other => return Err(anyhow!("Unsupported expand mode: {}", other)),
     };
     sess.sync_context_blocks_from_codegraph();
     sess.current_block = update.focus.map(|id| id.to_string());
 
-    print_context_update(format, &session, &update, sess.context_blocks.len(), "Expanded context")?;
+    print_context_update(
+        format,
+        &session,
+        &update,
+        sess.context_blocks.len(),
+        "Expanded context",
+    )?;
     write_stateful_document(&stateful, input)?;
     Ok(())
 }
@@ -851,7 +887,9 @@ fn context_hydrate(
     let mut stateful = read_stateful_document(input.clone())?;
     let document = stateful.document.clone();
     if !is_codegraph_document(&document) {
-        return Err(anyhow!("context hydrate currently requires a codegraph document"));
+        return Err(anyhow!(
+            "context hydrate currently requires a codegraph document"
+        ));
     }
     let block_id = resolve_selector(&document, &target)?;
 
@@ -862,7 +900,13 @@ fn context_hydrate(
     sess.sync_context_blocks_from_codegraph();
     sess.current_block = update.focus.map(|id| id.to_string());
 
-    print_context_update(format, &session, &update, sess.context_blocks.len(), "Hydrated source")?;
+    print_context_update(
+        format,
+        &session,
+        &update,
+        sess.context_blocks.len(),
+        "Hydrated source",
+    )?;
     write_stateful_document(&stateful, input)?;
     Ok(())
 }
@@ -877,7 +921,9 @@ fn context_collapse(
     let mut stateful = read_stateful_document(input.clone())?;
     let document = stateful.document.clone();
     if !is_codegraph_document(&document) {
-        return Err(anyhow!("context collapse currently requires a codegraph document"));
+        return Err(anyhow!(
+            "context collapse currently requires a codegraph document"
+        ));
     }
     let block_id = resolve_selector(&document, &target)?;
 
@@ -888,7 +934,13 @@ fn context_collapse(
     sess.sync_context_blocks_from_codegraph();
     sess.current_block = update.focus.map(|id| id.to_string());
 
-    print_context_update(format, &session, &update, sess.context_blocks.len(), "Collapsed context")?;
+    print_context_update(
+        format,
+        &session,
+        &update,
+        sess.context_blocks.len(),
+        "Collapsed context",
+    )?;
     write_stateful_document(&stateful, input)?;
     Ok(())
 }
@@ -903,7 +955,9 @@ fn context_pin(
     let mut stateful = read_stateful_document(input.clone())?;
     let document = stateful.document.clone();
     if !is_codegraph_document(&document) {
-        return Err(anyhow!("context pin currently requires a codegraph document"));
+        return Err(anyhow!(
+            "context pin currently requires a codegraph document"
+        ));
     }
     let block_id = resolve_selector(&document, &target)?;
 
@@ -912,13 +966,16 @@ fn context_pin(
     sess.sync_context_blocks_from_codegraph();
 
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "success": true,
-            "session": session,
-            "target": block_id.to_string(),
-            "pinned": pinned,
-            "total": sess.context_blocks.len()
-        }))?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "success": true,
+                "session": session,
+                "target": block_id.to_string(),
+                "pinned": pinned,
+                "total": sess.context_blocks.len()
+            }))?
+        ),
         OutputFormat::Text => print_success(&format!(
             "{} {}",
             if pinned { "Pinned" } else { "Unpinned" },
@@ -937,11 +994,14 @@ fn context_clear(input: Option<String>, session: String, format: OutputFormat) -
     sess.current_block = None;
 
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "success": true,
-            "session": session,
-            "count": 0
-        }))?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "success": true,
+                "session": session,
+                "count": 0
+            }))?
+        ),
         OutputFormat::Text => print_success("Context cleared"),
     }
 
@@ -967,13 +1027,16 @@ fn context_show(input: Option<String>, session: String, format: OutputFormat) ->
             );
             match format {
                 OutputFormat::Json => {
-                    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                        "session": session,
-                        "focus": context.focus.map(|id| id.to_string()),
-                        "summary": context.summary(&stateful.document),
-                        "blocks": sess.context_blocks,
-                        "rendered": rendered
-                    }))?);
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({
+                            "session": session,
+                            "focus": context.focus.map(|id| id.to_string()),
+                            "summary": context.summary(&stateful.document),
+                            "blocks": sess.context_blocks,
+                            "rendered": rendered
+                        }))?
+                    );
                 }
                 OutputFormat::Text => {
                     println!("{}", rendered);
@@ -1061,16 +1124,19 @@ fn print_context_update(
 ) -> Result<()> {
     match format {
         OutputFormat::Json => {
-            println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                "success": true,
-                "session": session,
-                "added": update.added.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-                "removed": update.removed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-                "changed": update.changed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-                "focus": update.focus.map(|id| id.to_string()),
-                "warnings": update.warnings,
-                "total": total
-            }))?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "success": true,
+                    "session": session,
+                    "added": update.added.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "removed": update.removed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "changed": update.changed.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    "focus": update.focus.map(|id| id.to_string()),
+                    "warnings": update.warnings,
+                    "total": total
+                }))?
+            );
         }
         OutputFormat::Text => {
             print_success(&format!(

@@ -804,9 +804,11 @@ impl AgentTraversal {
         session.check_can_modify_context()?;
         session.context_blocks.insert(block_id);
         if codegraph_doc {
-            session
-                .ensure_codegraph_context()
-                .select_block(&doc, block_id, CodeGraphDetailLevel::SymbolCard);
+            session.ensure_codegraph_context().select_block(
+                &doc,
+                block_id,
+                CodeGraphDetailLevel::SymbolCard,
+            );
         }
 
         session.metrics.record_context_add(1);
@@ -837,9 +839,11 @@ impl AgentTraversal {
         for block_id in &results {
             session.context_blocks.insert(*block_id);
             if codegraph_doc {
-                session
-                    .ensure_codegraph_context()
-                    .select_block(&doc, *block_id, CodeGraphDetailLevel::SymbolCard);
+                session.ensure_codegraph_context().select_block(
+                    &doc,
+                    *block_id,
+                    CodeGraphDetailLevel::SymbolCard,
+                );
             }
         }
         session.metrics.record_context_add(results.len());
@@ -936,7 +940,9 @@ impl AgentTraversal {
             .read()
             .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
         if !is_codegraph_document(&doc) {
-            return Err(AgentError::Internal("document is not a codegraph".to_string()));
+            return Err(AgentError::Internal(
+                "document is not a codegraph".to_string(),
+            ));
         }
 
         let mut sessions = self
@@ -962,7 +968,9 @@ impl AgentTraversal {
         session_id: &AgentSessionId,
         block_id: BlockId,
     ) -> Result<CodeGraphContextUpdate> {
-        self.codegraph_update(session_id, |doc, context| context.expand_file(doc, block_id))
+        self.codegraph_update(session_id, |doc, context| {
+            context.expand_file(doc, block_id)
+        })
     }
 
     pub fn codegraph_expand_dependencies(
@@ -993,7 +1001,9 @@ impl AgentTraversal {
         block_id: BlockId,
         padding: usize,
     ) -> Result<CodeGraphContextUpdate> {
-        self.codegraph_update(session_id, |doc, context| context.hydrate_source(doc, block_id, padding))
+        self.codegraph_update(session_id, |doc, context| {
+            context.hydrate_source(doc, block_id, padding)
+        })
     }
 
     pub fn codegraph_collapse(
@@ -1017,7 +1027,9 @@ impl AgentTraversal {
             .read()
             .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
         if !is_codegraph_document(&doc) {
-            return Err(AgentError::Internal("document is not a codegraph".to_string()));
+            return Err(AgentError::Internal(
+                "document is not a codegraph".to_string(),
+            ));
         }
 
         let sessions = self
@@ -1027,10 +1039,9 @@ impl AgentTraversal {
         let session = sessions
             .get(session_id)
             .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
-        let context = session
-            .codegraph_context
-            .as_ref()
-            .ok_or_else(|| AgentError::Internal("codegraph context has not been initialized".to_string()))?;
+        let context = session.codegraph_context.as_ref().ok_or_else(|| {
+            AgentError::Internal("codegraph context has not been initialized".to_string())
+        })?;
         Ok(render_codegraph_context_prompt(&doc, context, &config))
     }
 
@@ -1049,7 +1060,9 @@ impl AgentTraversal {
             .read()
             .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
         if !is_codegraph_document(&doc) {
-            return Err(AgentError::Internal("document is not a codegraph".to_string()));
+            return Err(AgentError::Internal(
+                "document is not a codegraph".to_string(),
+            ));
         }
 
         let mut sessions = self

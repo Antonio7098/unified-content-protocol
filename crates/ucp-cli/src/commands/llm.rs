@@ -229,7 +229,10 @@ fn context(
                 .get(session_id)
                 .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
             let context = agent_session.codegraph_context.as_ref().ok_or_else(|| {
-                anyhow!("Session {} has no codegraph context; run `agent context seed` first", session_id)
+                anyhow!(
+                    "Session {} has no codegraph context; run `agent context seed` first",
+                    session_id
+                )
             })?;
             render_codegraph_context_prompt(
                 doc,
@@ -240,7 +243,11 @@ fn context(
             let mut context = CodeGraphContextSession::new();
             context.seed_overview(doc);
             if let Some(blocks) = blocks.as_ref() {
-                for selector in blocks.split(',').map(str::trim).filter(|value| !value.is_empty()) {
+                for selector in blocks
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                {
                     let block_id = resolve_codegraph_selector(doc, selector)
                         .or_else(|| BlockId::from_str(selector).ok())
                         .ok_or_else(|| anyhow!("Could not resolve block selector: {}", selector))?;
@@ -257,13 +264,16 @@ fn context(
         let used_tokens = approximate_prompt_tokens(&rendered);
         match format {
             OutputFormat::Json => {
-                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                    "mode": "codegraph_context",
-                    "session": session,
-                    "max_tokens": max_tokens,
-                    "used_tokens": used_tokens,
-                    "rendered": rendered
-                }))?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "mode": "codegraph_context",
+                        "session": session,
+                        "max_tokens": max_tokens,
+                        "used_tokens": used_tokens,
+                        "rendered": rendered
+                    }))?
+                );
             }
             OutputFormat::Text => {
                 println!("{}", "CodeGraph LLM Context".cyan().bold());

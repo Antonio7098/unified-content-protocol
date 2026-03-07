@@ -491,7 +491,11 @@ impl CodeGraphContextSession {
         ));
     }
 
-    pub fn set_focus(&mut self, doc: &Document, block_id: Option<BlockId>) -> CodeGraphContextUpdate {
+    pub fn set_focus(
+        &mut self,
+        doc: &Document,
+        block_id: Option<BlockId>,
+    ) -> CodeGraphContextUpdate {
         let mut update = CodeGraphContextUpdate::default();
         if let Some(block_id) = block_id {
             if doc.get_block(&block_id).is_none() {
@@ -679,7 +683,11 @@ impl CodeGraphContextSession {
                 self.ensure_selected_with_origin(
                     symbol_id,
                     CodeGraphDetailLevel::SymbolCard,
-                    selection_origin(CodeGraphSelectionOriginKind::FileSymbols, None, Some(file_id)),
+                    selection_origin(
+                        CodeGraphSelectionOriginKind::FileSymbols,
+                        None,
+                        Some(file_id),
+                    ),
                     &mut update,
                 );
                 if !was_selected && self.selected.contains_key(&symbol_id) {
@@ -712,7 +720,10 @@ impl CodeGraphContextSession {
             "expand:file:{}:{}:{}:{}",
             file_id,
             traversal.depth(),
-            traversal.max_add.map(|value| value.to_string()).unwrap_or_else(|| "*".to_string()),
+            traversal
+                .max_add
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "*".to_string()),
             traversal
                 .priority_threshold
                 .map(|value| value.to_string())
@@ -922,7 +933,9 @@ impl CodeGraphContextSession {
 
         let mut out = String::new();
         let _ = writeln!(out, "CodeGraph working set");
-        let focus = self.focus.and_then(|id| render_reference(doc, &index, &short_ids, id));
+        let focus = self
+            .focus
+            .and_then(|id| render_reference(doc, &index, &short_ids, id));
         let _ = writeln!(
             out,
             "focus: {}",
@@ -990,7 +1003,11 @@ impl CodeGraphContextSession {
                     .unwrap_or_else(|| block_id.to_string());
                 let coderef = metadata_coderef_display(block)
                     .or_else(|| content_coderef_display(block))
-                    .unwrap_or_else(|| index.display_label(doc, &block_id).unwrap_or_else(|| block_id.to_string()));
+                    .unwrap_or_else(|| {
+                        index
+                            .display_label(doc, &block_id)
+                            .unwrap_or_else(|| block_id.to_string())
+                    });
                 let pin = if node.pinned { " [pinned]" } else { "" };
                 let _ = writeln!(
                     out,
@@ -1003,8 +1020,8 @@ impl CodeGraphContextSession {
                 if !pin.is_empty() {
                     let _ = writeln!(out, "  flags:{}", pin);
                 }
-                if let Some(description) = content_string(block, "description")
-                    .or_else(|| block.metadata.summary.clone())
+                if let Some(description) =
+                    content_string(block, "description").or_else(|| block.metadata.summary.clone())
                 {
                     let _ = writeln!(out, "  docs: {}", description);
                 }
@@ -1034,12 +1051,12 @@ impl CodeGraphContextSession {
 
                 if node.detail_level.includes_source() {
                     if let Some(source) = &node.hydrated_source {
-                        let _ = writeln!(out, "  source: {}:{}-{}", source.path, source.start_line, source.end_line);
-                        for line in source
-                            .snippet
-                            .lines()
-                            .take(config.max_source_lines)
-                        {
+                        let _ = writeln!(
+                            out,
+                            "  source: {}:{}-{}",
+                            source.path, source.start_line, source.end_line
+                        );
+                        for line in source.snippet.lines().take(config.max_source_lines) {
                             let _ = writeln!(out, "    {}", line);
                         }
                     }
@@ -1050,7 +1067,11 @@ impl CodeGraphContextSession {
         let total_symbols = index.total_symbols();
         let omitted_symbols = total_symbols.saturating_sub(summary.symbols);
         let _ = writeln!(out, "\nomissions:");
-        let _ = writeln!(out, "- symbols omitted from working set: {}", omitted_symbols);
+        let _ = writeln!(
+            out,
+            "- symbols omitted from working set: {}",
+            omitted_symbols
+        );
         let _ = writeln!(
             out,
             "- prune policy: max_selected={} demote_before_remove={} protect_focus={}",
@@ -1081,7 +1102,10 @@ impl CodeGraphContextSession {
                     let _ = writeln!(out, "- [{}] collapse", short);
                 }
                 _ => {
-                    let _ = writeln!(out, "- set focus to a file or symbol to expand the working set");
+                    let _ = writeln!(
+                        out,
+                        "- set focus to a file or symbol to expand the working set"
+                    );
                 }
             }
         } else {
@@ -1126,11 +1150,8 @@ impl CodeGraphContextSession {
                 !visible_selected_ids.contains(block_id) && !distances.contains_key(block_id)
             })
             .count();
-        let filtered_selected_ids = class_filtered_selected_ids(
-            &index,
-            &visible_selected_ids,
-            export_config,
-        );
+        let filtered_selected_ids =
+            class_filtered_selected_ids(&index, &visible_selected_ids, export_config);
         let rendered = if export_config.include_rendered {
             self.render_for_prompt(doc, config)
         } else {
@@ -1154,12 +1175,8 @@ impl CodeGraphContextSession {
                 .unwrap_or_else(|| block_id.to_string());
             let logical_key = block_logical_key(block);
             let distance_from_focus = distances.get(&block_id).copied();
-            let relevance_score = relevance_score_for_node(
-                self,
-                &index,
-                block_id,
-                distance_from_focus,
-            );
+            let relevance_score =
+                relevance_score_for_node(self, &index, block_id, distance_from_focus);
             let signature = if node_class == "symbol" {
                 Some(format!(
                     "{}{}",
@@ -1169,7 +1186,13 @@ impl CodeGraphContextSession {
             } else {
                 None
             };
-            let docs = if should_include_docs(export_config, self.focus, block_id, node, distance_from_focus) {
+            let docs = if should_include_docs(
+                export_config,
+                self.focus,
+                block_id,
+                node,
+                distance_from_focus,
+            ) {
                 content_string(block, "description").or_else(|| block.metadata.summary.clone())
             } else {
                 None
@@ -1232,9 +1255,7 @@ impl CodeGraphContextSession {
             export_mode: export_config.mode,
             visible_levels: export_config.visible_levels,
             focus: self.focus,
-            focus_short_id: self
-                .focus
-                .and_then(|id| short_ids.get(&id).cloned()),
+            focus_short_id: self.focus.and_then(|id| short_ids.get(&id).cloned()),
             focus_label: self.focus.and_then(|id| index.display_label(doc, &id)),
             visible_node_count: nodes.len(),
             hidden_unreachable_count,
@@ -1420,18 +1441,23 @@ impl CodeGraphContextSession {
         let mut reasons = Vec::new();
         let should_stop = match self.focus {
             None => {
-                reasons.push("set focus to a file or symbol before continuing expansion".to_string());
+                reasons
+                    .push("set focus to a file or symbol before continuing expansion".to_string());
                 false
             }
             Some(focus_id) => match index.node_class(&focus_id).unwrap_or("unknown") {
                 "file" => {
                     if hidden_candidate_count == 0 && focus_hydrated {
                         reasons.push(
-                            "focus file is hydrated and no unselected file symbols remain".to_string(),
+                            "focus file is hydrated and no unselected file symbols remain"
+                                .to_string(),
                         );
                         true
                     } else if hidden_candidate_count == 0 {
-                        reasons.push("all file symbols for the focused file are already selected".to_string());
+                        reasons.push(
+                            "all file symbols for the focused file are already selected"
+                                .to_string(),
+                        );
                         false
                     } else {
                         false
@@ -1782,14 +1808,21 @@ impl CodeGraphQueryIndex {
             if let Some(class) = node_class(block) {
                 node_classes.insert(*block_id, class.clone());
             }
-            if let Some(path) = metadata_coderef_path(block).or_else(|| content_coderef_path(block)) {
+            if let Some(path) = metadata_coderef_path(block).or_else(|| content_coderef_path(block))
+            {
                 let should_replace = match paths_to_id.get(&path) {
                     Some(existing_id) => {
                         let existing_rank = path_selector_rank(
-                            node_classes.get(existing_id).map(String::as_str).unwrap_or("unknown"),
+                            node_classes
+                                .get(existing_id)
+                                .map(String::as_str)
+                                .unwrap_or("unknown"),
                         );
                         let next_rank = path_selector_rank(
-                            node_classes.get(block_id).map(String::as_str).unwrap_or("unknown"),
+                            node_classes
+                                .get(block_id)
+                                .map(String::as_str)
+                                .unwrap_or("unknown"),
                         );
                         next_rank < existing_rank
                     }
@@ -1799,7 +1832,9 @@ impl CodeGraphQueryIndex {
                     paths_to_id.insert(path, *block_id);
                 }
             }
-            if let Some(display) = metadata_coderef_display(block).or_else(|| content_coderef_display(block)) {
+            if let Some(display) =
+                metadata_coderef_display(block).or_else(|| content_coderef_display(block))
+            {
                 display_to_id.insert(display, *block_id);
             }
             let content_name = content_string(block, "name");
@@ -1832,9 +1867,15 @@ impl CodeGraphQueryIndex {
         }
 
         for (parent, children) in &doc.structure {
-            let parent_class = node_classes.get(parent).map(String::as_str).unwrap_or("unknown");
+            let parent_class = node_classes
+                .get(parent)
+                .map(String::as_str)
+                .unwrap_or("unknown");
             for child in children {
-                let child_class = node_classes.get(child).map(String::as_str).unwrap_or("unknown");
+                let child_class = node_classes
+                    .get(child)
+                    .map(String::as_str)
+                    .unwrap_or("unknown");
                 if parent_class == "file" && child_class == "symbol" {
                     file_symbols.entry(*parent).or_default().push(*child);
                 }
@@ -1886,7 +1927,11 @@ impl CodeGraphQueryIndex {
             if !visited.insert(block_id) {
                 continue;
             }
-            let class = self.node_classes.get(&block_id).map(String::as_str).unwrap_or("unknown");
+            let class = self
+                .node_classes
+                .get(&block_id)
+                .map(String::as_str)
+                .unwrap_or("unknown");
             if matches!(class, "repository" | "directory" | "file") {
                 nodes.push(block_id);
             }
@@ -1894,7 +1939,11 @@ impl CodeGraphQueryIndex {
                 continue;
             }
             for child in doc.children(&block_id) {
-                let child_class = self.node_classes.get(&child).map(String::as_str).unwrap_or("unknown");
+                let child_class = self
+                    .node_classes
+                    .get(&child)
+                    .map(String::as_str)
+                    .unwrap_or("unknown");
                 if matches!(child_class, "repository" | "directory" | "file") {
                     queue.push_back((*child, depth + 1));
                 }
@@ -1929,7 +1978,11 @@ impl CodeGraphQueryIndex {
     }
 
     fn symbol_children(&self, block_id: &BlockId) -> Vec<BlockId> {
-        let mut children = self.symbol_children.get(block_id).cloned().unwrap_or_default();
+        let mut children = self
+            .symbol_children
+            .get(block_id)
+            .cloned()
+            .unwrap_or_default();
         children.sort_by_key(|id| {
             self.logical_keys
                 .get(id)
@@ -1988,11 +2041,7 @@ impl CodeGraphQueryIndex {
 }
 
 pub fn is_codegraph_document(doc: &Document) -> bool {
-    let profile = doc
-        .metadata
-        .custom
-        .get("profile")
-        .and_then(Value::as_str);
+    let profile = doc.metadata.custom.get("profile").and_then(Value::as_str);
     let marker = doc
         .metadata
         .custom
@@ -2040,7 +2089,9 @@ fn origin_is_more_protective(
     current: Option<&CodeGraphSelectionOrigin>,
 ) -> bool {
     match (next, current) {
-        (Some(next), Some(current)) => selection_origin_protection_rank(next) < selection_origin_protection_rank(current),
+        (Some(next), Some(current)) => {
+            selection_origin_protection_rank(next) < selection_origin_protection_rank(current)
+        }
         (Some(_), None) => true,
         _ => false,
     }
@@ -2056,7 +2107,10 @@ fn selection_origin_protection_rank(origin: &CodeGraphSelectionOrigin) -> u8 {
     }
 }
 
-fn origin_prune_rank(origin: Option<&CodeGraphSelectionOrigin>, policy: &CodeGraphPrunePolicy) -> u8 {
+fn origin_prune_rank(
+    origin: Option<&CodeGraphSelectionOrigin>,
+    policy: &CodeGraphPrunePolicy,
+) -> u8 {
     let _ = policy;
     match origin.map(|origin| origin.kind) {
         Some(CodeGraphSelectionOriginKind::Dependents) => 5,
@@ -2068,7 +2122,10 @@ fn origin_prune_rank(origin: Option<&CodeGraphSelectionOrigin>, policy: &CodeGra
     }
 }
 
-fn relation_prune_rank(origin: Option<&CodeGraphSelectionOrigin>, policy: &CodeGraphPrunePolicy) -> u8 {
+fn relation_prune_rank(
+    origin: Option<&CodeGraphSelectionOrigin>,
+    policy: &CodeGraphPrunePolicy,
+) -> u8 {
     origin
         .and_then(|origin| origin.relation.as_ref())
         .and_then(|relation| policy.relation_prune_priority.get(relation).copied())
@@ -2145,7 +2202,11 @@ fn render_edge_section(
         } else {
             String::new()
         };
-        let _ = writeln!(out, "    - {} -> [{}] {}{}", edge.relation, short, target, suffix);
+        let _ = writeln!(
+            out,
+            "    - {} -> [{}] {}{}",
+            edge.relation, short, target, suffix
+        );
     }
 
     if visible.len() > limit {
@@ -2179,8 +2240,16 @@ fn append_relation_frontier(
             relation: Some(relation.clone()),
             direction: Some(direction.to_string()),
             candidate_count,
-            priority: frontier_priority(action, Some(relation.as_str()), candidate_count, low_value),
-            description: format!("{} {} neighbors via {} for {}", action, direction, relation, label),
+            priority: frontier_priority(
+                action,
+                Some(relation.as_str()),
+                candidate_count,
+                low_value,
+            ),
+            description: format!(
+                "{} {} neighbors via {} for {}",
+                action, direction, relation, label
+            ),
         });
     }
 }
@@ -2228,7 +2297,9 @@ fn export_edges(
                     continue;
                 }
                 total_selected_edges += 1;
-                *counts.entry((source, edge.relation, edge.other)).or_default() += 1;
+                *counts
+                    .entry((source, edge.relation, edge.other))
+                    .or_default() += 1;
             }
         }
         for ((source, relation, target), multiplicity) in counts {
@@ -2379,12 +2450,14 @@ fn hidden_level_summaries(
     }
     counts
         .into_iter()
-        .map(|((level, relation, direction), count)| CodeGraphHiddenLevelSummary {
-            level,
-            count,
-            relation,
-            direction,
-        })
+        .map(
+            |((level, relation, direction), count)| CodeGraphHiddenLevelSummary {
+                level,
+                count,
+                relation,
+                direction,
+            },
+        )
         .collect()
 }
 
@@ -2403,19 +2476,22 @@ fn hidden_summary_metadata(
         Some(origin) if origin.kind == CodeGraphSelectionOriginKind::Dependents => {
             (origin.relation.clone(), Some("incoming".to_string()))
         }
-        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::FileSymbols => {
-            (Some("contains_symbol".to_string()), Some("structural".to_string()))
-        }
-        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::Overview => {
-            (Some("structure".to_string()), Some("structural".to_string()))
-        }
+        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::FileSymbols => (
+            Some("contains_symbol".to_string()),
+            Some("structural".to_string()),
+        ),
+        Some(origin) if origin.kind == CodeGraphSelectionOriginKind::Overview => (
+            Some("structure".to_string()),
+            Some("structural".to_string()),
+        ),
         Some(origin) if origin.kind == CodeGraphSelectionOriginKind::Manual => {
             (origin.relation.clone(), Some("manual".to_string()))
         }
         _ => match index.node_class(&block_id).unwrap_or("unknown") {
-            "repository" | "directory" | "file" => {
-                (Some("structure".to_string()), Some("structural".to_string()))
-            }
+            "repository" | "directory" | "file" => (
+                Some("structure".to_string()),
+                Some("structural".to_string()),
+            ),
             _ => (None, None),
         },
     }
@@ -2530,7 +2606,8 @@ fn should_include_hydrated_source(
     match export_config.mode {
         CodeGraphExportMode::Full => true,
         CodeGraphExportMode::Compact => {
-            focus == Some(block_id) || (node.pinned && distance_from_focus.unwrap_or(usize::MAX) <= 1)
+            focus == Some(block_id)
+                || (node.pinned && distance_from_focus.unwrap_or(usize::MAX) <= 1)
         }
     }
 }
@@ -2644,8 +2721,10 @@ fn hydrate_source_excerpt(
     let Some(block) = doc.get_block(&block_id) else {
         return Err(format!("block not found: {}", block_id));
     };
-    let coderef = block_coderef(block).ok_or_else(|| format!("missing coderef for {}", block_id))?;
-    let repo = repository_root(doc).ok_or_else(|| "missing repository_path metadata".to_string())?;
+    let coderef =
+        block_coderef(block).ok_or_else(|| format!("missing coderef for {}", block_id))?;
+    let repo =
+        repository_root(doc).ok_or_else(|| "missing repository_path metadata".to_string())?;
     #[cfg(target_arch = "wasm32")]
     {
         let _ = (repo, coderef, padding);
@@ -2659,7 +2738,11 @@ fn hydrate_source_excerpt(
         let lines: Vec<_> = source.lines().collect();
         let line_count = lines.len().max(1);
         let start_line = coderef.start_line.unwrap_or(1).max(1);
-        let end_line = coderef.end_line.unwrap_or(start_line).max(start_line).min(line_count);
+        let end_line = coderef
+            .end_line
+            .unwrap_or(start_line)
+            .max(start_line)
+            .min(line_count);
         let slice_start = start_line.saturating_sub(padding + 1);
         let slice_end = (end_line + padding).min(line_count);
 
@@ -2710,10 +2793,21 @@ fn block_coderef(block: &Block) -> Option<BlockCoderef> {
         display: value
             .get("display")
             .and_then(Value::as_str)
-            .unwrap_or_else(|| value.get("path").and_then(Value::as_str).unwrap_or("unknown"))
+            .unwrap_or_else(|| {
+                value
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown")
+            })
             .to_string(),
-        start_line: value.get("start_line").and_then(Value::as_u64).map(|v| v as usize),
-        end_line: value.get("end_line").and_then(Value::as_u64).map(|v| v as usize),
+        start_line: value
+            .get("start_line")
+            .and_then(Value::as_u64)
+            .map(|v| v as usize),
+        end_line: value
+            .get("end_line")
+            .and_then(Value::as_u64)
+            .map(|v| v as usize),
     })
 }
 
@@ -2878,7 +2972,11 @@ mod tests {
     fn build_test_graph() -> Document {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
-        fs::write(dir.path().join("src/util.rs"), "pub fn util() -> i32 { 1 }\n").unwrap();
+        fs::write(
+            dir.path().join("src/util.rs"),
+            "pub fn util() -> i32 { 1 }\n",
+        )
+        .unwrap();
         fs::write(
             dir.path().join("src/lib.rs"),
             "mod util;\n/// Add values.\npub async fn add(a: i32, b: i32) -> i32 { util::util() + a + b }\n\npub fn sub(a: i32, b: i32) -> i32 { util::util() + a - b }\n",
@@ -3032,7 +3130,8 @@ mod tests {
         assert!(export
             .frontier
             .iter()
-            .any(|action| action.action == "expand_dependencies" && action.relation.as_deref() == Some("uses_symbol")));
+            .any(|action| action.action == "expand_dependencies"
+                && action.relation.as_deref() == Some("uses_symbol")));
     }
 
     #[test]
@@ -3064,7 +3163,8 @@ mod tests {
 
         let mut export_config = CodeGraphExportConfig::compact();
         export_config.visible_levels = Some(1);
-        let export = session.export_with_config(&doc, &CodeGraphRenderConfig::default(), &export_config);
+        let export =
+            session.export_with_config(&doc, &CodeGraphRenderConfig::default(), &export_config);
 
         assert_eq!(export.visible_levels, Some(1));
         assert!(export.visible_node_count < export.summary.selected);
@@ -3121,7 +3221,10 @@ mod tests {
         );
 
         assert_eq!(update.added.len(), 1);
-        assert!(update.warnings.iter().any(|warning| warning.contains("max_add")));
+        assert!(update
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("max_add")));
     }
 
     #[test]
@@ -3166,7 +3269,8 @@ mod tests {
         let mut export_config = CodeGraphExportConfig::compact();
         export_config.visible_levels = Some(0);
         export_config.only_node_classes = vec!["symbol".to_string()];
-        let export = session.export_with_config(&doc, &CodeGraphRenderConfig::default(), &export_config);
+        let export =
+            session.export_with_config(&doc, &CodeGraphRenderConfig::default(), &export_config);
 
         assert!(export.nodes.iter().all(|node| node.node_class == "symbol"));
         assert!(export.edges.iter().all(|edge| {

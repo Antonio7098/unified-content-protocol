@@ -74,7 +74,11 @@ fn fake_block_id() -> BlockId {
 fn create_codegraph_document() -> Document {
     let dir = tempdir().unwrap();
     fs::create_dir_all(dir.path().join("src")).unwrap();
-    fs::write(dir.path().join("src/util.rs"), "pub fn util() -> i32 { 1 }\n").unwrap();
+    fs::write(
+        dir.path().join("src/util.rs"),
+        "pub fn util() -> i32 { 1 }\n",
+    )
+    .unwrap();
     fs::write(
         dir.path().join("src/lib.rs"),
         "mod util;\npub fn add(a: i32, b: i32) -> i32 { util::util() + a + b }\n",
@@ -654,17 +658,22 @@ fn test_codegraph_context_session_operations_are_stateful() {
     assert!(overview.focus.is_some());
 
     let file_id = ucp_codegraph::resolve_codegraph_selector(&doc, "src/lib.rs").unwrap();
-    traversal.codegraph_expand_file(&session_id, file_id).unwrap();
+    traversal
+        .codegraph_expand_file(&session_id, file_id)
+        .unwrap();
 
     let add_id = ucp_codegraph::resolve_codegraph_selector(&doc, "symbol:src/lib.rs::add").unwrap();
-    let util_id = ucp_codegraph::resolve_codegraph_selector(&doc, "symbol:src/util.rs::util").unwrap();
+    let util_id =
+        ucp_codegraph::resolve_codegraph_selector(&doc, "symbol:src/util.rs::util").unwrap();
     traversal
         .codegraph_expand_dependencies(&session_id, add_id, Some("uses_symbol"))
         .unwrap();
     traversal
         .codegraph_expand_dependents(&session_id, util_id, Some("uses_symbol"))
         .unwrap();
-    traversal.codegraph_hydrate_source(&session_id, add_id, 1).unwrap();
+    traversal
+        .codegraph_hydrate_source(&session_id, add_id, 1)
+        .unwrap();
 
     let rendered = traversal
         .render_codegraph_context(&session_id, ucp_codegraph::CodeGraphRenderConfig::default())
