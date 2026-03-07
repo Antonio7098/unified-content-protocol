@@ -671,9 +671,36 @@ mod workflow_tests {
         assert_eq!(
             first_json
                 .get("incremental")
+                .and_then(|v| v.get("scanned_files"))
+                .and_then(|v| v.as_u64()),
+            Some(2)
+        );
+        assert_eq!(
+            first_json
+                .get("incremental")
+                .and_then(|v| v.get("state_entries"))
+                .and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        assert_eq!(
+            first_json
+                .get("incremental")
+                .and_then(|v| v.get("direct_invalidated_files"))
+                .and_then(|v| v.as_u64()),
+            Some(2)
+        );
+        assert_eq!(
+            first_json
+                .get("incremental")
                 .and_then(|v| v.get("rebuilt_files"))
                 .and_then(|v| v.as_u64()),
             Some(2)
+        );
+        assert_eq!(
+            first_json
+                .get("incremental_state_file")
+                .and_then(|v| v.as_str()),
+            Some(state_path.as_str())
         );
 
         let second = run_cli(&[
@@ -697,6 +724,20 @@ mod workflow_tests {
             stderr(&second)
         );
         let second_json: serde_json::Value = serde_json::from_str(&stdout(&second)).unwrap();
+        assert_eq!(
+            second_json
+                .get("incremental")
+                .and_then(|v| v.get("state_entries"))
+                .and_then(|v| v.as_u64()),
+            Some(2)
+        );
+        assert_eq!(
+            second_json
+                .get("incremental")
+                .and_then(|v| v.get("direct_invalidated_files"))
+                .and_then(|v| v.as_u64()),
+            Some(0)
+        );
         assert_eq!(
             second_json
                 .get("incremental")
@@ -738,6 +779,20 @@ mod workflow_tests {
         assert_eq!(
             changed_json
                 .get("incremental")
+                .and_then(|v| v.get("state_entries"))
+                .and_then(|v| v.as_u64()),
+            Some(2)
+        );
+        assert_eq!(
+            changed_json
+                .get("incremental")
+                .and_then(|v| v.get("direct_invalidated_files"))
+                .and_then(|v| v.as_u64()),
+            Some(1)
+        );
+        assert_eq!(
+            changed_json
+                .get("incremental")
                 .and_then(|v| v.get("changed_files"))
                 .and_then(|v| v.as_u64()),
             Some(1)
@@ -749,6 +804,57 @@ mod workflow_tests {
                 .and_then(|v| v.as_u64()),
             Some(2)
         );
+    }
+
+    #[test]
+    fn test_codegraph_incremental_build_text_reports_observability() {
+        use tempfile::tempdir;
+
+        let repo = tempdir().expect("temp repo");
+        let src = repo.path().join("src");
+        std::fs::create_dir_all(&src).expect("create src");
+        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n").expect("write util.rs");
+        std::fs::write(
+            src.join("lib.rs"),
+            "mod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
+        )
+        .expect("write lib.rs");
+
+        let doc_out = tempfile::NamedTempFile::new().expect("doc output");
+        let doc_path = doc_out.path().to_str().unwrap().to_string();
+        let state_path = repo
+            .path()
+            .join("codegraph-state.json")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let repo_path = repo.path().to_str().unwrap().to_string();
+
+        let result = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "incremental-cli-text",
+            "--output",
+            doc_path.as_str(),
+            "--incremental",
+            "--state-file",
+            state_path.as_str(),
+            "--allow-partial",
+            "--format",
+            "text",
+        ]);
+        assert!(
+            result.status.success(),
+            "text incremental build failed: {}",
+            stderr(&result)
+        );
+
+        let output = stdout(&result);
+        assert!(output.contains("incremental: scanned=2 state_entries=0 direct_invalidations=2"));
+        assert!(output.contains("incremental_state:"));
+        assert!(output.contains(state_path.as_str()));
     }
 
     #[test]

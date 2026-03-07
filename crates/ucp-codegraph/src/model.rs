@@ -145,6 +145,12 @@ pub struct CodeGraphIncrementalStats {
     #[serde(default)]
     pub requested: bool,
     #[serde(default)]
+    pub scanned_files: usize,
+    #[serde(default)]
+    pub state_entries: usize,
+    #[serde(default)]
+    pub direct_invalidated_files: usize,
+    #[serde(default)]
     pub reused_files: usize,
     #[serde(default)]
     pub rebuilt_files: usize,

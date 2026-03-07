@@ -124,6 +124,7 @@ fn build(
                 canonical_fingerprint: String,
                 stats: ucp_api::CodeGraphStats,
                 incremental: Option<ucp_api::CodeGraphIncrementalStats>,
+                incremental_state_file: Option<String>,
                 diagnostics: Vec<ucp_api::CodeGraphDiagnostic>,
                 document: DocumentJson,
             }
@@ -134,6 +135,9 @@ fn build(
                 canonical_fingerprint: result.canonical_fingerprint,
                 stats: result.stats,
                 incremental: result.incremental.clone(),
+                incremental_state_file: incremental_state_file
+                    .as_ref()
+                    .map(|path| path.display().to_string()),
                 diagnostics: result.diagnostics.clone(),
                 document: doc_json,
             };
@@ -160,7 +164,10 @@ fn build(
             );
             if let Some(incremental) = &result.incremental {
                 println!(
-                    "incremental: rebuilt={} reused={} added={} changed={} deleted={} invalidated={}{}",
+                    "incremental: scanned={} state_entries={} direct_invalidations={} rebuilt={} reused={} added={} changed={} deleted={} invalidated={}{}",
+                    incremental.scanned_files,
+                    incremental.state_entries,
+                    incremental.direct_invalidated_files,
                     incremental.rebuilt_files,
                     incremental.reused_files,
                     incremental.added_files,

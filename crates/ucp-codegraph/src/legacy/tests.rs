@@ -1,12 +1,75 @@
 use super::*;
 use crate::model::*;
-use crate::{CodeGraphBuildInput, CodeGraphExtractorConfig};
+use crate::{CodeGraphBuildInput, CodeGraphExtractorConfig, CodeGraphIncrementalBuildInput};
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
+use std::path::Path;
 use tempfile::tempdir;
 use ucm_core::{Block, BlockId, Content, Document, EdgeType};
+
+fn default_build_input(repo_root: &Path, commit_hash: &str) -> CodeGraphBuildInput {
+    CodeGraphBuildInput {
+        repository_path: repo_root.to_path_buf(),
+        commit_hash: commit_hash.to_string(),
+        config: CodeGraphExtractorConfig::default(),
+    }
+}
+
+fn default_incremental_input(
+    repo_root: &Path,
+    state_file: &Path,
+    commit_hash: &str,
+) -> CodeGraphIncrementalBuildInput {
+    CodeGraphIncrementalBuildInput {
+        build: default_build_input(repo_root, commit_hash),
+        state_file: state_file.to_path_buf(),
+    }
+}
+
+fn diagnostic_signatures(diags: &[CodeGraphDiagnostic]) -> Vec<String> {
+    let mut signatures = diags
+        .iter()
+        .map(|diag| {
+            format!(
+                "{:?}|{}|{}|{}|{}",
+                diag.severity,
+                diag.code,
+                diag.path.clone().unwrap_or_default(),
+                diag.logical_key.clone().unwrap_or_default(),
+                diag.message,
+            )
+        })
+        .collect::<Vec<_>>();
+    signatures.sort();
+    signatures
+}
+
+fn assert_builds_equivalent(full: &CodeGraphBuildResult, incremental: &CodeGraphBuildResult) {
+    assert_eq!(full.status, incremental.status);
+    assert_eq!(full.profile_version, incremental.profile_version);
+    assert_eq!(full.stats, incremental.stats);
+    assert_eq!(
+        full.canonical_fingerprint,
+        incremental.canonical_fingerprint
+    );
+    assert_eq!(
+        canonical_codegraph_json(&full.document).unwrap(),
+        canonical_codegraph_json(&incremental.document).unwrap()
+    );
+    assert_eq!(
+        diagnostic_signatures(&full.diagnostics),
+        diagnostic_signatures(&incremental.diagnostics)
+    );
+}
+
+fn mutate_incremental_state_json(state_file: &Path, mutate: impl FnOnce(&mut serde_json::Value)) {
+    let mut state: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(state_file).unwrap()).unwrap();
+    mutate(&mut state);
+    fs::write(state_file, serde_json::to_string_pretty(&state).unwrap()).unwrap();
+}
 
 fn symbol_logical_keys(doc: &Document) -> Vec<String> {
     let mut out: Vec<_> = doc
@@ -3249,17 +3312,15 @@ fn test_incremental_build_reuses_unchanged_files() {
     .unwrap();
 
     let state_file = dir.path().join("codegraph-state.json");
-    let input = CodeGraphIncrementalBuildInput {
-        build: CodeGraphBuildInput {
-            repository_path: dir.path().to_path_buf(),
-            commit_hash: "incremental-smoke".to_string(),
-            config: CodeGraphExtractorConfig::default(),
-        },
-        state_file: state_file.clone(),
-    };
+    let input = default_incremental_input(dir.path(), &state_file, "incremental-smoke");
+    let full = build_code_graph(&default_build_input(dir.path(), "incremental-smoke")).unwrap();
 
     let first = build_code_graph_incremental(&input).unwrap();
     let first_stats = first.incremental.clone().unwrap();
+    assert_builds_equivalent(&full, &first);
+    assert_eq!(first_stats.scanned_files, 2);
+    assert_eq!(first_stats.state_entries, 0);
+    assert_eq!(first_stats.direct_invalidated_files, 2);
     assert_eq!(first_stats.rebuilt_files, 2);
     assert_eq!(first_stats.reused_files, 0);
     assert_eq!(
@@ -3270,6 +3331,10 @@ fn test_incremental_build_reuses_unchanged_files() {
 
     let second = build_code_graph_incremental(&input).unwrap();
     let second_stats = second.incremental.clone().unwrap();
+    assert_builds_equivalent(&full, &second);
+    assert_eq!(second_stats.scanned_files, 2);
+    assert_eq!(second_stats.state_entries, 2);
+    assert_eq!(second_stats.direct_invalidated_files, 0);
     assert_eq!(second_stats.rebuilt_files, 0);
     assert_eq!(second_stats.reused_files, 2);
     assert_eq!(second_stats.full_rebuild_reason, None);
@@ -3293,14 +3358,7 @@ fn test_incremental_build_invalidates_dependents_and_deletions() {
     .unwrap();
 
     let state_file = dir.path().join("codegraph-state.json");
-    let input = CodeGraphIncrementalBuildInput {
-        build: CodeGraphBuildInput {
-            repository_path: dir.path().to_path_buf(),
-            commit_hash: "incremental-invalidations".to_string(),
-            config: CodeGraphExtractorConfig::default(),
-        },
-        state_file: state_file.clone(),
-    };
+    let input = default_incremental_input(dir.path(), &state_file, "incremental-invalidations");
 
     let baseline = build_code_graph_incremental(&input).unwrap();
     assert_eq!(baseline.stats.file_nodes, 3);
@@ -3308,6 +3366,9 @@ fn test_incremental_build_invalidates_dependents_and_deletions() {
     fs::write(src.join("util.rs"), "pub fn util() -> i32 { 7 }\n").unwrap();
     let changed = build_code_graph_incremental(&input).unwrap();
     let changed_stats = changed.incremental.clone().unwrap();
+    assert_eq!(changed_stats.scanned_files, 3);
+    assert_eq!(changed_stats.state_entries, 3);
+    assert_eq!(changed_stats.direct_invalidated_files, 1);
     assert_eq!(changed_stats.changed_files, 1);
     assert_eq!(changed_stats.rebuilt_files, 2);
     assert_eq!(changed_stats.reused_files, 1);
@@ -3321,9 +3382,204 @@ fn test_incremental_build_invalidates_dependents_and_deletions() {
     .unwrap();
     let deleted = build_code_graph_incremental(&input).unwrap();
     let deleted_stats = deleted.incremental.clone().unwrap();
+    assert_eq!(deleted_stats.scanned_files, 2);
+    assert_eq!(deleted_stats.state_entries, 3);
+    assert_eq!(deleted_stats.direct_invalidated_files, 2);
     assert_eq!(deleted_stats.deleted_files, 1);
     assert_eq!(deleted_stats.changed_files, 1);
     assert_eq!(deleted_stats.rebuilt_files, 1);
     assert_eq!(deleted_stats.reused_files, 1);
     assert_eq!(deleted.stats.file_nodes, 2);
+}
+
+#[test]
+fn test_incremental_build_matches_full_build_after_dependency_affecting_change() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("helper.rs"), "pub fn helper() -> i32 { 2 }\n").unwrap();
+    fs::write(
+        src.join("util.rs"),
+        "pub fn util() -> i32 { helper::helper() }\n",
+    )
+    .unwrap();
+    fs::write(
+        src.join("lib.rs"),
+        "mod helper;\nmod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
+    )
+    .unwrap();
+
+    let state_file = dir.path().join("codegraph-state.json");
+    let input = default_incremental_input(dir.path(), &state_file, "incremental-equivalence");
+    build_code_graph_incremental(&input).unwrap();
+
+    fs::write(
+        src.join("util.rs"),
+        "pub fn util() -> i32 { helper::helper() }\npub fn util_twice() -> i32 { util() * 2 }\n",
+    )
+    .unwrap();
+
+    let full =
+        build_code_graph(&default_build_input(dir.path(), "incremental-equivalence")).unwrap();
+    let incremental = build_code_graph_incremental(&input).unwrap();
+    let incremental_stats = incremental.incremental.clone().unwrap();
+
+    assert_builds_equivalent(&full, &incremental);
+    assert_eq!(incremental_stats.scanned_files, 3);
+    assert_eq!(incremental_stats.state_entries, 3);
+    assert_eq!(incremental_stats.direct_invalidated_files, 1);
+    assert_eq!(incremental_stats.changed_files, 1);
+    assert_eq!(incremental_stats.rebuilt_files, 2);
+    assert_eq!(incremental_stats.reused_files, 1);
+}
+
+#[test]
+fn test_incremental_build_falls_back_for_invalid_state_contents() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("lib.rs"), "pub fn add(a:i32,b:i32)->i32{a+b}\n").unwrap();
+
+    let state_file = dir.path().join("codegraph-state.json");
+    let input = default_incremental_input(dir.path(), &state_file, "incremental-invalid-state");
+    build_code_graph_incremental(&input).unwrap();
+
+    fs::write(&state_file, "{ definitely-not-valid-json ").unwrap();
+
+    let full = build_code_graph(&default_build_input(
+        dir.path(),
+        "incremental-invalid-state",
+    ))
+    .unwrap();
+    let rebuilt = build_code_graph_incremental(&input).unwrap();
+    let stats = rebuilt.incremental.clone().unwrap();
+
+    assert_eq!(full.stats, rebuilt.stats);
+    assert_eq!(full.canonical_fingerprint, rebuilt.canonical_fingerprint);
+    assert_eq!(
+        canonical_codegraph_json(&full.document).unwrap(),
+        canonical_codegraph_json(&rebuilt.document).unwrap()
+    );
+    assert_eq!(stats.full_rebuild_reason.as_deref(), Some("invalid_state"));
+    assert_eq!(stats.rebuilt_files, 1);
+    assert_eq!(stats.reused_files, 0);
+    assert!(diagnostic_signatures(&rebuilt.diagnostics)
+        .iter()
+        .any(|diag| diag.contains("CG2009") && diag.contains("incremental state invalid")));
+}
+
+#[test]
+fn test_incremental_build_falls_back_for_incompatible_state_metadata() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("lib.rs"), "pub fn add(a:i32,b:i32)->i32{a+b}\n").unwrap();
+
+    let state_file = dir.path().join("codegraph-state.json");
+    let input = default_incremental_input(dir.path(), &state_file, "incremental-incompatibilities");
+    build_code_graph_incremental(&input).unwrap();
+
+    let scenarios: [(&str, fn(&mut serde_json::Value)); 3] = [
+        ("extractor_version_changed", |state| {
+            state["extractor_version"] = json!("ucp-codegraph-extractor.v-next");
+        }),
+        ("repository_changed", |state| {
+            state["repository_path"] = json!("/some/other/repository");
+        }),
+        ("config_changed", |state| {
+            state["config"]["include_hidden"] = json!(true);
+        }),
+    ];
+
+    for (reason, mutate) in scenarios {
+        build_code_graph_incremental(&input).unwrap();
+        mutate_incremental_state_json(&state_file, mutate);
+
+        let full = build_code_graph(&default_build_input(
+            dir.path(),
+            "incremental-incompatibilities",
+        ))
+        .unwrap();
+        let rebuilt = build_code_graph_incremental(&input).unwrap();
+        let stats = rebuilt.incremental.clone().unwrap();
+
+        assert_builds_equivalent(&full, &rebuilt);
+        assert_eq!(stats.full_rebuild_reason.as_deref(), Some(reason));
+        assert_eq!(stats.rebuilt_files, 1);
+        assert_eq!(stats.reused_files, 0);
+    }
+}
+
+#[test]
+fn test_incremental_build_performance_harness_large_fixture() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("src");
+    fs::create_dir_all(&src).unwrap();
+
+    for i in 0..400usize {
+        let mut file = fs::File::create(src.join(format!("m{}.rs", i))).unwrap();
+        writeln!(file, "pub fn f{}() -> usize {{ {} }}", i, i).unwrap();
+        if i > 0 {
+            writeln!(file, "use crate::m{}::f{};", i - 1, i - 1).unwrap();
+            writeln!(
+                file,
+                "pub fn chain{}() -> usize {{ f{}() + {} }}",
+                i,
+                i - 1,
+                i
+            )
+            .unwrap();
+        }
+    }
+
+    let state_file = dir.path().join("codegraph-state.json");
+    let full_input = default_build_input(dir.path(), "incremental-perf");
+    let incremental_input = default_incremental_input(dir.path(), &state_file, "incremental-perf");
+
+    let full_start = std::time::Instant::now();
+    let full = build_code_graph(&full_input).unwrap();
+    let full_elapsed = full_start.elapsed();
+
+    let seed_start = std::time::Instant::now();
+    let seed = build_code_graph_incremental(&incremental_input).unwrap();
+    let seed_elapsed = seed_start.elapsed();
+
+    let no_change_start = std::time::Instant::now();
+    let no_change = build_code_graph_incremental(&incremental_input).unwrap();
+    let no_change_elapsed = no_change_start.elapsed();
+
+    fs::write(
+        src.join("m399.rs"),
+        "pub fn f399() -> usize { 399 }\nuse crate::m398::f398;\npub fn chain399() -> usize { f398() + 399 }\npub fn leaf_extra() -> usize { chain399() }\n",
+    )
+    .unwrap();
+    let changed_start = std::time::Instant::now();
+    let changed = build_code_graph_incremental(&incremental_input).unwrap();
+    let changed_elapsed = changed_start.elapsed();
+
+    eprintln!(
+        "full={full_elapsed:?} seed_incremental={seed_elapsed:?} no_change_incremental={no_change_elapsed:?} changed_incremental={changed_elapsed:?}"
+    );
+
+    assert_builds_equivalent(&full, &seed);
+    let seed_stats = seed.incremental.clone().unwrap();
+    assert_eq!(seed_stats.scanned_files, 400);
+    assert_eq!(seed_stats.rebuilt_files, 400);
+    assert_eq!(seed_stats.reused_files, 0);
+
+    let no_change_stats = no_change.incremental.clone().unwrap();
+    assert_eq!(no_change_stats.scanned_files, 400);
+    assert_eq!(no_change_stats.state_entries, 400);
+    assert_eq!(no_change_stats.direct_invalidated_files, 0);
+    assert_eq!(no_change_stats.rebuilt_files, 0);
+    assert_eq!(no_change_stats.reused_files, 400);
+
+    let changed_stats = changed.incremental.clone().unwrap();
+    assert_eq!(changed_stats.scanned_files, 400);
+    assert_eq!(changed_stats.state_entries, 400);
+    assert_eq!(changed_stats.direct_invalidated_files, 1);
+    assert_eq!(changed_stats.changed_files, 1);
+    assert_eq!(changed_stats.rebuilt_files, 1);
+    assert_eq!(changed_stats.reused_files, 399);
+    assert_eq!(changed_stats.invalidated_files, 1);
 }

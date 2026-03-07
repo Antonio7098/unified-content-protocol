@@ -103,6 +103,7 @@ pub fn build_code_graph_incremental(
         .collect::<Result<Vec<_>>>()?;
 
     let previous_state = state_status.state.as_ref();
+    let state_entries = previous_state.map(|state| state.files.len()).unwrap_or(0);
     let current_paths: BTreeSet<String> = loaded_files
         .iter()
         .map(|loaded| loaded.repo_file.relative_path.clone())
@@ -195,6 +196,9 @@ pub fn build_code_graph_incremental(
     let mut result = assembled.result;
     result.incremental = Some(CodeGraphIncrementalStats {
         requested: true,
+        scanned_files: repo_files.len(),
+        state_entries,
+        direct_invalidated_files: initial_invalidations.len(),
         reused_files,
         rebuilt_files,
         added_files,
