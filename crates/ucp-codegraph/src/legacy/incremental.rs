@@ -5,7 +5,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::model::{CodeLanguage, FileAnalysis};
+use crate::model::{CodeLanguage, ExtractedInput, ExtractedModifiers, FileAnalysis, ImportBinding};
 use crate::{
     CodeGraphBuildResult, CodeGraphDiagnostic, CodeGraphExtractorConfig,
     CodeGraphIncrementalBuildInput, CodeGraphIncrementalStats, CODEGRAPH_EXTRACTOR_VERSION,
@@ -30,6 +30,8 @@ struct IncrementalFileState {
     relative_path: String,
     language: CodeLanguage,
     content_hash: String,
+    #[serde(default)]
+    surface_signature: String,
     analysis: Option<FileAnalysis>,
     diagnostics: Vec<CodeGraphDiagnostic>,
     dependencies: Vec<String>,
@@ -51,6 +53,7 @@ impl IncrementalFileState {
             relative_path: file.relative_path.clone(),
             language: file.language,
             content_hash: file.content_hash.clone()?,
+            surface_signature: compute_file_surface_signature(file.analysis.as_ref()),
             analysis: file.analysis.clone(),
             diagnostics: file.diagnostics.clone(),
             dependencies,
@@ -119,16 +122,25 @@ pub fn build_code_graph_incremental(
         })
         .unwrap_or_default();
 
-    let mut added_files = 0usize;
-    let mut changed_files = 0usize;
-    let mut initial_invalidations: BTreeSet<String> = deleted_paths.clone();
+    let (
+        analyzed_files,
+        added_files,
+        changed_files,
+        direct_invalidated_files,
+        surface_changed_files,
+        rebuilt_files,
+        reused_files,
+        invalidated_files,
+    ) = if let Some(state) = previous_state {
+        let mut added_files = 0usize;
+        let mut changed_files = 0usize;
+        let mut direct_rebuild_paths = BTreeSet::new();
 
-    if let Some(state) = previous_state {
         for loaded in &loaded_files {
             let path = &loaded.repo_file.relative_path;
             match state.files.get(path) {
                 None => {
-                    initial_invalidations.insert(path.clone());
+                    direct_rebuild_paths.insert(path.clone());
                     added_files += 1;
                 }
                 Some(previous) => {
@@ -138,27 +150,55 @@ pub fn build_code_graph_incremental(
                         .map(|hash| hash != &previous.content_hash)
                         .unwrap_or(true)
                     {
-                        initial_invalidations.insert(path.clone());
+                        direct_rebuild_paths.insert(path.clone());
                         changed_files += 1;
                     }
                 }
             }
         }
-    } else {
-        initial_invalidations.extend(current_paths.iter().cloned());
-    }
 
-    let rebuild_paths = previous_state
-        .map(|state| expand_invalidations(&initial_invalidations, state))
-        .unwrap_or_else(|| current_paths.clone());
+        let mut pre_analyzed = BTreeMap::new();
+        let mut surface_change_roots = deleted_paths.clone();
+        let mut surface_changed_files = deleted_paths.len();
 
-    let mut reused_files = 0usize;
-    let mut rebuilt_files = 0usize;
-    let analyzed_files = loaded_files
-        .into_iter()
-        .map(|loaded| {
-            let path = loaded.repo_file.relative_path.clone();
-            if let Some(state) = previous_state {
+        for loaded in loaded_files
+            .iter()
+            .filter(|loaded| direct_rebuild_paths.contains(&loaded.repo_file.relative_path))
+        {
+            let analyzed = analyze_loaded_repo_file(loaded.clone());
+            let current_surface = compute_file_surface_signature(analyzed.analysis.as_ref());
+            let previous_surface = state
+                .files
+                .get(&loaded.repo_file.relative_path)
+                .map(|entry| entry.surface_signature.as_str())
+                .unwrap_or("");
+            if current_surface != previous_surface {
+                surface_change_roots.insert(loaded.repo_file.relative_path.clone());
+                surface_changed_files += 1;
+            }
+            pre_analyzed.insert(loaded.repo_file.relative_path.clone(), analyzed);
+        }
+
+        let expanded_invalidations = expand_invalidations(&surface_change_roots, state);
+        let rebuild_paths = direct_rebuild_paths
+            .union(&expanded_invalidations)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let counted_rebuild_paths = rebuild_paths
+            .iter()
+            .filter(|path| current_paths.contains(*path))
+            .count();
+
+        let mut reused_files = 0usize;
+        let mut rebuilt_files = 0usize;
+        let analyzed_files = loaded_files
+            .into_iter()
+            .map(|loaded| {
+                let path = loaded.repo_file.relative_path.clone();
+                if let Some(analyzed) = pre_analyzed.remove(&path) {
+                    rebuilt_files += 1;
+                    return analyzed;
+                }
                 if !rebuild_paths.contains(&path) {
                     if let (Some(content_hash), Some(previous)) =
                         (loaded.content_hash.as_ref(), state.files.get(&path))
@@ -169,12 +209,39 @@ pub fn build_code_graph_incremental(
                         }
                     }
                 }
-            }
 
-            rebuilt_files += 1;
-            analyze_loaded_repo_file(loaded)
-        })
-        .collect::<Vec<_>>();
+                rebuilt_files += 1;
+                analyze_loaded_repo_file(loaded)
+            })
+            .collect::<Vec<_>>();
+
+        (
+            analyzed_files,
+            added_files,
+            changed_files,
+            direct_rebuild_paths.len() + deleted_paths.len(),
+            surface_changed_files,
+            rebuilt_files,
+            reused_files,
+            counted_rebuild_paths + deleted_paths.len(),
+        )
+    } else {
+        let rebuilt_files = loaded_files.len();
+        let analyzed_files = loaded_files
+            .into_iter()
+            .map(analyze_loaded_repo_file)
+            .collect::<Vec<_>>();
+        (
+            analyzed_files,
+            0,
+            0,
+            current_paths.len(),
+            0,
+            rebuilt_files,
+            0,
+            current_paths.len(),
+        )
+    };
 
     let assembled = assemble_code_graph_from_analyzed_files(
         &repo_root,
@@ -198,13 +265,14 @@ pub fn build_code_graph_incremental(
         requested: true,
         scanned_files: repo_files.len(),
         state_entries,
-        direct_invalidated_files: initial_invalidations.len(),
+        direct_invalidated_files,
+        surface_changed_files,
         reused_files,
         rebuilt_files,
         added_files,
         changed_files,
         deleted_files: deleted_paths.len(),
-        invalidated_files: rebuild_paths.len() + deleted_paths.len(),
+        invalidated_files,
         full_rebuild_reason: state_status.full_rebuild_reason,
     });
     Ok(result)
@@ -363,4 +431,115 @@ fn normalize_incremental_config(config: &CodeGraphExtractorConfig) -> CodeGraphE
     normalized.exclude_dirs.sort();
     normalized.exclude_dirs.dedup();
     normalized
+}
+
+#[derive(Serialize)]
+struct SurfaceSignatureSymbol {
+    name: String,
+    qualified_name: String,
+    parent_identity: Option<String>,
+    kind: String,
+    modifiers: ExtractedModifiers,
+    inputs: Vec<ExtractedInput>,
+    output: Option<String>,
+    type_info: Option<String>,
+    exported: bool,
+}
+
+#[derive(Serialize)]
+struct SurfaceSignatureReexport {
+    module: String,
+    symbols: Vec<String>,
+    bindings: Vec<ImportBinding>,
+    wildcard: bool,
+}
+
+#[derive(Serialize)]
+struct SurfaceSignatureSnapshot {
+    symbols: Vec<SurfaceSignatureSymbol>,
+    export_bindings: Vec<ImportBinding>,
+    exported_symbol_names: Vec<String>,
+    default_exported_symbol_names: Vec<String>,
+    reexports: Vec<SurfaceSignatureReexport>,
+}
+
+fn compute_file_surface_signature(analysis: Option<&FileAnalysis>) -> String {
+    let Some(analysis) = analysis else {
+        return String::new();
+    };
+
+    let mut symbols = analysis
+        .symbols
+        .iter()
+        .map(|symbol| SurfaceSignatureSymbol {
+            name: symbol.name.clone(),
+            qualified_name: symbol.qualified_name.clone(),
+            parent_identity: symbol.parent_identity.clone(),
+            kind: symbol.kind.clone(),
+            modifiers: symbol.modifiers.clone(),
+            inputs: symbol.inputs.clone(),
+            output: symbol.output.clone(),
+            type_info: symbol.type_info.clone(),
+            exported: symbol.exported,
+        })
+        .collect::<Vec<_>>();
+    symbols.sort_by(|left, right| {
+        left.qualified_name
+            .cmp(&right.qualified_name)
+            .then_with(|| left.kind.cmp(&right.kind))
+            .then_with(|| left.parent_identity.cmp(&right.parent_identity))
+            .then_with(|| left.name.cmp(&right.name))
+    });
+
+    let mut export_bindings = analysis.export_bindings.clone();
+    export_bindings.sort();
+
+    let mut exported_symbol_names = analysis
+        .exported_symbol_names
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    exported_symbol_names.sort();
+
+    let mut default_exported_symbol_names = analysis
+        .default_exported_symbol_names
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    default_exported_symbol_names.sort();
+
+    let mut reexports = analysis
+        .imports
+        .iter()
+        .filter(|import| import.reexported)
+        .map(|import| {
+            let mut symbols = import.symbols.clone();
+            symbols.sort();
+            let mut bindings = import.bindings.clone();
+            bindings.sort();
+            SurfaceSignatureReexport {
+                module: import.module.clone(),
+                symbols,
+                bindings,
+                wildcard: import.wildcard,
+            }
+        })
+        .collect::<Vec<_>>();
+    reexports.sort_by(|left, right| {
+        left.module
+            .cmp(&right.module)
+            .then_with(|| left.wildcard.cmp(&right.wildcard))
+            .then_with(|| left.symbols.cmp(&right.symbols))
+            .then_with(|| left.bindings.cmp(&right.bindings))
+    });
+
+    let snapshot = SurfaceSignatureSnapshot {
+        symbols,
+        export_bindings,
+        exported_symbol_names,
+        default_exported_symbol_names,
+        reexports,
+    };
+    let serialized = serde_json::to_string(&snapshot).expect("surface signature serialization");
+    super::build::hash_source(&serialized)
 }

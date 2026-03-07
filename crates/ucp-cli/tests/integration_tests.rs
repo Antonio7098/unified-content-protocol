@@ -692,6 +692,13 @@ mod workflow_tests {
         assert_eq!(
             first_json
                 .get("incremental")
+                .and_then(|v| v.get("surface_changed_files"))
+                .and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        assert_eq!(
+            first_json
+                .get("incremental")
                 .and_then(|v| v.get("rebuilt_files"))
                 .and_then(|v| v.as_u64()),
             Some(2)
@@ -735,6 +742,13 @@ mod workflow_tests {
             second_json
                 .get("incremental")
                 .and_then(|v| v.get("direct_invalidated_files"))
+                .and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        assert_eq!(
+            second_json
+                .get("incremental")
+                .and_then(|v| v.get("surface_changed_files"))
                 .and_then(|v| v.as_u64()),
             Some(0)
         );
@@ -793,12 +807,61 @@ mod workflow_tests {
         assert_eq!(
             changed_json
                 .get("incremental")
+                .and_then(|v| v.get("surface_changed_files"))
+                .and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        assert_eq!(
+            changed_json
+                .get("incremental")
                 .and_then(|v| v.get("changed_files"))
                 .and_then(|v| v.as_u64()),
             Some(1)
         );
         assert_eq!(
             changed_json
+                .get("incremental")
+                .and_then(|v| v.get("rebuilt_files"))
+                .and_then(|v| v.as_u64()),
+            Some(1)
+        );
+
+        std::fs::write(
+            src.join("util.rs"),
+            "pub fn util() -> i32 { 9 }\npub fn util_twice() -> i32 { util() * 2 }\n",
+        )
+        .expect("add exported util api");
+        let api_changed = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "incremental-cli",
+            "--output",
+            doc_path.as_str(),
+            "--incremental",
+            "--state-file",
+            state_path.as_str(),
+            "--allow-partial",
+            "--format",
+            "json",
+        ]);
+        assert!(
+            api_changed.status.success(),
+            "api-changed incremental build failed: {}",
+            stderr(&api_changed)
+        );
+        let api_changed_json: serde_json::Value =
+            serde_json::from_str(&stdout(&api_changed)).unwrap();
+        assert_eq!(
+            api_changed_json
+                .get("incremental")
+                .and_then(|v| v.get("surface_changed_files"))
+                .and_then(|v| v.as_u64()),
+            Some(1)
+        );
+        assert_eq!(
+            api_changed_json
                 .get("incremental")
                 .and_then(|v| v.get("rebuilt_files"))
                 .and_then(|v| v.as_u64()),
@@ -852,7 +915,9 @@ mod workflow_tests {
         );
 
         let output = stdout(&result);
-        assert!(output.contains("incremental: scanned=2 state_entries=0 direct_invalidations=2"));
+        assert!(output.contains(
+            "incremental: scanned=2 state_entries=0 direct_invalidations=2 surface_changes=0"
+        ));
         assert!(output.contains("incremental_state:"));
         assert!(output.contains(state_path.as_str()));
     }

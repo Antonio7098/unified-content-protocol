@@ -3321,6 +3321,7 @@ fn test_incremental_build_reuses_unchanged_files() {
     assert_eq!(first_stats.scanned_files, 2);
     assert_eq!(first_stats.state_entries, 0);
     assert_eq!(first_stats.direct_invalidated_files, 2);
+    assert_eq!(first_stats.surface_changed_files, 0);
     assert_eq!(first_stats.rebuilt_files, 2);
     assert_eq!(first_stats.reused_files, 0);
     assert_eq!(
@@ -3335,6 +3336,7 @@ fn test_incremental_build_reuses_unchanged_files() {
     assert_eq!(second_stats.scanned_files, 2);
     assert_eq!(second_stats.state_entries, 2);
     assert_eq!(second_stats.direct_invalidated_files, 0);
+    assert_eq!(second_stats.surface_changed_files, 0);
     assert_eq!(second_stats.rebuilt_files, 0);
     assert_eq!(second_stats.reused_files, 2);
     assert_eq!(second_stats.full_rebuild_reason, None);
@@ -3369,10 +3371,11 @@ fn test_incremental_build_invalidates_dependents_and_deletions() {
     assert_eq!(changed_stats.scanned_files, 3);
     assert_eq!(changed_stats.state_entries, 3);
     assert_eq!(changed_stats.direct_invalidated_files, 1);
+    assert_eq!(changed_stats.surface_changed_files, 0);
     assert_eq!(changed_stats.changed_files, 1);
-    assert_eq!(changed_stats.rebuilt_files, 2);
-    assert_eq!(changed_stats.reused_files, 1);
-    assert_eq!(changed_stats.invalidated_files, 2);
+    assert_eq!(changed_stats.rebuilt_files, 1);
+    assert_eq!(changed_stats.reused_files, 2);
+    assert_eq!(changed_stats.invalidated_files, 1);
 
     fs::remove_file(src.join("helper.rs")).unwrap();
     fs::write(
@@ -3385,10 +3388,12 @@ fn test_incremental_build_invalidates_dependents_and_deletions() {
     assert_eq!(deleted_stats.scanned_files, 2);
     assert_eq!(deleted_stats.state_entries, 3);
     assert_eq!(deleted_stats.direct_invalidated_files, 2);
+    assert_eq!(deleted_stats.surface_changed_files, 2);
     assert_eq!(deleted_stats.deleted_files, 1);
     assert_eq!(deleted_stats.changed_files, 1);
     assert_eq!(deleted_stats.rebuilt_files, 1);
     assert_eq!(deleted_stats.reused_files, 1);
+    assert_eq!(deleted_stats.invalidated_files, 2);
     assert_eq!(deleted.stats.file_nodes, 2);
 }
 
@@ -3428,6 +3433,7 @@ fn test_incremental_build_matches_full_build_after_dependency_affecting_change()
     assert_eq!(incremental_stats.scanned_files, 3);
     assert_eq!(incremental_stats.state_entries, 3);
     assert_eq!(incremental_stats.direct_invalidated_files, 1);
+    assert_eq!(incremental_stats.surface_changed_files, 1);
     assert_eq!(incremental_stats.changed_files, 1);
     assert_eq!(incremental_stats.rebuilt_files, 2);
     assert_eq!(incremental_stats.reused_files, 1);
@@ -3461,6 +3467,7 @@ fn test_incremental_build_falls_back_for_invalid_state_contents() {
         canonical_codegraph_json(&rebuilt.document).unwrap()
     );
     assert_eq!(stats.full_rebuild_reason.as_deref(), Some("invalid_state"));
+    assert_eq!(stats.surface_changed_files, 0);
     assert_eq!(stats.rebuilt_files, 1);
     assert_eq!(stats.reused_files, 0);
     assert!(diagnostic_signatures(&rebuilt.diagnostics)
@@ -3505,6 +3512,7 @@ fn test_incremental_build_falls_back_for_incompatible_state_metadata() {
 
         assert_builds_equivalent(&full, &rebuilt);
         assert_eq!(stats.full_rebuild_reason.as_deref(), Some(reason));
+        assert_eq!(stats.surface_changed_files, 0);
         assert_eq!(stats.rebuilt_files, 1);
         assert_eq!(stats.reused_files, 0);
     }
@@ -3550,15 +3558,26 @@ fn test_incremental_build_performance_harness_large_fixture() {
 
     fs::write(
         src.join("m399.rs"),
-        "pub fn f399() -> usize { 399 }\nuse crate::m398::f398;\npub fn chain399() -> usize { f398() + 399 }\npub fn leaf_extra() -> usize { chain399() }\n",
+        "pub fn f399() -> usize { 400 }\nuse crate::m398::f398;\npub fn chain399() -> usize { f398() + 399 }\n",
     )
     .unwrap();
-    let changed_start = std::time::Instant::now();
-    let changed = build_code_graph_incremental(&incremental_input).unwrap();
-    let changed_elapsed = changed_start.elapsed();
+    let body_change_start = std::time::Instant::now();
+    let body_changed = build_code_graph_incremental(&incremental_input).unwrap();
+    let body_change_elapsed = body_change_start.elapsed();
+
+    fs::write(
+        src.join("m398.rs"),
+        "pub fn f398() -> usize { 398 }\nuse crate::m397::f397;\npub fn chain398() -> usize { f397() + 398 }\npub fn added_api398() -> usize { chain398() }\n",
+    )
+    .unwrap();
+    let api_change_start = std::time::Instant::now();
+    let api_changed = build_code_graph_incremental(&incremental_input).unwrap();
+    let api_change_elapsed = api_change_start.elapsed();
+
+    let final_full = build_code_graph(&full_input).unwrap();
 
     eprintln!(
-        "full={full_elapsed:?} seed_incremental={seed_elapsed:?} no_change_incremental={no_change_elapsed:?} changed_incremental={changed_elapsed:?}"
+        "full={full_elapsed:?} seed_incremental={seed_elapsed:?} no_change_incremental={no_change_elapsed:?} body_change_incremental={body_change_elapsed:?} api_change_incremental={api_change_elapsed:?}"
     );
 
     assert_builds_equivalent(&full, &seed);
@@ -3574,12 +3593,24 @@ fn test_incremental_build_performance_harness_large_fixture() {
     assert_eq!(no_change_stats.rebuilt_files, 0);
     assert_eq!(no_change_stats.reused_files, 400);
 
-    let changed_stats = changed.incremental.clone().unwrap();
-    assert_eq!(changed_stats.scanned_files, 400);
-    assert_eq!(changed_stats.state_entries, 400);
-    assert_eq!(changed_stats.direct_invalidated_files, 1);
-    assert_eq!(changed_stats.changed_files, 1);
-    assert_eq!(changed_stats.rebuilt_files, 1);
-    assert_eq!(changed_stats.reused_files, 399);
-    assert_eq!(changed_stats.invalidated_files, 1);
+    let body_changed_stats = body_changed.incremental.clone().unwrap();
+    assert_eq!(body_changed_stats.scanned_files, 400);
+    assert_eq!(body_changed_stats.state_entries, 400);
+    assert_eq!(body_changed_stats.direct_invalidated_files, 1);
+    assert_eq!(body_changed_stats.surface_changed_files, 0);
+    assert_eq!(body_changed_stats.changed_files, 1);
+    assert_eq!(body_changed_stats.rebuilt_files, 1);
+    assert_eq!(body_changed_stats.reused_files, 399);
+    assert_eq!(body_changed_stats.invalidated_files, 1);
+
+    let api_changed_stats = api_changed.incremental.clone().unwrap();
+    assert_builds_equivalent(&final_full, &api_changed);
+    assert_eq!(api_changed_stats.scanned_files, 400);
+    assert_eq!(api_changed_stats.state_entries, 400);
+    assert_eq!(api_changed_stats.direct_invalidated_files, 1);
+    assert_eq!(api_changed_stats.surface_changed_files, 1);
+    assert_eq!(api_changed_stats.changed_files, 1);
+    assert_eq!(api_changed_stats.rebuilt_files, 2);
+    assert_eq!(api_changed_stats.reused_files, 398);
+    assert_eq!(api_changed_stats.invalidated_files, 2);
 }

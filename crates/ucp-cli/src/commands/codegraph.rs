@@ -164,10 +164,11 @@ fn build(
             );
             if let Some(incremental) = &result.incremental {
                 println!(
-                    "incremental: scanned={} state_entries={} direct_invalidations={} rebuilt={} reused={} added={} changed={} deleted={} invalidated={}{}",
+                    "incremental: scanned={} state_entries={} direct_invalidations={} surface_changes={} rebuilt={} reused={} added={} changed={} deleted={} invalidated={}{}",
                     incremental.scanned_files,
                     incremental.state_entries,
                     incremental.direct_invalidated_files,
+                    incremental.surface_changed_files,
                     incremental.rebuilt_files,
                     incremental.reused_files,
                     incremental.added_files,
