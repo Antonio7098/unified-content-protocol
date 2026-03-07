@@ -1123,6 +1123,14 @@ pub enum CodegraphCommands {
         /// Allow partial/failed-validation outputs without non-zero exit
         #[arg(long)]
         allow_partial: bool,
+
+        /// Reuse persisted per-file analysis snapshots and rebuild only changed/invalidated files
+        #[arg(long)]
+        incremental: bool,
+
+        /// Explicit path for the incremental state file
+        #[arg(long)]
+        state_file: Option<String>,
     },
 
     /// Inspect and validate an existing CodeGraph document

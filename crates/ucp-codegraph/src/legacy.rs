@@ -3,6 +3,7 @@ mod build;
 mod canonical;
 mod extract;
 mod filesystem;
+mod incremental;
 mod resolve;
 mod validate;
 mod languages {
@@ -13,6 +14,7 @@ mod languages {
 
 pub use build::build_code_graph;
 pub use canonical::{canonical_codegraph_json, canonical_fingerprint};
+pub use incremental::build_code_graph_incremental;
 pub use validate::validate_code_graph_profile;
 
 use analyze::{analyze_file, is_python_package_init};

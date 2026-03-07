@@ -4,16 +4,16 @@ use serde::Serialize;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str::FromStr;
-use ucp_api::{
-    build_code_graph, canonical_fingerprint, codegraph_prompt_projection,
-    export_codegraph_context_with_config, is_codegraph_document, render_codegraph_context_prompt,
-    resolve_codegraph_selector,
-    validate_code_graph_profile, CodeGraphBuildInput, CodeGraphBuildStatus,
-    CodeGraphContextExport, CodeGraphContextFrontierAction, CodeGraphContextUpdate,
-    CodeGraphDetailLevel, CodeGraphExportConfig, CodeGraphExtractorConfig, CodeGraphPrunePolicy,
-    CodeGraphRenderConfig, CodeGraphSeverity, CodeGraphTraversalConfig,
-};
 use ucm_core::{BlockId, Document};
+use ucp_api::{
+    build_code_graph, build_code_graph_incremental, canonical_fingerprint,
+    codegraph_prompt_projection, export_codegraph_context_with_config, is_codegraph_document,
+    render_codegraph_context_prompt, resolve_codegraph_selector, validate_code_graph_profile,
+    CodeGraphBuildInput, CodeGraphBuildStatus, CodeGraphContextExport,
+    CodeGraphContextFrontierAction, CodeGraphContextUpdate, CodeGraphDetailLevel,
+    CodeGraphExportConfig, CodeGraphExtractorConfig, CodeGraphIncrementalBuildInput,
+    CodeGraphPrunePolicy, CodeGraphRenderConfig, CodeGraphSeverity, CodeGraphTraversalConfig,
+};
 
 use crate::cli::{CodegraphCommands, CodegraphContextCommands, OutputFormat};
 use crate::output::{
@@ -36,6 +36,8 @@ pub fn handle(cmd: CodegraphCommands, format: OutputFormat) -> Result<()> {
             fail_on_parse_error,
             max_file_bytes,
             allow_partial,
+            incremental,
+            state_file,
         } => build(
             repo,
             commit,
@@ -46,6 +48,8 @@ pub fn handle(cmd: CodegraphCommands, format: OutputFormat) -> Result<()> {
             fail_on_parse_error,
             max_file_bytes,
             allow_partial,
+            incremental,
+            state_file,
             format,
         ),
         CodegraphCommands::Inspect { input } => inspect(input, format),
@@ -65,6 +69,8 @@ fn build(
     fail_on_parse_error: bool,
     max_file_bytes: usize,
     allow_partial: bool,
+    incremental: bool,
+    state_file: Option<String>,
     format: OutputFormat,
 ) -> Result<()> {
     let repository_path = PathBuf::from(&repo);
@@ -85,11 +91,21 @@ fn build(
     config.continue_on_parse_error = !fail_on_parse_error;
     config.max_file_bytes = max_file_bytes;
 
-    let result = build_code_graph(&CodeGraphBuildInput {
+    let build_input = CodeGraphBuildInput {
         repository_path,
         commit_hash,
         config,
-    })
+    };
+    let incremental_state_file =
+        resolve_incremental_state_file(incremental, state_file.as_deref(), output.as_deref())?;
+    let result = if let Some(state_file) = incremental_state_file.clone() {
+        build_code_graph_incremental(&CodeGraphIncrementalBuildInput {
+            build: build_input,
+            state_file,
+        })
+    } else {
+        build_code_graph(&build_input)
+    }
     .context("failed to build code graph")?;
 
     let doc_json = DocumentJson::from_document(&result.document);
@@ -107,6 +123,7 @@ fn build(
                 profile_version: String,
                 canonical_fingerprint: String,
                 stats: ucp_api::CodeGraphStats,
+                incremental: Option<ucp_api::CodeGraphIncrementalStats>,
                 diagnostics: Vec<ucp_api::CodeGraphDiagnostic>,
                 document: DocumentJson,
             }
@@ -116,6 +133,7 @@ fn build(
                 profile_version: result.profile_version,
                 canonical_fingerprint: result.canonical_fingerprint,
                 stats: result.stats,
+                incremental: result.incremental.clone(),
                 diagnostics: result.diagnostics.clone(),
                 document: doc_json,
             };
@@ -140,6 +158,25 @@ fn build(
                 "edges: total={} references={} exports={}",
                 result.stats.total_edges, result.stats.reference_edges, result.stats.export_edges
             );
+            if let Some(incremental) = &result.incremental {
+                println!(
+                    "incremental: rebuilt={} reused={} added={} changed={} deleted={} invalidated={}{}",
+                    incremental.rebuilt_files,
+                    incremental.reused_files,
+                    incremental.added_files,
+                    incremental.changed_files,
+                    incremental.deleted_files,
+                    incremental.invalidated_files,
+                    incremental
+                        .full_rebuild_reason
+                        .as_ref()
+                        .map(|reason| format!(" (full rebuild reason: {})", reason))
+                        .unwrap_or_default()
+                );
+                if let Some(state_file) = &incremental_state_file {
+                    println!("incremental_state: {}", state_file.display());
+                }
+            }
 
             if !result.stats.languages.is_empty() {
                 let mut langs: Vec<_> = result.stats.languages.iter().collect();
@@ -196,6 +233,30 @@ fn build(
     }
 
     Ok(())
+}
+
+fn resolve_incremental_state_file(
+    incremental: bool,
+    state_file: Option<&str>,
+    output: Option<&str>,
+) -> Result<Option<PathBuf>> {
+    match (incremental, state_file, output) {
+        (false, Some(path), _) => Ok(Some(PathBuf::from(path))),
+        (false, None, _) => Ok(None),
+        (true, Some(path), _) => Ok(Some(PathBuf::from(path))),
+        (true, None, Some(output)) => {
+            let mut path = PathBuf::from(output);
+            let file_name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| anyhow!("output path must include a file name for incremental mode"))?;
+            path.set_file_name(format!("{}.codegraph-state.json", file_name));
+            Ok(Some(path))
+        }
+        (true, None, None) => Err(anyhow!(
+            "incremental builds require either --output or --state-file so the state can be persisted"
+        )),
+    }
 }
 
 fn inspect(input: Option<String>, format: OutputFormat) -> Result<()> {
@@ -574,7 +635,10 @@ fn context_init(
             );
         }
         OutputFormat::Text => {
-            print_success(&format!("Initialized codegraph context session: {}", session_id));
+            print_success(&format!(
+                "Initialized codegraph context session: {}",
+                session_id
+            ));
         }
     }
 
@@ -609,7 +673,8 @@ fn context_show(
         only.as_deref(),
         exclude.as_deref(),
     )?;
-    let export = export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
+    let export =
+        export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
 
     match format {
         OutputFormat::Json => {
@@ -619,7 +684,10 @@ fn context_show(
             }
             println!("{}", serde_json::to_string_pretty(&value)?);
         }
-        OutputFormat::Text => println!("{}", render_context_show_text(&stateful.document, context, &config, &export)),
+        OutputFormat::Text => println!(
+            "{}",
+            render_context_show_text(&stateful.document, context, &config, &export)
+        ),
     }
 
     Ok(())
@@ -652,7 +720,8 @@ fn context_export(
         only.as_deref(),
         exclude.as_deref(),
     )?;
-    let export = export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
+    let export =
+        export_codegraph_context_with_config(&stateful.document, context, &config, &export_config);
 
     match format {
         OutputFormat::Json => {
@@ -708,7 +777,13 @@ fn context_defaults(
 
     if !has_updates {
         let sess = get_session(&stateful, &session)?;
-        return print_context_defaults(format, &session, &sess.codegraph_preferences, Vec::new(), false);
+        return print_context_defaults(
+            format,
+            &session,
+            &sess.codegraph_preferences,
+            Vec::new(),
+            false,
+        );
     }
 
     let sess = get_session_mut(&mut stateful, &session)?;
@@ -795,7 +870,10 @@ fn render_context_show_text(
                 (None, Some(relation)) => format!(" via {}", relation),
                 (None, None) => String::new(),
             };
-            lines.push(format!("+ {} nodes at level {}{}", hidden.count, hidden.level, suffix));
+            lines.push(format!(
+                "+ {} nodes at level {}{}",
+                hidden.count, hidden.level, suffix
+            ));
         }
     }
     if export.hidden_unreachable_count > 0 {
@@ -872,7 +950,9 @@ fn build_session_preferences(
     exclude_node_classes: Vec<String>,
 ) -> Result<CodeGraphSessionPreferences> {
     if preset.is_some() && !relation_filters.is_empty() {
-        return Err(anyhow!("Use either --default-preset or --default-relations, not both"));
+        return Err(anyhow!(
+            "Use either --default-preset or --default-relations, not both"
+        ));
     }
     if let Some(name) = preset.as_deref() {
         let _ = expand_relation_preset(name)?;
@@ -919,7 +999,9 @@ fn update_session_preferences(
         return Err(anyhow!("Use either --preset or --clear-preset, not both"));
     }
     if relations.is_some() && clear_relations {
-        return Err(anyhow!("Use either --relations or --clear-relations, not both"));
+        return Err(anyhow!(
+            "Use either --relations or --clear-relations, not both"
+        ));
     }
     if depth.is_some() && clear_depth {
         return Err(anyhow!("Use either --depth or --clear-depth, not both"));
@@ -1024,7 +1106,10 @@ fn print_context_defaults(
         }
         OutputFormat::Text => {
             if updated {
-                print_success(&format!("Updated codegraph defaults for session: {}", session));
+                print_success(&format!(
+                    "Updated codegraph defaults for session: {}",
+                    session
+                ));
                 if !changed_fields.is_empty() {
                     println!("Changed: {}", changed_fields.join(", "));
                 }
@@ -1198,7 +1283,10 @@ fn context_add(
         }
     }
     sess.sync_context_blocks_from_codegraph();
-    sess.current_block = update.focus.map(|id| id.to_string()).or_else(|| sess.current_block.clone());
+    sess.current_block = update
+        .focus
+        .map(|id| id.to_string())
+        .or_else(|| sess.current_block.clone());
 
     print_context_update(format, &session, &update, sess)?;
     write_stateful_document(&stateful, input)?;
@@ -1220,7 +1308,9 @@ fn context_focus(
         .transpose()?;
 
     let sess = get_session_mut(&mut stateful, &session)?;
-    let update = sess.ensure_codegraph_context().set_focus(&document, target_id);
+    let update = sess
+        .ensure_codegraph_context()
+        .set_focus(&document, target_id);
     sess.sync_context_blocks_from_codegraph();
     sess.current_block = update.focus.map(|id| id.to_string());
 
@@ -1319,7 +1409,9 @@ fn context_expand_recommended(
     };
 
     if actions.is_empty() {
-        return Err(anyhow!("No recommended actions available for the current focus"));
+        return Err(anyhow!(
+            "No recommended actions available for the current focus"
+        ));
     }
 
     let sess = get_session_mut(&mut stateful, &session)?;
@@ -1327,27 +1419,33 @@ fn context_expand_recommended(
     let mut applied = Vec::new();
     for action in actions {
         let traversal = CodeGraphTraversalConfig {
-            depth: depth.or(sess.codegraph_preferences.expand_depth).unwrap_or(1),
+            depth: depth
+                .or(sess.codegraph_preferences.expand_depth)
+                .unwrap_or(1),
             relation_filters: action.relation.clone().into_iter().collect(),
             max_add,
             priority_threshold,
         };
         let next = match action.action.as_str() {
-            "hydrate_source" => sess
-                .ensure_codegraph_context()
-                .hydrate_source(&document, action.block_id, padding),
-            "expand_file" => sess
-                .ensure_codegraph_context()
-                .expand_file_with_config(&document, action.block_id, &traversal),
+            "hydrate_source" => {
+                sess.ensure_codegraph_context()
+                    .hydrate_source(&document, action.block_id, padding)
+            }
+            "expand_file" => sess.ensure_codegraph_context().expand_file_with_config(
+                &document,
+                action.block_id,
+                &traversal,
+            ),
             "expand_dependencies" => sess
                 .ensure_codegraph_context()
                 .expand_dependencies_with_config(&document, action.block_id, &traversal),
             "expand_dependents" => sess
                 .ensure_codegraph_context()
                 .expand_dependents_with_config(&document, action.block_id, &traversal),
-            "collapse" => sess
-                .ensure_codegraph_context()
-                .collapse(&document, action.block_id, false),
+            "collapse" => {
+                sess.ensure_codegraph_context()
+                    .collapse(&document, action.block_id, false)
+            }
             _ => continue,
         };
         applied.push(action_summary(&action));
@@ -1355,7 +1453,10 @@ fn context_expand_recommended(
     }
 
     sess.sync_context_blocks_from_codegraph();
-    sess.current_block = merged.focus.map(|id| id.to_string()).or_else(|| sess.current_block.clone());
+    sess.current_block = merged
+        .focus
+        .map(|id| id.to_string())
+        .or_else(|| sess.current_block.clone());
 
     match format {
         OutputFormat::Json => {
@@ -1377,7 +1478,8 @@ fn context_expand_recommended(
         OutputFormat::Text => {
             print_success(&format!(
                 "Applied {} recommended action(s) to codegraph context {}",
-                applied.len(), session
+                applied.len(),
+                session
             ));
             for item in &applied {
                 println!("- {}", item);
@@ -1472,9 +1574,14 @@ fn context_prune(
     let document = stateful.document.clone();
 
     let sess = get_session_mut(&mut stateful, &session)?;
-    let update = sess.ensure_codegraph_context().prune(&document, max_selected);
+    let update = sess
+        .ensure_codegraph_context()
+        .prune(&document, max_selected);
     sess.sync_context_blocks_from_codegraph();
-    sess.current_block = update.focus.map(|id| id.to_string()).or_else(|| sess.current_block.clone());
+    sess.current_block = update
+        .focus
+        .map(|id| id.to_string())
+        .or_else(|| sess.current_block.clone());
 
     print_context_update(format, &session, &update, sess)?;
     write_stateful_document(&stateful, input)?;

@@ -617,14 +617,148 @@ mod workflow_tests {
     }
 
     #[test]
+    fn test_codegraph_incremental_build_workflow() {
+        use tempfile::tempdir;
+
+        let repo = tempdir().expect("temp repo");
+        let src = repo.path().join("src");
+        std::fs::create_dir_all(&src).expect("create src");
+        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n").expect("write util.rs");
+        std::fs::write(
+            src.join("lib.rs"),
+            "mod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
+        )
+        .expect("write lib.rs");
+
+        let doc_out = tempfile::NamedTempFile::new().expect("doc output");
+        let doc_path = doc_out.path().to_str().unwrap().to_string();
+        let state_path = repo
+            .path()
+            .join("codegraph-state.json")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let repo_path = repo.path().to_str().unwrap().to_string();
+
+        let first = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "incremental-cli",
+            "--output",
+            doc_path.as_str(),
+            "--incremental",
+            "--state-file",
+            state_path.as_str(),
+            "--allow-partial",
+            "--format",
+            "json",
+        ]);
+        assert!(
+            first.status.success(),
+            "first incremental build failed: {}",
+            stderr(&first)
+        );
+        let first_json: serde_json::Value = serde_json::from_str(&stdout(&first)).unwrap();
+        assert_eq!(
+            first_json
+                .get("incremental")
+                .and_then(|v| v.get("full_rebuild_reason"))
+                .and_then(|v| v.as_str()),
+            Some("missing_state")
+        );
+        assert_eq!(
+            first_json
+                .get("incremental")
+                .and_then(|v| v.get("rebuilt_files"))
+                .and_then(|v| v.as_u64()),
+            Some(2)
+        );
+
+        let second = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "incremental-cli",
+            "--output",
+            doc_path.as_str(),
+            "--incremental",
+            "--state-file",
+            state_path.as_str(),
+            "--allow-partial",
+            "--format",
+            "json",
+        ]);
+        assert!(
+            second.status.success(),
+            "second incremental build failed: {}",
+            stderr(&second)
+        );
+        let second_json: serde_json::Value = serde_json::from_str(&stdout(&second)).unwrap();
+        assert_eq!(
+            second_json
+                .get("incremental")
+                .and_then(|v| v.get("rebuilt_files"))
+                .and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        assert_eq!(
+            second_json
+                .get("incremental")
+                .and_then(|v| v.get("reused_files"))
+                .and_then(|v| v.as_u64()),
+            Some(2)
+        );
+
+        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 9 }\n")
+            .expect("update util.rs");
+        let changed = run_cli(&[
+            "codegraph",
+            "build",
+            repo_path.as_str(),
+            "--commit",
+            "incremental-cli",
+            "--output",
+            doc_path.as_str(),
+            "--incremental",
+            "--state-file",
+            state_path.as_str(),
+            "--allow-partial",
+            "--format",
+            "json",
+        ]);
+        assert!(
+            changed.status.success(),
+            "changed incremental build failed: {}",
+            stderr(&changed)
+        );
+        let changed_json: serde_json::Value = serde_json::from_str(&stdout(&changed)).unwrap();
+        assert_eq!(
+            changed_json
+                .get("incremental")
+                .and_then(|v| v.get("changed_files"))
+                .and_then(|v| v.as_u64()),
+            Some(1)
+        );
+        assert_eq!(
+            changed_json
+                .get("incremental")
+                .and_then(|v| v.get("rebuilt_files"))
+                .and_then(|v| v.as_u64()),
+            Some(2)
+        );
+    }
+
+    #[test]
     fn test_codegraph_context_session_workflow() {
         use tempfile::tempdir;
 
         let repo = tempdir().expect("temp repo");
         let src = repo.path().join("src");
         std::fs::create_dir_all(&src).expect("create src");
-        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n")
-            .expect("write util.rs");
+        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n").expect("write util.rs");
         std::fs::write(
             src.join("lib.rs"),
             "mod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
@@ -658,7 +792,11 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(create.status.success(), "session create failed: {}", stderr(&create));
+        assert!(
+            create.status.success(),
+            "session create failed: {}",
+            stderr(&create)
+        );
         let create_json: serde_json::Value = serde_json::from_str(&stdout(&create)).unwrap();
         let session_id = create_json
             .get("session_id")
@@ -722,7 +860,11 @@ mod workflow_tests {
             ],
         ] {
             let output = run_cli(&args);
-            assert!(output.status.success(), "command failed: {}", stderr(&output));
+            assert!(
+                output.status.success(),
+                "command failed: {}",
+                stderr(&output)
+            );
         }
 
         let show = run_cli(&[
@@ -736,7 +878,11 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(show.status.success(), "context show failed: {}", stderr(&show));
+        assert!(
+            show.status.success(),
+            "context show failed: {}",
+            stderr(&show)
+        );
         let show_json: serde_json::Value = serde_json::from_str(&stdout(&show)).unwrap();
         let rendered = show_json.get("rendered").and_then(|v| v.as_str()).unwrap();
         assert!(rendered.contains("CodeGraph working set"));
@@ -755,7 +901,10 @@ mod workflow_tests {
         ]);
         assert!(llm.status.success(), "llm context failed: {}", stderr(&llm));
         let llm_json: serde_json::Value = serde_json::from_str(&stdout(&llm)).unwrap();
-        assert_eq!(llm_json.get("mode").and_then(|v| v.as_str()), Some("codegraph_context"));
+        assert_eq!(
+            llm_json.get("mode").and_then(|v| v.as_str()),
+            Some("codegraph_context")
+        );
         assert!(llm_json
             .get("rendered")
             .and_then(|v| v.as_str())
@@ -770,8 +919,7 @@ mod workflow_tests {
         let repo = tempdir().expect("temp repo");
         let src = repo.path().join("src");
         std::fs::create_dir_all(&src).expect("create src");
-        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n")
-            .expect("write util.rs");
+        std::fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n").expect("write util.rs");
         std::fs::write(
             src.join("lib.rs"),
             "mod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
@@ -809,9 +957,16 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(init.status.success(), "context init failed: {}", stderr(&init));
+        assert!(
+            init.status.success(),
+            "context init failed: {}",
+            stderr(&init)
+        );
         let init_json: serde_json::Value = serde_json::from_str(&stdout(&init)).unwrap();
-        assert_eq!(init_json.get("initial_depth").and_then(|v| v.as_u64()), Some(1));
+        assert_eq!(
+            init_json.get("initial_depth").and_then(|v| v.as_u64()),
+            Some(1)
+        );
         assert_eq!(
             init_json
                 .get("summary")
@@ -899,7 +1054,11 @@ mod workflow_tests {
             ],
         ] {
             let output = run_cli(&args);
-            assert!(output.status.success(), "command failed: {}", stderr(&output));
+            assert!(
+                output.status.success(),
+                "command failed: {}",
+                stderr(&output)
+            );
         }
 
         let show = run_cli(&[
@@ -917,7 +1076,11 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(show.status.success(), "context show failed: {}", stderr(&show));
+        assert!(
+            show.status.success(),
+            "context show failed: {}",
+            stderr(&show)
+        );
         let show_json: serde_json::Value = serde_json::from_str(&stdout(&show)).unwrap();
         assert_eq!(
             show_json
@@ -926,21 +1089,32 @@ mod workflow_tests {
                 .and_then(|v| v.as_u64()),
             Some(4)
         );
-        assert_eq!(show_json.get("export_mode").and_then(|v| v.as_str()), Some("compact"));
-        assert_eq!(show_json.get("visible_levels").and_then(|v| v.as_u64()), Some(0));
+        assert_eq!(
+            show_json.get("export_mode").and_then(|v| v.as_str()),
+            Some("compact")
+        );
+        assert_eq!(
+            show_json.get("visible_levels").and_then(|v| v.as_u64()),
+            Some(0)
+        );
         assert!(show_json.get("rendered").is_none());
         assert!(show_json.get("nodes").and_then(|v| v.as_array()).is_some());
-        assert!(show_json.get("frontier").and_then(|v| v.as_array()).is_some());
-        assert!(show_json.get("heuristics").is_some());
         assert!(show_json
-            .get("visible_node_count")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0)
-            < show_json
-                .get("summary")
-                .and_then(|v| v.get("selected"))
+            .get("frontier")
+            .and_then(|v| v.as_array())
+            .is_some());
+        assert!(show_json.get("heuristics").is_some());
+        assert!(
+            show_json
+                .get("visible_node_count")
                 .and_then(|v| v.as_u64())
-                .unwrap_or(0));
+                .unwrap_or(0)
+                < show_json
+                    .get("summary")
+                    .and_then(|v| v.get("selected"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0)
+        );
         assert!(show_json
             .get("hidden_levels")
             .and_then(|v| v.as_array())
@@ -962,7 +1136,11 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(export.status.success(), "context export failed: {}", stderr(&export));
+        assert!(
+            export.status.success(),
+            "context export failed: {}",
+            stderr(&export)
+        );
         let export_json: serde_json::Value = serde_json::from_str(&stdout(&export)).unwrap();
         assert!(export_json
             .get("frontier")
@@ -985,7 +1163,10 @@ mod workflow_tests {
             .and_then(|v| v.as_array())
             .map(|edges| edges.iter().all(|edge| edge.get("multiplicity").is_some()))
             .unwrap_or(false));
-        assert_eq!(export_json.get("visible_levels").and_then(|v| v.as_u64()), Some(0));
+        assert_eq!(
+            export_json.get("visible_levels").and_then(|v| v.as_u64()),
+            Some(0)
+        );
     }
 
     #[test]
@@ -997,8 +1178,11 @@ mod workflow_tests {
         std::fs::create_dir_all(&src).expect("create src");
         std::fs::write(src.join("helper.rs"), "pub fn helper() -> i32 { 2 }\n")
             .expect("write helper.rs");
-        std::fs::write(src.join("util.rs"), "use crate::helper; pub fn util() -> i32 { helper::helper() }\n")
-            .expect("write util.rs");
+        std::fs::write(
+            src.join("util.rs"),
+            "use crate::helper; pub fn util() -> i32 { helper::helper() }\n",
+        )
+        .expect("write util.rs");
         std::fs::write(
             src.join("lib.rs"),
             "mod helper; mod util; pub fn add(a:i32,b:i32)->i32{util::util()+a+b}\npub fn sub(a:i32,b:i32)->i32{a-b}\n",
@@ -1051,9 +1235,16 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(init.status.success(), "context init failed: {}", stderr(&init));
+        assert!(
+            init.status.success(),
+            "context init failed: {}",
+            stderr(&init)
+        );
         let init_json: serde_json::Value = serde_json::from_str(&stdout(&init)).unwrap();
-        assert_eq!(init_json.get("focus").and_then(|v| v.as_str()), Some("symbol:src/lib.rs::add"));
+        assert_eq!(
+            init_json.get("focus").and_then(|v| v.as_str()),
+            Some("symbol:src/lib.rs::add")
+        );
         assert_eq!(
             init_json
                 .get("preferences")
@@ -1078,14 +1269,26 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(show.status.success(), "context show failed: {}", stderr(&show));
+        assert!(
+            show.status.success(),
+            "context show failed: {}",
+            stderr(&show)
+        );
         let show_json: serde_json::Value = serde_json::from_str(&stdout(&show)).unwrap();
-        assert_eq!(show_json.get("export_mode").and_then(|v| v.as_str()), Some("compact"));
-        assert_eq!(show_json.get("visible_levels").and_then(|v| v.as_u64()), Some(1));
+        assert_eq!(
+            show_json.get("export_mode").and_then(|v| v.as_str()),
+            Some("compact")
+        );
+        assert_eq!(
+            show_json.get("visible_levels").and_then(|v| v.as_u64()),
+            Some(1)
+        );
         assert!(show_json
             .get("nodes")
             .and_then(|v| v.as_array())
-            .map(|nodes| nodes.iter().all(|node| node.get("node_class").and_then(|v| v.as_str()) == Some("symbol")))
+            .map(|nodes| nodes
+                .iter()
+                .all(|node| node.get("node_class").and_then(|v| v.as_str()) == Some("symbol")))
             .unwrap_or(false));
         assert!(show_json
             .get("hidden_levels")
@@ -1104,9 +1307,17 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(defaults_show.status.success(), "defaults show failed: {}", stderr(&defaults_show));
-        let defaults_show_json: serde_json::Value = serde_json::from_str(&stdout(&defaults_show)).unwrap();
-        assert_eq!(defaults_show_json.get("updated").and_then(|v| v.as_bool()), Some(false));
+        assert!(
+            defaults_show.status.success(),
+            "defaults show failed: {}",
+            stderr(&defaults_show)
+        );
+        let defaults_show_json: serde_json::Value =
+            serde_json::from_str(&stdout(&defaults_show)).unwrap();
+        assert_eq!(
+            defaults_show_json.get("updated").and_then(|v| v.as_bool()),
+            Some(false)
+        );
         assert_eq!(
             defaults_show_json
                 .get("preferences")
@@ -1135,9 +1346,19 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(defaults_update.status.success(), "defaults update failed: {}", stderr(&defaults_update));
-        let defaults_update_json: serde_json::Value = serde_json::from_str(&stdout(&defaults_update)).unwrap();
-        assert_eq!(defaults_update_json.get("updated").and_then(|v| v.as_bool()), Some(true));
+        assert!(
+            defaults_update.status.success(),
+            "defaults update failed: {}",
+            stderr(&defaults_update)
+        );
+        let defaults_update_json: serde_json::Value =
+            serde_json::from_str(&stdout(&defaults_update)).unwrap();
+        assert_eq!(
+            defaults_update_json
+                .get("updated")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
         assert_eq!(
             defaults_update_json
                 .get("preferences")
@@ -1164,7 +1385,10 @@ mod workflow_tests {
                 .get("preferences")
                 .and_then(|v| v.get("relation_filters"))
                 .and_then(|v| v.as_array())
-                .map(|items| items.iter().filter_map(|item| item.as_str()).collect::<Vec<_>>()),
+                .map(|items| items
+                    .iter()
+                    .filter_map(|item| item.as_str())
+                    .collect::<Vec<_>>()),
             Some(vec!["uses_symbol"])
         );
 
@@ -1184,12 +1408,19 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(budgeted_expand.status.success(), "expand failed: {}", stderr(&budgeted_expand));
-        let expand_json: serde_json::Value = serde_json::from_str(&stdout(&budgeted_expand)).unwrap();
+        assert!(
+            budgeted_expand.status.success(),
+            "expand failed: {}",
+            stderr(&budgeted_expand)
+        );
+        let expand_json: serde_json::Value =
+            serde_json::from_str(&stdout(&budgeted_expand)).unwrap();
         assert!(expand_json
             .get("warnings")
             .and_then(|v| v.as_array())
-            .map(|warnings| warnings.iter().any(|warning| warning.as_str().unwrap_or("").contains("max_add")))
+            .map(|warnings| warnings
+                .iter()
+                .any(|warning| warning.as_str().unwrap_or("").contains("max_add")))
             .unwrap_or(false));
 
         let updated_show = run_cli(&[
@@ -1203,14 +1434,31 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(updated_show.status.success(), "updated show failed: {}", stderr(&updated_show));
-        let updated_show_json: serde_json::Value = serde_json::from_str(&stdout(&updated_show)).unwrap();
-        assert_eq!(updated_show_json.get("export_mode").and_then(|v| v.as_str()), Some("full"));
-        assert_eq!(updated_show_json.get("visible_levels").and_then(|v| v.as_u64()), None);
+        assert!(
+            updated_show.status.success(),
+            "updated show failed: {}",
+            stderr(&updated_show)
+        );
+        let updated_show_json: serde_json::Value =
+            serde_json::from_str(&stdout(&updated_show)).unwrap();
+        assert_eq!(
+            updated_show_json
+                .get("export_mode")
+                .and_then(|v| v.as_str()),
+            Some("full")
+        );
+        assert_eq!(
+            updated_show_json
+                .get("visible_levels")
+                .and_then(|v| v.as_u64()),
+            None
+        );
         assert!(updated_show_json
             .get("nodes")
             .and_then(|v| v.as_array())
-            .map(|nodes| nodes.iter().all(|node| node.get("node_class").and_then(|v| v.as_str()) != Some("file")))
+            .map(|nodes| nodes
+                .iter()
+                .all(|node| node.get("node_class").and_then(|v| v.as_str()) != Some("file")))
             .unwrap_or(false));
 
         let files_only = run_cli(&[
@@ -1226,12 +1474,18 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(files_only.status.success(), "files-only export failed: {}", stderr(&files_only));
+        assert!(
+            files_only.status.success(),
+            "files-only export failed: {}",
+            stderr(&files_only)
+        );
         let files_json: serde_json::Value = serde_json::from_str(&stdout(&files_only)).unwrap();
         assert!(files_json
             .get("nodes")
             .and_then(|v| v.as_array())
-            .map(|nodes| nodes.iter().all(|node| node.get("node_class").and_then(|v| v.as_str()) == Some("file")))
+            .map(|nodes| nodes
+                .iter()
+                .all(|node| node.get("node_class").and_then(|v| v.as_str()) == Some("file")))
             .unwrap_or(false));
 
         let recommended = run_cli(&[
@@ -1249,8 +1503,13 @@ mod workflow_tests {
             "--format",
             "json",
         ]);
-        assert!(recommended.status.success(), "expand-recommended failed: {}", stderr(&recommended));
-        let recommended_json: serde_json::Value = serde_json::from_str(&stdout(&recommended)).unwrap();
+        assert!(
+            recommended.status.success(),
+            "expand-recommended failed: {}",
+            stderr(&recommended)
+        );
+        let recommended_json: serde_json::Value =
+            serde_json::from_str(&stdout(&recommended)).unwrap();
         assert!(recommended_json
             .get("applied_actions")
             .and_then(|v| v.as_array())

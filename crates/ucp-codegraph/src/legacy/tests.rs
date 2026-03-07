@@ -3235,3 +3235,95 @@ fn test_performance_smoke_medium_fixture() {
     assert!(build.stats.file_nodes >= 300);
     assert!(elapsed.as_secs_f64() < 3.0, "elapsed: {elapsed:?}");
 }
+
+#[test]
+fn test_incremental_build_reuses_unchanged_files() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n").unwrap();
+    fs::write(
+        src.join("lib.rs"),
+        "mod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
+    )
+    .unwrap();
+
+    let state_file = dir.path().join("codegraph-state.json");
+    let input = CodeGraphIncrementalBuildInput {
+        build: CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "incremental-smoke".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        },
+        state_file: state_file.clone(),
+    };
+
+    let first = build_code_graph_incremental(&input).unwrap();
+    let first_stats = first.incremental.clone().unwrap();
+    assert_eq!(first_stats.rebuilt_files, 2);
+    assert_eq!(first_stats.reused_files, 0);
+    assert_eq!(
+        first_stats.full_rebuild_reason.as_deref(),
+        Some("missing_state")
+    );
+    assert!(state_file.exists());
+
+    let second = build_code_graph_incremental(&input).unwrap();
+    let second_stats = second.incremental.clone().unwrap();
+    assert_eq!(second_stats.rebuilt_files, 0);
+    assert_eq!(second_stats.reused_files, 2);
+    assert_eq!(second_stats.full_rebuild_reason, None);
+    assert_eq!(
+        first.canonical_fingerprint, second.canonical_fingerprint,
+        "unchanged incremental rebuild should preserve the graph fingerprint"
+    );
+}
+
+#[test]
+fn test_incremental_build_invalidates_dependents_and_deletions() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("helper.rs"), "pub fn helper() -> i32 { 2 }\n").unwrap();
+    fs::write(src.join("util.rs"), "pub fn util() -> i32 { 1 }\n").unwrap();
+    fs::write(
+        src.join("lib.rs"),
+        "mod helper;\nmod util;\npub fn add(a:i32,b:i32)->i32{helper::helper()+util::util()+a+b}\n",
+    )
+    .unwrap();
+
+    let state_file = dir.path().join("codegraph-state.json");
+    let input = CodeGraphIncrementalBuildInput {
+        build: CodeGraphBuildInput {
+            repository_path: dir.path().to_path_buf(),
+            commit_hash: "incremental-invalidations".to_string(),
+            config: CodeGraphExtractorConfig::default(),
+        },
+        state_file: state_file.clone(),
+    };
+
+    let baseline = build_code_graph_incremental(&input).unwrap();
+    assert_eq!(baseline.stats.file_nodes, 3);
+
+    fs::write(src.join("util.rs"), "pub fn util() -> i32 { 7 }\n").unwrap();
+    let changed = build_code_graph_incremental(&input).unwrap();
+    let changed_stats = changed.incremental.clone().unwrap();
+    assert_eq!(changed_stats.changed_files, 1);
+    assert_eq!(changed_stats.rebuilt_files, 2);
+    assert_eq!(changed_stats.reused_files, 1);
+    assert_eq!(changed_stats.invalidated_files, 2);
+
+    fs::remove_file(src.join("helper.rs")).unwrap();
+    fs::write(
+        src.join("lib.rs"),
+        "mod util;\npub fn add(a:i32,b:i32)->i32{util::util()+a+b}\n",
+    )
+    .unwrap();
+    let deleted = build_code_graph_incremental(&input).unwrap();
+    let deleted_stats = deleted.incremental.clone().unwrap();
+    assert_eq!(deleted_stats.deleted_files, 1);
+    assert_eq!(deleted_stats.changed_files, 1);
+    assert_eq!(deleted_stats.rebuilt_files, 1);
+    assert_eq!(deleted_stats.reused_files, 1);
+    assert_eq!(deleted.stats.file_nodes, 2);
+}

@@ -115,6 +115,7 @@ pub struct CodeGraphBuildResult {
     pub profile_version: String,
     pub canonical_fingerprint: String,
     pub status: CodeGraphBuildStatus,
+    pub incremental: Option<CodeGraphIncrementalStats>,
 }
 
 impl CodeGraphBuildResult {
@@ -134,6 +135,32 @@ pub struct CodeGraphBuildInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphIncrementalBuildInput {
+    pub build: CodeGraphBuildInput,
+    pub state_file: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct CodeGraphIncrementalStats {
+    #[serde(default)]
+    pub requested: bool,
+    #[serde(default)]
+    pub reused_files: usize,
+    #[serde(default)]
+    pub rebuilt_files: usize,
+    #[serde(default)]
+    pub added_files: usize,
+    #[serde(default)]
+    pub changed_files: usize,
+    #[serde(default)]
+    pub deleted_files: usize,
+    #[serde(default)]
+    pub invalidated_files: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full_rebuild_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CodeGraphExtractorConfig {
     #[serde(default = "default_include_extensions")]
     pub include_extensions: Vec<String>,
@@ -268,7 +295,8 @@ impl PortableDocument {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum CodeLanguage {
     Rust,
     Python,
@@ -287,14 +315,14 @@ impl CodeLanguage {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct RepoFile {
     pub(crate) absolute_path: PathBuf,
     pub(crate) relative_path: String,
     pub(crate) language: CodeLanguage,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ExtractedSymbol {
     pub(crate) name: String,
     pub(crate) qualified_name: String,
@@ -313,7 +341,7 @@ pub(crate) struct ExtractedSymbol {
     pub(crate) end_col: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ExtractedInput {
     pub(crate) name: String,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
@@ -327,7 +355,8 @@ pub(crate) struct ExtractedSignature {
     pub(crate) type_info: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub(crate) struct ExtractedModifiers {
     #[serde(rename = "async", skip_serializing_if = "is_false")]
     pub(crate) is_async: bool,
@@ -349,7 +378,7 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ExtractedImport {
     pub(crate) module: String,
     pub(crate) symbols: Vec<String>,
@@ -359,13 +388,13 @@ pub(crate) struct ExtractedImport {
     pub(crate) wildcard: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub(crate) struct ImportBinding {
     pub(crate) source_name: String,
     pub(crate) local_name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ExtractedRelationship {
     pub(crate) source_identity: String,
     pub(crate) relation: String,
@@ -373,14 +402,14 @@ pub(crate) struct ExtractedRelationship {
     pub(crate) target_name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ExtractedUsage {
     pub(crate) source_identity: String,
     pub(crate) target_expr: String,
     pub(crate) target_name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ExtractedAlias {
     pub(crate) name: String,
     pub(crate) target_expr: String,
@@ -395,7 +424,7 @@ pub(crate) enum ImportResolution {
     Unresolved,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct FileAnalysis {
     pub(crate) file_description: Option<String>,
     pub(crate) symbols: Vec<ExtractedSymbol>,

@@ -31,23 +31,21 @@ use ucm_engine::{Engine, Operation, OperationResult};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use ucp_codegraph::{
-    approximate_prompt_tokens, build_code_graph, canonical_codegraph_json,
-    canonical_fingerprint, codegraph_prompt_projection, codegraph_prompt_projection_with_config,
-    is_codegraph_document, render_codegraph_context_prompt, resolve_codegraph_selector,
-    export_codegraph_context, export_codegraph_context_with_config,
-    validate_code_graph_profile, CodeGraphBuildInput, CodeGraphBuildResult,
-    CodeGraphBuildStatus, CodeGraphCoderef, CodeGraphContextEdgeExport,
+    approximate_prompt_tokens, build_code_graph, build_code_graph_incremental,
+    canonical_codegraph_json, canonical_fingerprint, codegraph_prompt_projection,
+    codegraph_prompt_projection_with_config, export_codegraph_context,
+    export_codegraph_context_with_config, is_codegraph_document, render_codegraph_context_prompt,
+    resolve_codegraph_selector, validate_code_graph_profile, CodeGraphBuildInput,
+    CodeGraphBuildResult, CodeGraphBuildStatus, CodeGraphCoderef, CodeGraphContextEdgeExport,
     CodeGraphContextExport, CodeGraphContextFrontierAction, CodeGraphContextHeuristics,
     CodeGraphContextNodeExport, CodeGraphContextSession, CodeGraphContextSummary,
-    CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphDiagnostic,
-    CodeGraphExportConfig, CodeGraphExportMode, CodeGraphExtractorConfig,
-    CodeGraphHiddenLevelSummary,
-    CodeGraphPromptProjectionConfig, CodeGraphPrunePolicy, CodeGraphRenderConfig,
-    CodeGraphSelectionOrigin, CodeGraphSelectionOriginKind, CodeGraphSeverity,
-    CodeGraphTraversalConfig,
-    CodeGraphStats, CodeGraphValidationResult, HydratedSourceExcerpt,
-    PortableDocument, CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER,
-    CODEGRAPH_PROFILE_VERSION,
+    CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphDiagnostic, CodeGraphExportConfig,
+    CodeGraphExportMode, CodeGraphExtractorConfig, CodeGraphHiddenLevelSummary,
+    CodeGraphIncrementalBuildInput, CodeGraphIncrementalStats, CodeGraphPromptProjectionConfig,
+    CodeGraphPrunePolicy, CodeGraphRenderConfig, CodeGraphSelectionOrigin,
+    CodeGraphSelectionOriginKind, CodeGraphSeverity, CodeGraphStats, CodeGraphTraversalConfig,
+    CodeGraphValidationResult, HydratedSourceExcerpt, PortableDocument,
+    CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
 };
 
 /// UCP client for document manipulation
