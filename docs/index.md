@@ -37,6 +37,9 @@ ucp-api = "0.1.13"
 - Build graph: `ucp codegraph build`
 - Validate graph profile + fingerprint: `ucp codegraph inspect`
 - Create projection for LLM context: `ucp codegraph prompt`
+- Manage focused sessions: `ucp codegraph context ...`
+- Rebuild incrementally with state reuse: `ucp codegraph build --incremental`
+- Deep-dive guide: [CodeGraph Guide](./ucp-cli/codegraph.md)
 
 Example:
 

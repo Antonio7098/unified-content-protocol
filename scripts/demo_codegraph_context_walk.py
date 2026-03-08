@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 import json
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PYTHON_SRC = ROOT / "crates" / "ucp-python" / "python"
 TRANSCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "artifacts/codegraph-context-demo-transcript.md"
-TARGET_FILES = [
+TARGET_FILES = {
     "crates/ucp-cli/src/commands/codegraph.rs",
     "crates/ucp-cli/src/commands/agent.rs",
-    "crates/ucp-cli/src/state.rs",
-]
-TARGET_SUFFIXES = {"::context_show", "::resolve_selector", "::get_session_mut", "::print_context_update"}
-QUEUE_FILES = set(TARGET_FILES + ["crates/ucp-codegraph/src/context.rs"])
+    "crates/ucp-codegraph/src/context.rs",
+}
+SEED_NAME_REGEX = "context_show|get_session_mut|print_context_update|resolve_codegraph_selector"
 MAX_OUTPUT_LINES = 80
-MAX_SYMBOL_STEPS = 8
+
+sys.path.insert(0, str(PYTHON_SRC))
+
+try:
+    import ucp
+except ImportError as exc:  # pragma: no cover - manual demo helper
+    raise SystemExit(
+        "Could not import the local `ucp` Python package. Build the extension first, for example:\n"
+        "  CARGO_TARGET_DIR=/tmp/ucp-python-ext cargo build -p ucp-python --features pyo3/extension-module\n"
+        "and place the resulting shared library in crates/ucp-python/python/ucp/."
+    ) from exc
 
 
 def write(text: str = "") -> None:
@@ -24,32 +32,16 @@ def write(text: str = "") -> None:
         handle.write(text)
 
 
-def run_step(title: str, *cmd: str) -> str:
-    write(f"\n## {title}\n\n`$ {' '.join(cmd)}`\n\n")
-    completed = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
-    if completed.stdout:
-        write(f"```text\n{clip_output(completed.stdout)}```\n")
-    if completed.stderr:
-        write(f"```text\n{clip_output(completed.stderr)}```\n")
-    if completed.returncode != 0:
-        raise SystemExit(completed.returncode)
-    return completed.stdout
-
-
-def cli(*args: str) -> list[str]:
-    return ["cargo", "run", "-q", "-p", "ucp-cli", "--", *args]
-
-
-def parse_json(text: str) -> dict:
-    return json.loads(text)
-
-
-def clip_output(text: str) -> str:
+def clip(text: str) -> str:
     lines = text.splitlines()
     if len(lines) <= MAX_OUTPUT_LINES:
         return text
-    clipped = "\n".join(lines[:MAX_OUTPUT_LINES])
-    return f"{clipped}\n... clipped {len(lines) - MAX_OUTPUT_LINES} more lines ...\n"
+    return "\n".join(lines[:MAX_OUTPUT_LINES]) + f"\n... clipped {len(lines) - MAX_OUTPUT_LINES} more lines ...\n"
+
+
+def record(title: str, payload) -> None:
+    rendered = json.dumps(payload, indent=2, sort_keys=True) if not isinstance(payload, str) else payload
+    write(f"\n## {title}\n\n```json\n{clip(rendered)}\n```\n")
 
 
 def read_excerpt(path: Path, start: int | None, end: int | None, padding: int = 2) -> str:
@@ -59,318 +51,83 @@ def read_excerpt(path: Path, start: int | None, end: int | None, padding: int = 
     return "\n".join(f"{idx + 1:>4} {lines[idx]}" for idx in range(first - 1, last))
 
 
-def seed_symbols(export: dict) -> list[str]:
-    out = []
-    for node in export.get("nodes", []):
-        logical_key = node.get("logical_key")
-        if not logical_key or node.get("node_class") != "symbol":
-            continue
-        if any(logical_key == f"symbol:{path}{suffix}" for path in TARGET_FILES for suffix in TARGET_SUFFIXES):
-            out.append(logical_key)
-    out = sorted(set(out))
-    if out:
-        return out
-    return queueable_symbols(export, set(), set())[:3]
-
-
-def queueable_symbols(export: dict, seen: set[str], queued: set[str]) -> list[str]:
-    discovered = []
-    for node in export.get("nodes", []):
-        logical_key = node.get("logical_key")
-        coderef = node.get("coderef") or {}
-        origin = (node.get("origin") or {}).get("kind")
-        if not logical_key or node.get("node_class") != "symbol":
-            continue
-        if logical_key in seen or logical_key in queued:
-            continue
-        if coderef.get("path") not in QUEUE_FILES:
-            continue
-        if origin not in {"dependencies", "dependents", "file_symbols", "manual"}:
-            continue
-        discovered.append(logical_key)
-    return sorted(discovered)
-
-
-def pick_relations(frontier: list[dict], action: str, limit: int = 2) -> list[str]:
-    relations: list[str] = []
-    for item in frontier:
-        if item.get("action") != action or item.get("candidate_count", 0) == 0:
-            continue
-        relation = item.get("relation")
-        if not relation or relation in relations:
-            continue
-        relations.append(relation)
-        if len(relations) >= limit:
-            break
-    return relations
-
-
 def main() -> None:
     if TRANSCRIPT.exists():
         TRANSCRIPT.unlink()
-    commit = subprocess.run(
-        ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True, capture_output=True
-    ).stdout.strip() or "demo"
-    write("## Codegraph context demo transcript\n\n")
-    write("Chosen refactor candidate: deduplicate codegraph context/session helper logic across `agent.rs` and `codegraph.rs`, using bounded depth and selected-edge traversal.\n")
-    with tempfile.TemporaryDirectory(prefix="ucp-codegraph-demo-") as tmp:
-        doc = Path(tmp) / "ucp-codegraph.json"
-        build_out = run_step(
-            "Build a codegraph for the current repository",
-            *cli("codegraph", "build", str(ROOT), "--commit", commit, "--output", str(doc), "--allow-partial", "--format", "json"),
-        )
-        _ = parse_json(build_out)
-        init_out = run_step(
-            "Initialize a focus-first codegraph context session with preserved defaults",
-            *cli(
-                "codegraph",
-                "context",
-                "init",
-                "--input",
-                str(doc),
-                "--name",
-                "demo_context_walk",
-                "--max-selected",
-                "512",
-                "--focus",
-                "crates/ucp-cli/src/commands/codegraph.rs",
-                "--focus-mode",
-                "file",
-                "--focus-depth",
-                "2",
-                "--initial-depth",
-                "1",
-                "--default-compact",
-                "--default-levels",
-                "1",
-                "--default-preset",
-                "semantic",
-                "--default-depth",
-                "2",
-                "--format",
-                "json",
-            ),
-        )
-        session_id = parse_json(init_out)["session_id"]
-        write(f"\nSession: `{session_id}`\n")
-        run_step(
-            "Show the initial working set using session defaults",
-            *cli(
-                "codegraph",
-                "context",
-                "show",
-                "--input",
-                str(doc),
-                "--session",
-                session_id,
-                "--format",
-                "json",
-            ),
-        )
-        for path in TARGET_FILES:
-            run_step(
-                f"Expand file symbols for {path} with nested depth",
-                *cli(
-                    "codegraph",
-                    "context",
-                    "expand",
-                    "--input",
-                    str(doc),
-                    "--session",
-                    session_id,
-                    path,
-                    "--mode",
-                    "file",
-                    "--depth",
-                    "2",
-                    "--format",
-                    "json",
-                ),
-            )
-        export = parse_json(
-            run_step(
-                "Export the structured working set after file expansion",
-                *cli(
-                    "codegraph",
-                    "context",
-                    "export",
-                    "--input",
-                    str(doc),
-                    "--session",
-                    session_id,
-                    "--compact",
-                    "--no-rendered",
-                    "--format",
-                    "json",
-                ),
-            )
-        )
-        seeds = seed_symbols(export)
-        write("\n### Seed symbols\n\n")
-        for symbol in seeds:
-            write(f"- `{symbol}`\n")
 
-        queue = list(seeds)
-        seen: set[str] = set()
-        while queue:
-            if len(seen) >= MAX_SYMBOL_STEPS:
-                break
-            symbol = queue.pop(0)
-            if symbol in seen:
-                continue
-            seen.add(symbol)
-            run_step(
-                f"Focus {symbol}",
-                *cli("codegraph", "context", "focus", "--input", str(doc), "--session", session_id, symbol, "--format", "json"),
-            )
-            if len(seen) == 1:
-                run_step(
-                    f"Show +1 levels around {symbol}",
-                    *cli(
-                        "codegraph",
-                        "context",
-                        "show",
-                        "--input",
-                        str(doc),
-                        "--session",
-                        session_id,
-                        "--compact",
-                        "--no-rendered",
-                        "--levels",
-                        "1",
-                        "--format",
-                        "text",
-                    ),
-                )
-            frontier_export = parse_json(
-                run_step(
-                    f"Export frontier for {symbol} (+1 visible level)",
-                    *cli(
-                        "codegraph",
-                        "context",
-                        "export",
-                        "--input",
-                        str(doc),
-                        "--session",
-                        session_id,
-                        "--compact",
-                        "--no-rendered",
-                        "--levels",
-                        "1",
-                        "--format",
-                        "json",
-                    ),
-                )
-            )
-            frontier = frontier_export.get("frontier", [])
-            dependency_relations = pick_relations(frontier, "expand_dependencies", limit=2)
-            if dependency_relations:
-                run_step(
-                    f"Expand dependencies for {symbol} with the semantic preset and a budget",
-                    *cli(
-                        "codegraph",
-                        "context",
-                        "expand",
-                        "--input",
-                        str(doc),
-                        "--session",
-                        session_id,
-                        symbol,
-                        "--mode",
-                        "dependencies",
-                        "--preset",
-                        "semantic",
-                        "--max-add",
-                        "8",
-                        "--format",
-                        "json",
-                    ),
-                )
-            run_step(
-                f"Apply the top recommended frontier action for {symbol}",
-                *cli(
-                    "codegraph",
-                    "context",
-                    "expand-recommended",
-                    "--input",
-                    str(doc),
-                    "--session",
-                    session_id,
-                    "--top",
-                    "1",
-                    "--priority-threshold",
-                    "60",
-                    "--format",
-                    "json",
-                ),
-            )
-            run_step(
-                f"Hydrate source for {symbol}",
-                *cli("codegraph", "context", "hydrate", "--input", str(doc), "--session", session_id, symbol, "--padding", "2", "--format", "json"),
-            )
-            updated = parse_json(
-                run_step(
-                    f"Export updated working set for {symbol}",
-                    *cli(
-                        "codegraph",
-                        "context",
-                        "export",
-                        "--input",
-                        str(doc),
-                        "--session",
-                        session_id,
-                        "--compact",
-                        "--no-rendered",
-                        "--format",
-                        "json",
-                    ),
-                )
-            )
-            queued = set(queue)
-            queue.extend(queueable_symbols(updated, seen, queued))
+    write("## Codegraph programmatic API demo transcript\n\n")
+    write(
+        "This transcript manually exercises the new Python CodeGraph API for agent-style traversal,\n"
+        "including regex discovery, stateful expansion, provenance inspection, frontier-driven actions,\n"
+        "path finding, and coderef-backed source hydration.\n"
+    )
 
-        final_export = parse_json(
-            run_step(
-                "Export the final structured context",
-                *cli(
-                    "codegraph",
-                    "context",
-                    "export",
-                    "--input",
-                    str(doc),
-                    "--session",
-                    session_id,
-                    "--compact",
-                    "--no-rendered",
-                    "--format",
-                    "json",
-                ),
-            )
+    graph = ucp.CodeGraph.build(str(ROOT), continue_on_parse_error=True)
+    record("Build repository graph", {"nodes": len(graph.to_document().blocks), "repr": repr(graph)})
+
+    session = graph.session()
+    record("Seed overview", session.seed_overview(max_depth=3))
+
+    for path in sorted(TARGET_FILES):
+        record(f"Expand file symbols for {path}", session.expand(path, mode="file", depth=2))
+
+    seeds = graph.find_nodes(
+        node_class="symbol",
+        path_regex="crates/ucp-cli/src/commands/codegraph\\.rs|crates/ucp-cli/src/commands/agent\\.rs|crates/ucp-codegraph/src/context\\.rs",
+        name_regex=SEED_NAME_REGEX,
+        limit=6,
+    )
+    record("Find regex-matched seed symbols", seeds)
+    if not seeds:
+        raise SystemExit("No seed symbols found for the demo workflow")
+
+    branch = session.fork()
+    for node in seeds[:3]:
+        logical_key = node["logical_key"]
+        record(f"Focus {logical_key}", branch.focus(logical_key))
+        record(
+            f"Expand dependencies for {logical_key}",
+            branch.expand(logical_key, mode="dependencies", depth=1, max_add=8),
         )
-        write("\n## Read coderef-backed excerpts from the final working set\n\n")
-        seen_refs: set[tuple[str, int | None, int | None, str]] = set()
-        for node in final_export.get("nodes", []):
-            coderef = node.get("coderef")
-            logical_key = node.get("logical_key") or node.get("label") or node["block_id"]
-            if not coderef or coderef.get("path") not in QUEUE_FILES:
-                continue
-            if node.get("node_class") == "symbol" and logical_key not in seen:
-                continue
-            key = (coderef["path"], coderef.get("start_line"), coderef.get("end_line"), logical_key)
-            if key in seen_refs:
-                continue
-            seen_refs.add(key)
-            path = ROOT / coderef["path"]
-            if not path.is_file():
-                continue
-            excerpt = read_excerpt(path, coderef.get("start_line"), coderef.get("end_line"))
-            write(f"### {node['short_id']} `{logical_key}`\n\n")
-            write(f"- ref: `{coderef['path']}:{coderef.get('start_line')}-{coderef.get('end_line')}`\n\n")
-            write(f"```rust\n{excerpt}\n```\n")
-        write("\n## Final summary\n\n")
-        write(f"- selected nodes: {final_export['summary']['selected']}\n")
-        write(f"- frontier actions remaining: {len(final_export.get('frontier', []))}\n")
-        write(f"- transcript file: `{TRANSCRIPT}`\n")
+        record(f"Why is {logical_key} selected?", branch.why_selected(logical_key))
+        record(f"Hydrate {logical_key}", branch.hydrate(logical_key, padding=2))
+        try:
+            record(f"Apply recommended action near {logical_key}", branch.apply_recommended(top=1, padding=2))
+        except RuntimeError as exc:
+            record(f"Apply recommended action near {logical_key}", {"warning": str(exc)})
+
+    if len(seeds) >= 2:
+        path = branch.path_between(seeds[0]["logical_key"], seeds[1]["logical_key"], max_hops=8)
+        record("Path between the first two seed symbols", path)
+
+    diff = session.diff(branch)
+    record("Diff between base session and exploration branch", diff)
+
+    exported = branch.export(compact=True, include_rendered=False, max_frontier_actions=8)
+    record("Compact structured export from the exploration branch", exported)
+
+    write("\n## Read coderef-backed excerpts from the final working set\n")
+    emitted = 0
+    for node in exported.get("nodes", []):
+        coderef = node.get("coderef") or {}
+        path = coderef.get("path")
+        if path not in TARGET_FILES:
+            continue
+        excerpt_path = ROOT / path
+        if not excerpt_path.is_file():
+            continue
+        excerpt = read_excerpt(excerpt_path, coderef.get("start_line"), coderef.get("end_line"))
+        write(f"\n### {node.get('short_id', node['block_id'])} `{node.get('logical_key') or node.get('label')}`\n\n")
+        write(f"- ref: `{path}:{coderef.get('start_line')}-{coderef.get('end_line')}`\n\n")
+        write(f"```rust\n{excerpt}\n```\n")
+        emitted += 1
+        if emitted >= 6:
+            break
+
+    write("\n## Final summary\n\n")
+    write(f"- selected nodes: {exported['summary']['selected']}\n")
+    write(f"- frontier actions remaining: {len(exported.get('frontier', []))}\n")
+    write(f"- transcript file: `{TRANSCRIPT}`\n")
 
 
 if __name__ == "__main__":

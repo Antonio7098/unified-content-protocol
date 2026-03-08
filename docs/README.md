@@ -39,6 +39,8 @@ ucp codegraph inspect --input graph.json --format json
 ucp codegraph prompt --input graph.json --output graph-projection.txt
 ```
 
+For the full CodeGraph surface, including context sessions, selector rules, incremental rebuilds, metrics, and benchmark tooling, see [`docs/ucp-cli/codegraph.md`](./ucp-cli/codegraph.md).
+
 ## LLM Workflow with CodeGraph
 
 ```bash
@@ -52,5 +54,6 @@ ucp llm prompt --capabilities all > system-prompt.txt
 - `docs/index.md`
 - `docs/ucp-api/README.md`
 - `docs/ucp-cli/README.md`
+- `docs/ucp-cli/codegraph.md`
 - `docs/ucp-llm/README.md`
 - `docs/ucp-agent/index.md`

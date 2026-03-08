@@ -78,7 +78,7 @@ Unified Content Protocol is a graph-based intermediate representation (IR) for s
 
 ## Documentation & CLI Guide
 
-The full docs live in [`/docs`](./docs/index.md). Highlights include Getting Started sequences, crate deep dives, translator walkthroughs, agent architecture notes, and an end-to-end CLI usage guide. Every CLI subcommand mirrors the Rust `Commands` enum, so the documentation always stays in sync with the source.
+The full docs live in [`/docs`](./docs/index.md). Highlights include Getting Started sequences, crate deep dives, translator walkthroughs, agent architecture notes, an end-to-end CLI usage guide, and a dedicated [CodeGraph guide](./docs/ucp-cli/codegraph.md) covering build, inspect, prompt, context sessions, incremental rebuilds, selectors, and benchmarking.
 
 ## Example: Deterministic Edits with IdMapper
 
