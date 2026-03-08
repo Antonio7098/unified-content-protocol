@@ -72,3 +72,45 @@ def test_graph_sessions_support_traversal_and_diff(tmp_path: Path):
     exported = branch.export()
     assert exported["nodes"]
     assert any(edge["relation"].lower() == "references" for edge in exported["edges"])
+
+
+def test_graph_sessions_preserve_truthful_origin_and_focus():
+    import ucp
+
+    graph = ucp.Graph.from_document(_build_doc(ucp))
+    session = graph.session()
+
+    session.select("root", detail_level="summary")
+    session.expand("root", mode="neighborhood", depth=2)
+
+    note_why = session.why_selected("note")
+    assert note_why["selected"] is True
+    assert note_why["origin"]["kind"] == "children"
+    assert note_why["anchor"]["block_id"] == graph.describe("section")["block_id"]
+
+    outgoing = graph.session()
+    outgoing.select("note", detail_level="summary")
+    outgoing.expand("note", mode="neighborhood", depth=1)
+
+    helper_why = outgoing.why_selected("helper")
+    assert helper_why["selected"] is True
+    assert helper_why["origin"]["kind"] == "outgoing"
+    assert helper_why["anchor"]["block_id"] == graph.describe("note")["block_id"]
+
+    outgoing.focus("helper")
+    collapsed = outgoing.collapse("helper", include_descendants=False)
+    assert "focus" not in collapsed
+
+
+def test_graph_search_and_paths_handle_case_and_hop_limits():
+    import ucp
+
+    graph = ucp.Graph.from_document(_build_doc(ucp))
+
+    matches = graph.find_nodes(label_regex="SECTION|HELPER", case_sensitive=False)
+    assert {node["label"] for node in matches} == {"section", "helper"}
+
+    assert graph.path_between("root", "note", max_hops=1) is None
+    path = graph.path_between("root", "note", max_hops=2)
+    assert path is not None
+    assert len(path["hops"]) == 2

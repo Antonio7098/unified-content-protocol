@@ -280,7 +280,7 @@ impl GraphSession {
                 self.select_id(
                     neighbor.to,
                     GraphDetailLevel::Summary,
-                    Some(origin_for(mode, &neighbor.relation, start)),
+                    Some(origin_for(mode, &neighbor, current)),
                     &mut update,
                 );
                 queue.push_back((neighbor.to, current_depth + 1));
@@ -558,16 +558,30 @@ impl GraphSession {
     }
 }
 
-fn origin_for(mode: GraphNeighborMode, relation: &str, anchor: BlockId) -> GraphSelectionOrigin {
+fn origin_for(
+    mode: GraphNeighborMode,
+    hop: &crate::types::GraphPathHop,
+    anchor: BlockId,
+) -> GraphSelectionOrigin {
     GraphSelectionOrigin {
         kind: match mode {
             GraphNeighborMode::Children => GraphSelectionOriginKind::Children,
             GraphNeighborMode::Parents => GraphSelectionOriginKind::Parents,
             GraphNeighborMode::Outgoing => GraphSelectionOriginKind::Outgoing,
             GraphNeighborMode::Incoming => GraphSelectionOriginKind::Incoming,
-            GraphNeighborMode::Neighborhood => GraphSelectionOriginKind::Outgoing,
+            GraphNeighborMode::Neighborhood => {
+                if hop.direction == "incoming" {
+                    GraphSelectionOriginKind::Incoming
+                } else if hop.relation == "parent" {
+                    GraphSelectionOriginKind::Parents
+                } else if hop.relation == "contains" {
+                    GraphSelectionOriginKind::Children
+                } else {
+                    GraphSelectionOriginKind::Outgoing
+                }
+            }
         },
-        relation: Some(relation.to_string()),
+        relation: Some(hop.relation.clone()),
         anchor: Some(anchor),
     }
 }

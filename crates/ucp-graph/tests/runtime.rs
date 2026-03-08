@@ -98,3 +98,92 @@ fn graph_roundtrips_between_json_and_sqlite() {
         .iter()
         .any(|field| field == "block_id"));
 }
+
+#[test]
+fn neighborhood_expansion_records_truthful_origin_and_anchor() {
+    let graph = GraphNavigator::from_document(fixture_document());
+    let mut session = graph.session();
+
+    session.select("root", GraphDetailLevel::Summary).unwrap();
+    let expanded = session
+        .expand("root", GraphNeighborMode::Neighborhood, 2, Some(8))
+        .unwrap();
+    assert!(!expanded.added.is_empty());
+
+    let note = graph.resolve_selector("note").unwrap();
+
+    let note_why = session.why_selected("note").unwrap();
+    assert_eq!(
+        note_why.origin.as_ref().and_then(|origin| origin.anchor),
+        Some(graph.resolve_selector("section").unwrap())
+    );
+    assert_eq!(
+        note_why.origin.as_ref().map(|origin| origin.kind),
+        Some(ucp_graph::GraphSelectionOriginKind::Children)
+    );
+
+    let mut outgoing_session = graph.session();
+    outgoing_session
+        .select("note", GraphDetailLevel::Summary)
+        .unwrap();
+    outgoing_session
+        .expand("note", GraphNeighborMode::Neighborhood, 1, Some(8))
+        .unwrap();
+
+    let helper_why = outgoing_session.why_selected("helper").unwrap();
+    assert_eq!(
+        helper_why.origin.as_ref().and_then(|origin| origin.anchor),
+        Some(note)
+    );
+    assert_eq!(
+        helper_why.origin.as_ref().map(|origin| origin.kind),
+        Some(ucp_graph::GraphSelectionOriginKind::Outgoing)
+    );
+}
+
+#[test]
+fn prune_and_collapse_handle_focus_and_pins() {
+    let graph = GraphNavigator::from_document(fixture_document());
+    let mut session = graph.session();
+
+    session.seed_overview(Some(1));
+    session.select("helper", GraphDetailLevel::Full).unwrap();
+    session.pin("section", true).unwrap();
+    session.focus(Some("helper")).unwrap();
+
+    let pruned = session.prune(Some(1));
+    assert!(pruned
+        .removed
+        .iter()
+        .all(|id| *id != graph.resolve_selector("section").unwrap()));
+    let summary = session.summary();
+    assert_eq!(summary.selected, 2);
+    assert!(summary.focused);
+    assert!(session.why_selected("helper").unwrap().selected);
+
+    let collapsed = session.collapse("helper", false).unwrap();
+    assert_eq!(collapsed.focus, None);
+    let why = session.why_selected("helper").unwrap();
+    assert!(!why.selected);
+}
+
+#[test]
+fn graph_search_and_paths_handle_case_and_hop_limits() {
+    let graph = GraphNavigator::from_document(fixture_document());
+
+    let matches = graph
+        .find_nodes(&GraphFindQuery {
+            label_regex: Some("SECTION|HELPER".to_string()),
+            case_sensitive: false,
+            ..GraphFindQuery::default()
+        })
+        .unwrap();
+    assert_eq!(matches.len(), 2);
+
+    let root = graph.resolve_selector("root").unwrap();
+    let note = graph.resolve_selector("note").unwrap();
+    assert!(graph.path_between(root, note, 1).is_none());
+    let path = graph.path_between(root, note, 2).unwrap();
+    assert_eq!(path.hops.len(), 2);
+    assert_eq!(path.hops[0].relation, "contains");
+}
