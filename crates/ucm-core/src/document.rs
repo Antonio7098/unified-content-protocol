@@ -432,7 +432,10 @@ impl Document {
         target: BlockId,
     ) {
         let edge = crate::edge::Edge::new(edge_type, target);
-        self.edge_index.add_edge(source, &edge);
+        if let Some(block) = self.blocks.get_mut(source) {
+            block.edges.push(edge.clone());
+            self.edge_index.add_edge(source, &edge);
+        }
     }
 
     /// Remove a block from the structure (makes it orphaned)

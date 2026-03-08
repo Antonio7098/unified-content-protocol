@@ -7,11 +7,11 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
 ```json
 {
   "backend": "memory",
-  "captured_at": "2026-03-08T19:25:20.399883882Z",
-  "document_id": "doc_189af43700e8f0a1",
+  "captured_at": "2026-03-08T20:42:42.832026881Z",
+  "document_id": "doc_189af86fe76be463",
   "explicit_edge_count": 1,
   "node_count": 4,
-  "root_block_id": "ff0000000000000000000000",
+  "root_block_id": "blk_ff0000000000000000000000",
   "structural_edge_count": 3
 }
 ```
@@ -31,12 +31,12 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
   ],
   "stats": {
     "backend": "sqlite",
-    "captured_at": "2026-03-08T19:25:20.424267997Z",
-    "document_id": "doc_189af43700e8f0a1",
+    "captured_at": "2026-03-08T20:42:42.860452837Z",
+    "document_id": "doc_189af86fe76be463",
     "explicit_edge_count": 1,
     "graph_key": "demo",
     "node_count": 4,
-    "root_block_id": "ff0000000000000000000000",
+    "root_block_id": "blk_ff0000000000000000000000",
     "structural_edge_count": 3
   }
 }
@@ -47,23 +47,23 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
 ```json
 [
   {
-    "block_id": "288c3139f7400323f96ed67e",
+    "block_id": "blk_288c3139f7400323f96ed67e",
     "children": 0,
     "content_type": "code",
     "incoming_edges": 1,
     "label": "helper",
     "outgoing_edges": 0,
-    "parent": "6a050bd9f8f78bb95dd911ab",
+    "parent": "blk_6a050bd9f8f78bb95dd911ab",
     "tags": []
   },
   {
-    "block_id": "647a8f492b004bb420732faf",
+    "block_id": "blk_647a8f492b004bb420732faf",
     "children": 0,
     "content_type": "text",
     "incoming_edges": 0,
     "label": "note",
     "outgoing_edges": 1,
-    "parent": "6a050bd9f8f78bb95dd911ab",
+    "parent": "blk_6a050bd9f8f78bb95dd911ab",
     "semantic_role": "paragraph",
     "tags": [
       "important",
@@ -78,31 +78,31 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
 ```json
 {
   "end": {
-    "block_id": "288c3139f7400323f96ed67e",
+    "block_id": "blk_288c3139f7400323f96ed67e",
     "children": 0,
     "content_type": "code",
     "incoming_edges": 1,
     "label": "helper",
     "outgoing_edges": 0,
-    "parent": "6a050bd9f8f78bb95dd911ab",
+    "parent": "blk_6a050bd9f8f78bb95dd911ab",
     "tags": []
   },
   "hops": [
     {
       "direction": "outgoing",
-      "from": "647a8f492b004bb420732faf",
+      "from": "blk_647a8f492b004bb420732faf",
       "relation": "references",
-      "to": "288c3139f7400323f96ed67e"
+      "to": "blk_288c3139f7400323f96ed67e"
     }
   ],
   "start": {
-    "block_id": "647a8f492b004bb420732faf",
+    "block_id": "blk_647a8f492b004bb420732faf",
     "children": 0,
     "content_type": "text",
     "incoming_edges": 0,
     "label": "note",
     "outgoing_edges": 1,
-    "parent": "6a050bd9f8f78bb95dd911ab",
+    "parent": "blk_6a050bd9f8f78bb95dd911ab",
     "semantic_role": "paragraph",
     "tags": [
       "important",
@@ -117,10 +117,11 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
 ```json
 {
   "added": [
-    "ff0000000000000000000000",
-    "6a050bd9f8f78bb95dd911ab"
+    "blk_ff0000000000000000000000",
+    "blk_6a050bd9f8f78bb95dd911ab"
   ],
   "changed": [],
+  "focus": null,
   "removed": [],
   "warnings": []
 }
@@ -131,9 +132,10 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
 ```json
 {
   "added": [
-    "647a8f492b004bb420732faf"
+    "blk_647a8f492b004bb420732faf"
   ],
   "changed": [],
+  "focus": null,
   "removed": [],
   "warnings": []
 }
@@ -144,9 +146,10 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
 ```json
 {
   "added": [
-    "288c3139f7400323f96ed67e"
+    "blk_288c3139f7400323f96ed67e"
   ],
   "changed": [],
+  "focus": null,
   "removed": [],
   "warnings": []
 }
@@ -157,31 +160,31 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
 ```json
 {
   "anchor": {
-    "block_id": "647a8f492b004bb420732faf",
+    "block_id": "blk_647a8f492b004bb420732faf",
     "children": 0,
     "content_type": "text",
     "incoming_edges": 0,
     "label": "note",
     "outgoing_edges": 1,
-    "parent": "6a050bd9f8f78bb95dd911ab",
+    "parent": "blk_6a050bd9f8f78bb95dd911ab",
     "semantic_role": "paragraph",
     "tags": [
       "important",
       "demo"
     ]
   },
-  "block_id": "288c3139f7400323f96ed67e",
+  "block_id": "blk_288c3139f7400323f96ed67e",
   "detail_level": "summary",
   "explanation": "Node was selected while following outgoing semantic edges.",
   "focus": false,
   "node": {
-    "block_id": "288c3139f7400323f96ed67e",
+    "block_id": "blk_288c3139f7400323f96ed67e",
     "children": 0,
     "content_type": "code",
     "incoming_edges": 1,
     "label": "helper",
     "outgoing_edges": 0,
-    "parent": "6a050bd9f8f78bb95dd911ab",
+    "parent": "blk_6a050bd9f8f78bb95dd911ab",
     "tags": []
   },
   "origin": {
@@ -202,55 +205,55 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
     {
       "direction": "structural",
       "relation": "contains",
-      "source": "6a050bd9f8f78bb95dd911ab",
-      "target": "288c3139f7400323f96ed67e"
+      "source": "blk_6a050bd9f8f78bb95dd911ab",
+      "target": "blk_288c3139f7400323f96ed67e"
     },
     {
       "direction": "structural",
       "relation": "contains",
-      "source": "6a050bd9f8f78bb95dd911ab",
-      "target": "647a8f492b004bb420732faf"
+      "source": "blk_6a050bd9f8f78bb95dd911ab",
+      "target": "blk_647a8f492b004bb420732faf"
     },
     {
       "direction": "structural",
       "relation": "contains",
-      "source": "ff0000000000000000000000",
-      "target": "6a050bd9f8f78bb95dd911ab"
+      "source": "blk_ff0000000000000000000000",
+      "target": "blk_6a050bd9f8f78bb95dd911ab"
     },
     {
       "direction": "structural",
       "relation": "parent",
-      "source": "288c3139f7400323f96ed67e",
-      "target": "6a050bd9f8f78bb95dd911ab"
+      "source": "blk_288c3139f7400323f96ed67e",
+      "target": "blk_6a050bd9f8f78bb95dd911ab"
     },
     {
       "direction": "structural",
       "relation": "parent",
-      "source": "647a8f492b004bb420732faf",
-      "target": "6a050bd9f8f78bb95dd911ab"
+      "source": "blk_647a8f492b004bb420732faf",
+      "target": "blk_6a050bd9f8f78bb95dd911ab"
     },
     {
       "direction": "structural",
       "relation": "parent",
-      "source": "6a050bd9f8f78bb95dd911ab",
-      "target": "ff0000000000000000000000"
+      "source": "blk_6a050bd9f8f78bb95dd911ab",
+      "target": "blk_ff0000000000000000000000"
     },
     {
       "direction": "incoming",
       "relation": "references",
-      "source": "288c3139f7400323f96ed67e",
-      "target": "647a8f492b004bb420732faf"
+      "source": "blk_288c3139f7400323f96ed67e",
+      "target": "blk_647a8f492b004bb420732faf"
     },
     {
       "direction": "outgoing",
       "relation": "references",
-      "source": "647a8f492b004bb420732faf",
-      "target": "288c3139f7400323f96ed67e"
+      "source": "blk_647a8f492b004bb420732faf",
+      "target": "blk_288c3139f7400323f96ed67e"
     }
   ],
   "nodes": [
     {
-      "block_id": "ff0000000000000000000000",
+      "block_id": "blk_ff0000000000000000000000",
       "children": 1,
       "content_type": "text",
       "detail_level": "summary",
@@ -261,26 +264,26 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
       "tags": []
     },
     {
-      "block_id": "288c3139f7400323f96ed67e",
+      "block_id": "blk_288c3139f7400323f96ed67e",
       "children": 0,
       "content_type": "code",
       "detail_level": "summary",
       "incoming_edges": 1,
       "label": "helper",
       "outgoing_edges": 0,
-      "parent": "6a050bd9f8f78bb95dd911ab",
+      "parent": "blk_6a050bd9f8f78bb95dd911ab",
       "pinned": false,
       "tags": []
     },
     {
-      "block_id": "647a8f492b004bb420732faf",
+      "block_id": "blk_647a8f492b004bb420732faf",
       "children": 0,
       "content_type": "text",
       "detail_level": "full",
       "incoming_edges": 0,
       "label": "note",
       "outgoing_edges": 1,
-      "parent": "6a050bd9f8f78bb95dd911ab",
+      "parent": "blk_6a050bd9f8f78bb95dd911ab",
       "pinned": false,
       "semantic_role": "paragraph",
       "tags": [
@@ -289,14 +292,14 @@ This transcript demonstrates generic graph traversal over a plain UCP document, 
       ]
     },
     {
-      "block_id": "6a050bd9f8f78bb95dd911ab",
+      "block_id": "blk_6a050bd9f8f78bb95dd911ab",
       "children": 2,
       "content_type": "text",
       "detail_level": "summary",
       "incoming_edges": 0,
       "label": "section",
       "outgoing_edges": 0,
-      "parent": "ff0000000000000000000000",
+      "parent": "blk_ff0000000000000000000000",
       "pinned": false,
       "tags": []
     }

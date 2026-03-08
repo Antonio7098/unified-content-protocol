@@ -160,7 +160,7 @@ pub struct CodeGraphContextUpdate {
     pub removed: Vec<BlockId>,
     #[serde(default)]
     pub changed: Vec<BlockId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub focus: Option<BlockId>,
     #[serde(default)]
     pub warnings: Vec<String>,

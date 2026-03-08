@@ -181,8 +181,15 @@ impl GraphStore for SqliteGraphStore {
         let conn = self.connection.borrow();
         let mut stmt = conn
             .prepare(
-                "SELECT label, content_type, semantic_role, tags_json, parent_block_id, child_count, outgoing_count, incoming_count
-                 FROM nodes WHERE graph_key = ?1 AND block_id = ?2",
+                "SELECT n.label,
+                        n.content_type,
+                        n.semantic_role,
+                        n.tags_json,
+                        n.parent_block_id,
+                        (SELECT COUNT(*) FROM structure s WHERE s.graph_key = n.graph_key AND s.parent_block_id = n.block_id) AS child_count,
+                        (SELECT COUNT(*) FROM edges e WHERE e.graph_key = n.graph_key AND e.source_block_id = n.block_id) AS outgoing_count,
+                        (SELECT COUNT(*) FROM edges e WHERE e.graph_key = n.graph_key AND e.target_block_id = n.block_id) AS incoming_count
+                 FROM nodes n WHERE n.graph_key = ?1 AND n.block_id = ?2",
             )
             .ok()?;
         stmt.query_row(

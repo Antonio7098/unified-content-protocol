@@ -41,7 +41,9 @@ def test_graph_runtime_supports_json_and_sqlite(tmp_path: Path):
     reopened = ucp.Graph.from_sqlite(str(db_path), "fixture")
 
     assert reopened.store_stats()["backend"] == "sqlite"
+    assert reopened.store_stats()["root_block_id"] == str(doc.root_id)
     assert str(sqlite.resolve("helper")) == str(reopened.resolve("helper"))
+    assert reopened.describe("helper")["block_id"] == str(reopened.resolve("helper"))
     assert str(reopened.to_document().root_id) == str(doc.root_id)
 
 
@@ -86,7 +88,7 @@ def test_graph_sessions_preserve_truthful_origin_and_focus():
     note_why = session.why_selected("note")
     assert note_why["selected"] is True
     assert note_why["origin"]["kind"] == "children"
-    assert note_why["anchor"]["block_id"] == graph.describe("section")["block_id"]
+    assert note_why["anchor"]["block_id"] == str(graph.resolve("section"))
 
     outgoing = graph.session()
     outgoing.select("note", detail_level="summary")
@@ -95,11 +97,12 @@ def test_graph_sessions_preserve_truthful_origin_and_focus():
     helper_why = outgoing.why_selected("helper")
     assert helper_why["selected"] is True
     assert helper_why["origin"]["kind"] == "outgoing"
-    assert helper_why["anchor"]["block_id"] == graph.describe("note")["block_id"]
+    assert helper_why["anchor"]["block_id"] == str(graph.resolve("note"))
 
     outgoing.focus("helper")
     collapsed = outgoing.collapse("helper", include_descendants=False)
-    assert "focus" not in collapsed
+    assert "focus" in collapsed
+    assert collapsed["focus"] is None
 
 
 def test_graph_search_and_paths_handle_case_and_hop_limits():

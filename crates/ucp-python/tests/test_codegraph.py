@@ -43,6 +43,7 @@ def test_codegraph_sessions_support_agentic_workflows(tmp_path):
     why = branch.why_selected("symbol:src/util.rs::util")
     assert why["selected"] is True
     assert "dependency" in why["explanation"].lower()
+    assert why["block_id"] == str(graph.resolve("symbol:src/util.rs::util"))
 
     diff = session.diff(branch)
     assert any(node["logical_key"] == "symbol:src/util.rs::util" for node in diff["added"])
@@ -53,7 +54,15 @@ def test_codegraph_sessions_support_agentic_workflows(tmp_path):
 
     recommended = branch.apply_recommended(top=1, padding=1)
     assert recommended["applied_actions"]
+    assert "focus" in recommended["update"]
 
     exported = branch.export(compact=True, max_frontier_actions=4)
     assert exported["nodes"]
     assert exported["frontier"] is not None
+
+    branch.focus("symbol:src/util.rs::util")
+    collapsed = branch.collapse("symbol:src/util.rs::util")
+    assert "focus" in collapsed
+    cleared_focus = branch.focus(None)
+    assert "focus" in cleared_focus
+    assert cleared_focus["focus"] is None

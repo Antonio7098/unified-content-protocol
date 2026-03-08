@@ -8,8 +8,8 @@ path finding, and coderef-backed source hydration.
 
 ```json
 {
-  "nodes": 5471,
-  "repr": "CodeGraph(nodes=5471)"
+  "nodes": 5487,
+  "repr": "CodeGraph(nodes=5487)"
 }
 ```
 
@@ -18,30 +18,30 @@ path finding, and coderef-backed source hydration.
 ```json
 {
   "added": [
-    "99b62cfb483779db26d3be75",
-    "11f2222350db8eee5bc5ef71",
-    "7cf2a27244897a4b9b334414",
-    "1463cfacf2bd8c2604b76bde",
-    "6a0e503cbb91ad4b20bf7083",
-    "54c55b45f69468fdb717d1f2",
-    "8deca5103a3b10e631b1fa62",
-    "3043405a7c5239bd734b2298",
-    "27dd45b9f4f423b3da20d031",
-    "123d8e68e78ebec442607b86",
-    "686b241bbbc1ebd533b4fb9c",
-    "d2cef3475e8ab2b5ed3ec587",
-    "3febc0ada88477685bc61d98",
-    "e75297e577b337ca2fb68a7a",
-    "6c752b79da406a1c951e3a8b",
-    "b07c00f9cb6f24a8023c3cf2",
-    "27181c8b52e4b06023cc9774",
-    "d5685d95a7229a5fb2b8a2e3",
-    "73114ea8e67a3c5edd51420d",
-    "da1e5784051bb4cf30e6d66b",
-    "35d1be9f87753900056d83e5"
+    "blk_99b62cfb483779db26d3be75",
+    "blk_11f2222350db8eee5bc5ef71",
+    "blk_7cf2a27244897a4b9b334414",
+    "blk_1463cfacf2bd8c2604b76bde",
+    "blk_6a0e503cbb91ad4b20bf7083",
+    "blk_54c55b45f69468fdb717d1f2",
+    "blk_8deca5103a3b10e631b1fa62",
+    "blk_3043405a7c5239bd734b2298",
+    "blk_27dd45b9f4f423b3da20d031",
+    "blk_123d8e68e78ebec442607b86",
+    "blk_686b241bbbc1ebd533b4fb9c",
+    "blk_d2cef3475e8ab2b5ed3ec587",
+    "blk_3febc0ada88477685bc61d98",
+    "blk_e75297e577b337ca2fb68a7a",
+    "blk_6c752b79da406a1c951e3a8b",
+    "blk_b07c00f9cb6f24a8023c3cf2",
+    "blk_27181c8b52e4b06023cc9774",
+    "blk_d5685d95a7229a5fb2b8a2e3",
+    "blk_73114ea8e67a3c5edd51420d",
+    "blk_da1e5784051bb4cf30e6d66b",
+    "blk_35d1be9f87753900056d83e5"
   ],
   "changed": [],
-  "focus": "99b62cfb483779db26d3be75",
+  "focus": "blk_99b62cfb483779db26d3be75",
   "removed": [],
   "warnings": []
 }
@@ -52,81 +52,81 @@ path finding, and coderef-backed source hydration.
 ```json
 {
   "added": [
-    "421333df5881c48ef6b4be16",
-    "6235791ed9ac4d7a14aac319",
-    "4f940e434b235b682b66a993",
-    "22cc5420d70d16fc97e384f9",
-    "61b08fbe32bf13550b809e0e",
-    "81f3d43984931b527f7f03e1",
-    "17f326535b810acf87cb5480",
-    "5cfb844f59b2ef0e148b802e",
-    "0cb4f27ad738e059268f66dc",
-    "33c464f1fa016a2a873ce023",
-    "32c2f79214c85e15ed7111ca",
-    "388c43cdf82cf3be4c3a2de3",
-    "2fe932adcdb289e658dd95c3",
-    "75ba4b5be43d622dbdbea654",
-    "4e5834618eba57dc2705bf21",
-    "2f2ff11e7823297e4a3a58ca",
-    "038a0d36c4bfe68f61ae207d",
-    "ab3db77747df355713964772",
-    "36297514b84ae49ca30429cf",
-    "878416793291749c3f8c45f0",
-    "1c2377fdb5c6e58265653ec2",
-    "7573ba527b717f92b1f9ff37",
-    "a03f786951e9056adeb7d847",
-    "9cb55c80be4d1e6e672635b5",
-    "252a08abfd351262785f1af7",
-    "83fe331988dd1204ee617928",
-    "83c18aaef4cd71a1c2471814"
+    "blk_421333df5881c48ef6b4be16",
+    "blk_6235791ed9ac4d7a14aac319",
+    "blk_4f940e434b235b682b66a993",
+    "blk_22cc5420d70d16fc97e384f9",
+    "blk_61b08fbe32bf13550b809e0e",
+    "blk_81f3d43984931b527f7f03e1",
+    "blk_17f326535b810acf87cb5480",
+    "blk_5cfb844f59b2ef0e148b802e",
+    "blk_0cb4f27ad738e059268f66dc",
+    "blk_33c464f1fa016a2a873ce023",
+    "blk_32c2f79214c85e15ed7111ca",
+    "blk_388c43cdf82cf3be4c3a2de3",
+    "blk_2fe932adcdb289e658dd95c3",
+    "blk_75ba4b5be43d622dbdbea654",
+    "blk_4e5834618eba57dc2705bf21",
+    "blk_2f2ff11e7823297e4a3a58ca",
+    "blk_038a0d36c4bfe68f61ae207d",
+    "blk_ab3db77747df355713964772",
+    "blk_36297514b84ae49ca30429cf",
+    "blk_878416793291749c3f8c45f0",
+    "blk_1c2377fdb5c6e58265653ec2",
+    "blk_7573ba527b717f92b1f9ff37",
+    "blk_a03f786951e9056adeb7d847",
+    "blk_9cb55c80be4d1e6e672635b5",
+    "blk_252a08abfd351262785f1af7",
+    "blk_83fe331988dd1204ee617928",
+    "blk_83c18aaef4cd71a1c2471814"
   ],
   "changed": [
-    "ab3db77747df355713964772",
-    "a03f786951e9056adeb7d847",
-    "9cb55c80be4d1e6e672635b5",
-    "878416793291749c3f8c45f0",
-    "83fe331988dd1204ee617928",
-    "83c18aaef4cd71a1c2471814",
-    "81f3d43984931b527f7f03e1",
-    "75ba4b5be43d622dbdbea654",
-    "7573ba527b717f92b1f9ff37",
-    "6235791ed9ac4d7a14aac319",
-    "61b08fbe32bf13550b809e0e",
-    "5cfb844f59b2ef0e148b802e",
-    "4f940e434b235b682b66a993",
-    "4e5834618eba57dc2705bf21",
-    "388c43cdf82cf3be4c3a2de3",
-    "36297514b84ae49ca30429cf",
-    "33c464f1fa016a2a873ce023",
-    "32c2f79214c85e15ed7111ca",
-    "2fe932adcdb289e658dd95c3",
-    "2f2ff11e7823297e4a3a58ca",
-    "252a08abfd351262785f1af7",
-    "22cc5420d70d16fc97e384f9",
-    "1c2377fdb5c6e58265653ec2",
-    "17f326535b810acf87cb5480",
-    "0cb4f27ad738e059268f66dc",
-    "038a0d36c4bfe68f61ae207d"
+    "blk_ab3db77747df355713964772",
+    "blk_a03f786951e9056adeb7d847",
+    "blk_9cb55c80be4d1e6e672635b5",
+    "blk_878416793291749c3f8c45f0",
+    "blk_83fe331988dd1204ee617928",
+    "blk_83c18aaef4cd71a1c2471814",
+    "blk_81f3d43984931b527f7f03e1",
+    "blk_75ba4b5be43d622dbdbea654",
+    "blk_7573ba527b717f92b1f9ff37",
+    "blk_6235791ed9ac4d7a14aac319",
+    "blk_61b08fbe32bf13550b809e0e",
+    "blk_5cfb844f59b2ef0e148b802e",
+    "blk_4f940e434b235b682b66a993",
+    "blk_4e5834618eba57dc2705bf21",
+    "blk_388c43cdf82cf3be4c3a2de3",
+    "blk_36297514b84ae49ca30429cf",
+    "blk_33c464f1fa016a2a873ce023",
+    "blk_32c2f79214c85e15ed7111ca",
+    "blk_2fe932adcdb289e658dd95c3",
+    "blk_2f2ff11e7823297e4a3a58ca",
+    "blk_252a08abfd351262785f1af7",
+    "blk_22cc5420d70d16fc97e384f9",
+    "blk_1c2377fdb5c6e58265653ec2",
+    "blk_17f326535b810acf87cb5480",
+    "blk_0cb4f27ad738e059268f66dc",
+    "blk_038a0d36c4bfe68f61ae207d"
   ],
-  "focus": "421333df5881c48ef6b4be16",
+  "focus": "blk_421333df5881c48ef6b4be16",
   "removed": [
-    "fcbaff9c723b3c545893b460",
-    "f97e4beae70a52e156496818",
-    "effc5cb92c68fc2fc7c6060c",
-    "ec5990bce475a7f5e5b35c8f",
-    "e82bc834beb1e93b6beb9320",
-    "e804bec6a3d59ded23434300",
-    "e2bd3b36c044c451a0f19fc5",
-    "e1461da0092b93ba436329f5",
-    "dabdd7fa1f031b5b15d50adf",
-    "da1643f054f4e69d501e077f",
-    "d26b84666d6b90b00dc8abb9",
-    "ce4deb0d861f1c377b1fb833",
-    "caa0b63234a21634ac29a13c",
-    "ca0802fbc374965adcf94c36",
-    "bb03ce046fceeccdba185a54",
-    "b2bc11f492b1d0c47f16e483",
-    "b0cf9a52abda636795e63fd5"
+    "blk_fcbaff9c723b3c545893b460",
+    "blk_f97e4beae70a52e156496818",
+    "blk_effc5cb92c68fc2fc7c6060c",
+    "blk_ec5990bce475a7f5e5b35c8f",
+    "blk_e82bc834beb1e93b6beb9320",
+    "blk_e804bec6a3d59ded23434300",
+    "blk_e2bd3b36c044c451a0f19fc5",
+    "blk_e1461da0092b93ba436329f5",
+    "blk_dabdd7fa1f031b5b15d50adf",
+    "blk_da1643f054f4e69d501e077f",
+    "blk_d26b84666d6b90b00dc8abb9",
+    "blk_ce4deb0d861f1c377b1fb833",
+    "blk_caa0b63234a21634ac29a13c",
+    "blk_ca0802fbc374965adcf94c36",
+    "blk_bb03ce046fceeccdba185a54",
+    "blk_b2bc11f492b1d0c47f16e483",
+    "blk_b0cf9a52abda636795e63fd5"
   ],
   "warnings": []
 }
@@ -137,84 +137,84 @@ path finding, and coderef-backed source hydration.
 ```json
 {
   "added": [
-    "e4fc6ac96af7e1f5b261fe1f",
-    "3646aae8c636bd629cb14366",
-    "161c61d5da7740a0bc13a64e",
-    "375556c414d9721671b244c7",
-    "26e431149695347e143b19cf",
-    "047a6b142bd13e2db299bf35",
-    "3151bec71c3e401b32d89e13",
-    "040772f35cb58849119a71d3",
-    "1d53058ff34da01f81742a3a",
-    "3103889e0868639d19d5dd3a",
-    "062fa5d2fb2e61baf1c646f3",
-    "014ce77409a8733bccd0f8d0",
-    "0e7d0f83b415d245f8c23dc2",
-    "2161df5de0a7600080bb8616",
-    "19cfcdf5e1c6dacfa6119063"
+    "blk_e4fc6ac96af7e1f5b261fe1f",
+    "blk_3646aae8c636bd629cb14366",
+    "blk_161c61d5da7740a0bc13a64e",
+    "blk_375556c414d9721671b244c7",
+    "blk_26e431149695347e143b19cf",
+    "blk_047a6b142bd13e2db299bf35",
+    "blk_3151bec71c3e401b32d89e13",
+    "blk_040772f35cb58849119a71d3",
+    "blk_1d53058ff34da01f81742a3a",
+    "blk_3103889e0868639d19d5dd3a",
+    "blk_062fa5d2fb2e61baf1c646f3",
+    "blk_014ce77409a8733bccd0f8d0",
+    "blk_0e7d0f83b415d245f8c23dc2",
+    "blk_2161df5de0a7600080bb8616",
+    "blk_19cfcdf5e1c6dacfa6119063"
   ],
   "changed": [
-    "375556c414d9721671b244c7",
-    "3646aae8c636bd629cb14366",
-    "3151bec71c3e401b32d89e13",
-    "3103889e0868639d19d5dd3a",
-    "26e431149695347e143b19cf",
-    "2161df5de0a7600080bb8616",
-    "1d53058ff34da01f81742a3a",
-    "19cfcdf5e1c6dacfa6119063",
-    "161c61d5da7740a0bc13a64e",
-    "0e7d0f83b415d245f8c23dc2",
-    "062fa5d2fb2e61baf1c646f3",
-    "047a6b142bd13e2db299bf35",
-    "040772f35cb58849119a71d3",
-    "014ce77409a8733bccd0f8d0",
-    "421333df5881c48ef6b4be16"
+    "blk_375556c414d9721671b244c7",
+    "blk_3646aae8c636bd629cb14366",
+    "blk_3151bec71c3e401b32d89e13",
+    "blk_3103889e0868639d19d5dd3a",
+    "blk_26e431149695347e143b19cf",
+    "blk_2161df5de0a7600080bb8616",
+    "blk_1d53058ff34da01f81742a3a",
+    "blk_19cfcdf5e1c6dacfa6119063",
+    "blk_161c61d5da7740a0bc13a64e",
+    "blk_0e7d0f83b415d245f8c23dc2",
+    "blk_062fa5d2fb2e61baf1c646f3",
+    "blk_047a6b142bd13e2db299bf35",
+    "blk_040772f35cb58849119a71d3",
+    "blk_014ce77409a8733bccd0f8d0",
+    "blk_421333df5881c48ef6b4be16"
   ],
-  "focus": "e4fc6ac96af7e1f5b261fe1f",
+  "focus": "blk_e4fc6ac96af7e1f5b261fe1f",
   "removed": [
-    "fbfdddbcc02c8067b53b27fe",
-    "f47adb3aefb90cb841185e13",
-    "eb004d6c64bc2e36e41ea42e",
-    "e9e0aaa367d526981ddb3bd8",
-    "e81a9910a424fc896400553d",
-    "e28fb03581432f00751e5aa1",
-    "db3f7f37e4a98c80ab7b56e3",
-    "d1fab9b7f09d11d524cad890",
-    "d0d52950985309a94e6f6850",
-    "c7e49d010c98625831da4ac0",
-    "bd92be797081a333ff5fe2ef",
-    "b88ee3d1f959fb29c50e3394",
-    "b738f29aa1ec2082a1ec17ba",
-    "b50a20b247a70d746a6eecf9",
-    "b1514cfae7b8f5469d4e1fd0",
-    "ab3db77747df355713964772",
-    "a9da1b867af922f88886b437",
-    "a744b420301741a16b8fa63d",
-    "a67dfd8379bec3da9c9282ec",
-    "a03f786951e9056adeb7d847",
-    "9cb55c80be4d1e6e672635b5",
-    "8bf08260fbf72b9acc4dfff8",
-    "89a19cc0e721bb3337a34809",
-    "878416793291749c3f8c45f0",
-    "83fe331988dd1204ee617928",
-    "83c18aaef4cd71a1c2471814",
-    "81f3d43984931b527f7f03e1",
-    "75ba4b5be43d622dbdbea654",
-    "7573ba527b717f92b1f9ff37",
-    "72378fe9f8f5b777ae450ac1",
-    "6f33d3963c5f676aef6346bf",
-    "633ebbcde7448a93b661f796",
-    "6235791ed9ac4d7a14aac319",
-    "61b08fbe32bf13550b809e0e",
-    "5cfb844f59b2ef0e148b802e",
-    "58274abbe22f3a5e56527269",
-    "53fa15e7333e649f4eb74d9c",
-    "4f940e434b235b682b66a993",
-    "4e5834618eba57dc2705bf21",
-    "471425c007861b13a70219c9",
-    "417c1f9bfe4c790b8f40b26c",
-    "388c43cdf82cf3be4c3a2de3",
-    "384b68c8c1725eba6a9eb9da"
+    "blk_fbfdddbcc02c8067b53b27fe",
+    "blk_f47adb3aefb90cb841185e13",
+    "blk_eb004d6c64bc2e36e41ea42e",
+    "blk_e9e0aaa367d526981ddb3bd8",
+    "blk_e81a9910a424fc896400553d",
+    "blk_e28fb03581432f00751e5aa1",
+    "blk_db3f7f37e4a98c80ab7b56e3",
+    "blk_d1fab9b7f09d11d524cad890",
+    "blk_d0d52950985309a94e6f6850",
+    "blk_c7e49d010c98625831da4ac0",
+    "blk_bd92be797081a333ff5fe2ef",
+    "blk_b88ee3d1f959fb29c50e3394",
+    "blk_b738f29aa1ec2082a1ec17ba",
+    "blk_b50a20b247a70d746a6eecf9",
+    "blk_b1514cfae7b8f5469d4e1fd0",
+    "blk_ab3db77747df355713964772",
+    "blk_a9da1b867af922f88886b437",
+    "blk_a744b420301741a16b8fa63d",
+    "blk_a67dfd8379bec3da9c9282ec",
+    "blk_a03f786951e9056adeb7d847",
+    "blk_9cb55c80be4d1e6e672635b5",
+    "blk_8bf08260fbf72b9acc4dfff8",
+    "blk_89a19cc0e721bb3337a34809",
+    "blk_878416793291749c3f8c45f0",
+    "blk_83fe331988dd1204ee617928",
+    "blk_83c18aaef4cd71a1c2471814",
+    "blk_81f3d43984931b527f7f03e1",
+    "blk_75ba4b5be43d622dbdbea654",
+    "blk_7573ba527b717f92b1f9ff37",
+    "blk_72378fe9f8f5b777ae450ac1",
+    "blk_6f33d3963c5f676aef6346bf",
+    "blk_633ebbcde7448a93b661f796",
+    "blk_6235791ed9ac4d7a14aac319",
+    "blk_61b08fbe32bf13550b809e0e",
+    "blk_5cfb844f59b2ef0e148b802e",
+    "blk_58274abbe22f3a5e56527269",
+    "blk_53fa15e7333e649f4eb74d9c",
+    "blk_4f940e434b235b682b66a993",
+    "blk_4e5834618eba57dc2705bf21",
+    "blk_471425c007861b13a70219c9",
+    "blk_417c1f9bfe4c790b8f40b26c",
+    "blk_388c43cdf82cf3be4c3a2de3",
+    "blk_384b68c8c1725eba6a9eb9da"
 ... clipped 3 more lines ...
 
 ```
@@ -224,84 +224,84 @@ path finding, and coderef-backed source hydration.
 ```json
 {
   "added": [
-    "a3e405bc4c3b866ba88b4abf",
-    "01ed95dc82a44e58ddd09413",
-    "067cf50fe3a960d4a9abf46e",
-    "11da0dff38408a4acce6ffa1",
-    "0381c32bbd548c3242bcb6d5",
-    "0a3801fdf0420775e6e1d03c",
-    "0053b58411298b4292bb2f75",
-    "0c76d9bf7be13c3fcac16fdf",
-    "03051d05dea43f33b67334f3",
-    "100ad4273916c2d577d032c7",
-    "0710c5abf5ca5e903a53cc2b",
-    "0e941dccb05e78d98eceb563",
-    "0367e9c75308d52846eaa2d1",
-    "10ba15bb8defcf4a41a893a7",
-    "0dcc972ff1c3efcfebeeb8bd",
-    "0cded6f25ea15aaeac8f5676",
-    "09203ddb0037c565c85efea3",
-    "07082130fd7777bda29875f3"
+    "blk_a3e405bc4c3b866ba88b4abf",
+    "blk_01ed95dc82a44e58ddd09413",
+    "blk_067cf50fe3a960d4a9abf46e",
+    "blk_11da0dff38408a4acce6ffa1",
+    "blk_0381c32bbd548c3242bcb6d5",
+    "blk_0a3801fdf0420775e6e1d03c",
+    "blk_0053b58411298b4292bb2f75",
+    "blk_0c76d9bf7be13c3fcac16fdf",
+    "blk_03051d05dea43f33b67334f3",
+    "blk_100ad4273916c2d577d032c7",
+    "blk_0710c5abf5ca5e903a53cc2b",
+    "blk_0e941dccb05e78d98eceb563",
+    "blk_0367e9c75308d52846eaa2d1",
+    "blk_10ba15bb8defcf4a41a893a7",
+    "blk_0dcc972ff1c3efcfebeeb8bd",
+    "blk_0cded6f25ea15aaeac8f5676",
+    "blk_09203ddb0037c565c85efea3",
+    "blk_07082130fd7777bda29875f3"
   ],
   "changed": [
-    "11da0dff38408a4acce6ffa1",
-    "10ba15bb8defcf4a41a893a7",
-    "100ad4273916c2d577d032c7",
-    "0e941dccb05e78d98eceb563",
-    "0dcc972ff1c3efcfebeeb8bd",
-    "0cded6f25ea15aaeac8f5676",
-    "0c76d9bf7be13c3fcac16fdf",
-    "0a3801fdf0420775e6e1d03c",
-    "09203ddb0037c565c85efea3",
-    "0710c5abf5ca5e903a53cc2b",
-    "07082130fd7777bda29875f3",
-    "067cf50fe3a960d4a9abf46e",
-    "0381c32bbd548c3242bcb6d5",
-    "0367e9c75308d52846eaa2d1",
-    "03051d05dea43f33b67334f3",
-    "01ed95dc82a44e58ddd09413",
-    "0053b58411298b4292bb2f75",
-    "e4fc6ac96af7e1f5b261fe1f"
+    "blk_11da0dff38408a4acce6ffa1",
+    "blk_10ba15bb8defcf4a41a893a7",
+    "blk_100ad4273916c2d577d032c7",
+    "blk_0e941dccb05e78d98eceb563",
+    "blk_0dcc972ff1c3efcfebeeb8bd",
+    "blk_0cded6f25ea15aaeac8f5676",
+    "blk_0c76d9bf7be13c3fcac16fdf",
+    "blk_0a3801fdf0420775e6e1d03c",
+    "blk_09203ddb0037c565c85efea3",
+    "blk_0710c5abf5ca5e903a53cc2b",
+    "blk_07082130fd7777bda29875f3",
+    "blk_067cf50fe3a960d4a9abf46e",
+    "blk_0381c32bbd548c3242bcb6d5",
+    "blk_0367e9c75308d52846eaa2d1",
+    "blk_03051d05dea43f33b67334f3",
+    "blk_01ed95dc82a44e58ddd09413",
+    "blk_0053b58411298b4292bb2f75",
+    "blk_e4fc6ac96af7e1f5b261fe1f"
   ],
-  "focus": "a3e405bc4c3b866ba88b4abf",
+  "focus": "blk_a3e405bc4c3b866ba88b4abf",
   "removed": [
-    "fe0b229ce681f020e98ece18",
-    "fc35a6f1e95bd9d5189d5f0b",
-    "f9d8e38bb08b0efa1183e2f8",
-    "f7e2b0de2e149648deed90b2",
-    "f7dddbca107e88ccd6bb728a",
-    "f3f7d547ca1d32730042f609",
-    "f36543dac6e451cf1329f13d",
-    "f11cc63188a6eb8d95ed69a2",
-    "ee64daf298092e9b99bdb3e5",
-    "ecca6ba880fde780c1c5d2cd",
-    "ec0c871c10d4cb0c40feb7f9",
-    "ec0816a9156e1dff05d3ffec",
-    "ea2cc47c53a649693e270db9",
-    "e906ea322f45cd7efc7e4f71",
-    "e87c5f06952f1bd4e35c27c8",
-    "e6dde791b9ca9b46bd9c03d7",
-    "e52ea8e2dabdb702281b40e0",
-    "e3f223155544d6ed1fbc1d55",
-    "e08ae5dd8379dd0642e5d41b",
-    "ddfcb11ee5e0926e2c32f37f",
-    "d9d5cb61c1016ab0f44fdf66",
-    "d5f6b7c8e629e8db9fde8cb0",
-    "d582694aa475872b3479211e",
-    "d1b4c434de790672bb420a17",
-    "d1638a37550fd4eadf1ecdac",
-    "d0656d4726bb94c70d35f474",
-    "ce517652ab851da3bd3f2acb",
-    "cdc3bf6dfe512c7c48535fb7",
-    "cc709e9aaf921bcadd52c0b0",
-    "c91928fb41334cc295a96b1a",
-    "c8db92f70f39c22ae5265c03",
-    "c82596b5d50c15d1694f219a",
-    "c713dd7c6a0c6be47218fa67",
-    "c5b3e67dac90fb0a005e2f36",
-    "c316ea750038ca703f2a372e",
-    "bd8e2e1069a0a01df340286a",
-    "bc50ae99725041a517927232",
+    "blk_fe0b229ce681f020e98ece18",
+    "blk_fc35a6f1e95bd9d5189d5f0b",
+    "blk_f9d8e38bb08b0efa1183e2f8",
+    "blk_f7e2b0de2e149648deed90b2",
+    "blk_f7dddbca107e88ccd6bb728a",
+    "blk_f3f7d547ca1d32730042f609",
+    "blk_f36543dac6e451cf1329f13d",
+    "blk_f11cc63188a6eb8d95ed69a2",
+    "blk_ee64daf298092e9b99bdb3e5",
+    "blk_ecca6ba880fde780c1c5d2cd",
+    "blk_ec0c871c10d4cb0c40feb7f9",
+    "blk_ec0816a9156e1dff05d3ffec",
+    "blk_ea2cc47c53a649693e270db9",
+    "blk_e906ea322f45cd7efc7e4f71",
+    "blk_e87c5f06952f1bd4e35c27c8",
+    "blk_e6dde791b9ca9b46bd9c03d7",
+    "blk_e52ea8e2dabdb702281b40e0",
+    "blk_e3f223155544d6ed1fbc1d55",
+    "blk_e08ae5dd8379dd0642e5d41b",
+    "blk_ddfcb11ee5e0926e2c32f37f",
+    "blk_d9d5cb61c1016ab0f44fdf66",
+    "blk_d5f6b7c8e629e8db9fde8cb0",
+    "blk_d582694aa475872b3479211e",
+    "blk_d1b4c434de790672bb420a17",
+    "blk_d1638a37550fd4eadf1ecdac",
+    "blk_d0656d4726bb94c70d35f474",
+    "blk_ce517652ab851da3bd3f2acb",
+    "blk_cdc3bf6dfe512c7c48535fb7",
+    "blk_cc709e9aaf921bcadd52c0b0",
+    "blk_c91928fb41334cc295a96b1a",
+    "blk_c8db92f70f39c22ae5265c03",
+    "blk_c82596b5d50c15d1694f219a",
+    "blk_c713dd7c6a0c6be47218fa67",
+    "blk_c5b3e67dac90fb0a005e2f36",
+    "blk_c316ea750038ca703f2a372e",
+    "blk_bd8e2e1069a0a01df340286a",
+    "blk_bc50ae99725041a517927232",
 ... clipped 126 more lines ...
 
 ```
@@ -311,7 +311,7 @@ path finding, and coderef-backed source hydration.
 ```json
 [
   {
-    "block_id": "0cb4f27ad738e059268f66dc",
+    "block_id": "blk_0cb4f27ad738e059268f66dc",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/agent.rs#L1012-L1085",
       "end_line": 1085,
@@ -326,7 +326,7 @@ path finding, and coderef-backed source hydration.
     "symbol_name": "context_show"
   },
   {
-    "block_id": "417c1f9bfe4c790b8f40b26c",
+    "block_id": "blk_417c1f9bfe4c790b8f40b26c",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/codegraph.rs#L657-L702",
       "end_line": 702,
@@ -341,7 +341,7 @@ path finding, and coderef-backed source hydration.
     "symbol_name": "context_show"
   },
   {
-    "block_id": "32c2f79214c85e15ed7111ca",
+    "block_id": "blk_32c2f79214c85e15ed7111ca",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/agent.rs#L1107-L1116",
       "end_line": 1116,
@@ -356,7 +356,7 @@ path finding, and coderef-backed source hydration.
     "symbol_name": "get_session_mut"
   },
   {
-    "block_id": "f47adb3aefb90cb841185e13",
+    "block_id": "blk_f47adb3aefb90cb841185e13",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/codegraph.rs#L1629-L1638",
       "end_line": 1638,
@@ -371,7 +371,7 @@ path finding, and coderef-backed source hydration.
     "symbol_name": "get_session_mut"
   },
   {
-    "block_id": "89a19cc0e721bb3337a34809",
+    "block_id": "blk_89a19cc0e721bb3337a34809",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/codegraph.rs#L1648-L1685",
       "end_line": 1685,
@@ -386,7 +386,7 @@ path finding, and coderef-backed source hydration.
     "symbol_name": "print_context_update"
   },
   {
-    "block_id": "ec5990bce475a7f5e5b35c8f",
+    "block_id": "blk_ec5990bce475a7f5e5b35c8f",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/agent.rs#L1118-L1158",
 ... clipped 12 more lines ...
@@ -399,9 +399,9 @@ path finding, and coderef-backed source hydration.
 {
   "added": [],
   "changed": [
-    "0cb4f27ad738e059268f66dc"
+    "blk_0cb4f27ad738e059268f66dc"
   ],
-  "focus": "0cb4f27ad738e059268f66dc",
+  "focus": "blk_0cb4f27ad738e059268f66dc",
   "removed": [],
   "warnings": []
 }
@@ -413,13 +413,13 @@ path finding, and coderef-backed source hydration.
 {
   "added": [],
   "changed": [
-    "0cb4f27ad738e059268f66dc",
-    "a3e405bc4c3b866ba88b4abf"
+    "blk_0cb4f27ad738e059268f66dc",
+    "blk_a3e405bc4c3b866ba88b4abf"
   ],
-  "focus": "0cb4f27ad738e059268f66dc",
+  "focus": "blk_0cb4f27ad738e059268f66dc",
   "removed": [
-    "6557d3b244263e4971245831",
-    "0c6c13995a670d18a116596b"
+    "blk_6557d3b244263e4971245831",
+    "blk_0c6c13995a670d18a116596b"
   ],
   "warnings": []
 }
@@ -429,12 +429,12 @@ path finding, and coderef-backed source hydration.
 
 ```json
 {
-  "block_id": "0cb4f27ad738e059268f66dc",
+  "block_id": "blk_0cb4f27ad738e059268f66dc",
   "detail_level": "neighborhood",
   "explanation": "Node was selected directly by the agent.",
   "focus": true,
   "node": {
-    "block_id": "0cb4f27ad738e059268f66dc",
+    "block_id": "blk_0cb4f27ad738e059268f66dc",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/agent.rs#L1012-L1085",
       "end_line": 1085,
@@ -462,10 +462,10 @@ path finding, and coderef-backed source hydration.
 {
   "added": [],
   "changed": [
-    "0cb4f27ad738e059268f66dc",
-    "0cb4f27ad738e059268f66dc"
+    "blk_0cb4f27ad738e059268f66dc",
+    "blk_0cb4f27ad738e059268f66dc"
   ],
-  "focus": "0cb4f27ad738e059268f66dc",
+  "focus": "blk_0cb4f27ad738e059268f66dc",
   "removed": [],
   "warnings": []
 }
@@ -481,10 +481,10 @@ path finding, and coderef-backed source hydration.
   "update": {
     "added": [],
     "changed": [],
-    "focus": "0cb4f27ad738e059268f66dc",
+    "focus": "blk_0cb4f27ad738e059268f66dc",
     "removed": [
-      "6557d3b244263e4971245831",
-      "0c6c13995a670d18a116596b"
+      "blk_6557d3b244263e4971245831",
+      "blk_0c6c13995a670d18a116596b"
     ],
     "warnings": []
   }
@@ -496,14 +496,14 @@ path finding, and coderef-backed source hydration.
 ```json
 {
   "added": [
-    "417c1f9bfe4c790b8f40b26c"
+    "blk_417c1f9bfe4c790b8f40b26c"
   ],
   "changed": [
-    "0cb4f27ad738e059268f66dc"
+    "blk_0cb4f27ad738e059268f66dc"
   ],
-  "focus": "417c1f9bfe4c790b8f40b26c",
+  "focus": "blk_417c1f9bfe4c790b8f40b26c",
   "removed": [
-    "11da0dff38408a4acce6ffa1"
+    "blk_11da0dff38408a4acce6ffa1"
   ],
   "warnings": []
 }
@@ -515,14 +515,14 @@ path finding, and coderef-backed source hydration.
 {
   "added": [],
   "changed": [
-    "417c1f9bfe4c790b8f40b26c"
+    "blk_417c1f9bfe4c790b8f40b26c"
   ],
-  "focus": "417c1f9bfe4c790b8f40b26c",
+  "focus": "blk_417c1f9bfe4c790b8f40b26c",
   "removed": [
-    "d1fab9b7f09d11d524cad890",
-    "53fa15e7333e649f4eb74d9c",
-    "384b68c8c1725eba6a9eb9da",
-    "0c6c13995a670d18a116596b"
+    "blk_d1fab9b7f09d11d524cad890",
+    "blk_53fa15e7333e649f4eb74d9c",
+    "blk_384b68c8c1725eba6a9eb9da",
+    "blk_0c6c13995a670d18a116596b"
   ],
   "warnings": []
 }
@@ -532,12 +532,12 @@ path finding, and coderef-backed source hydration.
 
 ```json
 {
-  "block_id": "417c1f9bfe4c790b8f40b26c",
+  "block_id": "blk_417c1f9bfe4c790b8f40b26c",
   "detail_level": "neighborhood",
   "explanation": "Node was selected directly by the agent.",
   "focus": true,
   "node": {
-    "block_id": "417c1f9bfe4c790b8f40b26c",
+    "block_id": "blk_417c1f9bfe4c790b8f40b26c",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/codegraph.rs#L657-L702",
       "end_line": 702,
@@ -565,10 +565,10 @@ path finding, and coderef-backed source hydration.
 {
   "added": [],
   "changed": [
-    "417c1f9bfe4c790b8f40b26c",
-    "417c1f9bfe4c790b8f40b26c"
+    "blk_417c1f9bfe4c790b8f40b26c",
+    "blk_417c1f9bfe4c790b8f40b26c"
   ],
-  "focus": "417c1f9bfe4c790b8f40b26c",
+  "focus": "blk_417c1f9bfe4c790b8f40b26c",
   "removed": [],
   "warnings": []
 }
@@ -584,12 +584,12 @@ path finding, and coderef-backed source hydration.
   "update": {
     "added": [],
     "changed": [],
-    "focus": "417c1f9bfe4c790b8f40b26c",
+    "focus": "blk_417c1f9bfe4c790b8f40b26c",
     "removed": [
-      "d1fab9b7f09d11d524cad890",
-      "53fa15e7333e649f4eb74d9c",
-      "384b68c8c1725eba6a9eb9da",
-      "0c6c13995a670d18a116596b"
+      "blk_d1fab9b7f09d11d524cad890",
+      "blk_53fa15e7333e649f4eb74d9c",
+      "blk_384b68c8c1725eba6a9eb9da",
+      "blk_0c6c13995a670d18a116596b"
     ],
     "warnings": []
   }
@@ -601,14 +601,14 @@ path finding, and coderef-backed source hydration.
 ```json
 {
   "added": [
-    "32c2f79214c85e15ed7111ca"
+    "blk_32c2f79214c85e15ed7111ca"
   ],
   "changed": [
-    "417c1f9bfe4c790b8f40b26c"
+    "blk_417c1f9bfe4c790b8f40b26c"
   ],
-  "focus": "32c2f79214c85e15ed7111ca",
+  "focus": "blk_32c2f79214c85e15ed7111ca",
   "removed": [
-    "10ba15bb8defcf4a41a893a7"
+    "blk_10ba15bb8defcf4a41a893a7"
   ],
   "warnings": []
 }
@@ -620,9 +620,9 @@ path finding, and coderef-backed source hydration.
 {
   "added": [],
   "changed": [
-    "32c2f79214c85e15ed7111ca"
+    "blk_32c2f79214c85e15ed7111ca"
   ],
-  "focus": "32c2f79214c85e15ed7111ca",
+  "focus": "blk_32c2f79214c85e15ed7111ca",
   "removed": [],
   "warnings": []
 }
@@ -632,12 +632,12 @@ path finding, and coderef-backed source hydration.
 
 ```json
 {
-  "block_id": "32c2f79214c85e15ed7111ca",
+  "block_id": "blk_32c2f79214c85e15ed7111ca",
   "detail_level": "neighborhood",
   "explanation": "Node was selected directly by the agent.",
   "focus": true,
   "node": {
-    "block_id": "32c2f79214c85e15ed7111ca",
+    "block_id": "blk_32c2f79214c85e15ed7111ca",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/agent.rs#L1107-L1116",
       "end_line": 1116,
@@ -665,10 +665,10 @@ path finding, and coderef-backed source hydration.
 {
   "added": [],
   "changed": [
-    "32c2f79214c85e15ed7111ca",
-    "32c2f79214c85e15ed7111ca"
+    "blk_32c2f79214c85e15ed7111ca",
+    "blk_32c2f79214c85e15ed7111ca"
   ],
-  "focus": "32c2f79214c85e15ed7111ca",
+  "focus": "blk_32c2f79214c85e15ed7111ca",
   "removed": [],
   "warnings": []
 }
@@ -684,17 +684,17 @@ path finding, and coderef-backed source hydration.
   "update": {
     "added": [],
     "changed": [],
-    "focus": "32c2f79214c85e15ed7111ca",
+    "focus": "blk_32c2f79214c85e15ed7111ca",
     "removed": [
-      "e2bd3b36c044c451a0f19fc5",
-      "da1643f054f4e69d501e077f",
-      "ca0802fbc374965adcf94c36",
-      "81f3d43984931b527f7f03e1",
-      "61b08fbe32bf13550b809e0e",
-      "5cfb844f59b2ef0e148b802e",
-      "4f940e434b235b682b66a993",
-      "22cc5420d70d16fc97e384f9",
-      "17f326535b810acf87cb5480"
+      "blk_e2bd3b36c044c451a0f19fc5",
+      "blk_da1643f054f4e69d501e077f",
+      "blk_ca0802fbc374965adcf94c36",
+      "blk_81f3d43984931b527f7f03e1",
+      "blk_61b08fbe32bf13550b809e0e",
+      "blk_5cfb844f59b2ef0e148b802e",
+      "blk_4f940e434b235b682b66a993",
+      "blk_22cc5420d70d16fc97e384f9",
+      "blk_17f326535b810acf87cb5480"
     ],
     "warnings": []
   }
@@ -706,7 +706,7 @@ path finding, and coderef-backed source hydration.
 ```json
 {
   "end": {
-    "block_id": "417c1f9bfe4c790b8f40b26c",
+    "block_id": "blk_417c1f9bfe4c790b8f40b26c",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/codegraph.rs#L657-L702",
       "end_line": 702,
@@ -723,19 +723,19 @@ path finding, and coderef-backed source hydration.
   "hops": [
     {
       "direction": "outgoing",
-      "from": "0cb4f27ad738e059268f66dc",
+      "from": "blk_0cb4f27ad738e059268f66dc",
       "relation": "uses_symbol",
-      "to": "0c6c13995a670d18a116596b"
+      "to": "blk_0c6c13995a670d18a116596b"
     },
     {
       "direction": "incoming",
-      "from": "0c6c13995a670d18a116596b",
+      "from": "blk_0c6c13995a670d18a116596b",
       "relation": "uses_symbol",
-      "to": "417c1f9bfe4c790b8f40b26c"
+      "to": "blk_417c1f9bfe4c790b8f40b26c"
     }
   ],
   "start": {
-    "block_id": "0cb4f27ad738e059268f66dc",
+    "block_id": "blk_0cb4f27ad738e059268f66dc",
     "coderef": {
       "display": "crates/ucp-cli/src/commands/agent.rs#L1012-L1085",
       "end_line": 1085,
@@ -758,7 +758,7 @@ path finding, and coderef-backed source hydration.
 {
   "added": [
     {
-      "block_id": "417c1f9bfe4c790b8f40b26c",
+      "block_id": "blk_417c1f9bfe4c790b8f40b26c",
       "coderef": {
         "display": "crates/ucp-cli/src/commands/codegraph.rs#L657-L702",
         "end_line": 702,
@@ -773,7 +773,7 @@ path finding, and coderef-backed source hydration.
       "symbol_name": "context_show"
     },
     {
-      "block_id": "32c2f79214c85e15ed7111ca",
+      "block_id": "blk_32c2f79214c85e15ed7111ca",
       "coderef": {
         "display": "crates/ucp-cli/src/commands/agent.rs#L1107-L1116",
         "end_line": 1116,
@@ -789,11 +789,11 @@ path finding, and coderef-backed source hydration.
     }
   ],
   "changed_focus": true,
-  "focus_after": "32c2f79214c85e15ed7111ca",
-  "focus_before": "a3e405bc4c3b866ba88b4abf",
+  "focus_after": "blk_32c2f79214c85e15ed7111ca",
+  "focus_before": "blk_a3e405bc4c3b866ba88b4abf",
   "removed": [
     {
-      "block_id": "11da0dff38408a4acce6ffa1",
+      "block_id": "blk_11da0dff38408a4acce6ffa1",
       "coderef": {
         "display": "crates/ucp-codegraph/src/context.rs#L237-L246",
         "end_line": 246,
@@ -808,7 +808,7 @@ path finding, and coderef-backed source hydration.
       "symbol_name": "CodeGraphTraversalConfig"
     },
     {
-      "block_id": "10ba15bb8defcf4a41a893a7",
+      "block_id": "blk_10ba15bb8defcf4a41a893a7",
       "coderef": {
         "display": "crates/ucp-codegraph/src/context.rs#L2125-L2133",
         "end_line": 2133,
@@ -834,44 +834,44 @@ path finding, and coderef-backed source hydration.
     {
       "multiplicity": 1,
       "relation": "exports",
-      "source": "a3e405bc4c3b866ba88b4abf",
+      "source": "blk_a3e405bc4c3b866ba88b4abf",
       "source_short_id": "F3",
-      "target": "01ed95dc82a44e58ddd09413",
+      "target": "blk_01ed95dc82a44e58ddd09413",
       "target_short_id": "S10"
     },
     {
       "multiplicity": 1,
       "relation": "exports",
-      "source": "a3e405bc4c3b866ba88b4abf",
+      "source": "blk_a3e405bc4c3b866ba88b4abf",
       "source_short_id": "F3",
-      "target": "0710c5abf5ca5e903a53cc2b",
+      "target": "blk_0710c5abf5ca5e903a53cc2b",
       "target_short_id": "S21"
     },
     {
       "multiplicity": 1,
       "relation": "uses_symbol",
-      "source": "040772f35cb58849119a71d3",
+      "source": "blk_040772f35cb58849119a71d3",
       "source_short_id": "S5",
-      "target": "014ce77409a8733bccd0f8d0",
+      "target": "blk_014ce77409a8733bccd0f8d0",
       "target_short_id": "S8"
     },
     {
       "multiplicity": 1,
       "relation": "uses_symbol",
-      "source": "0e7d0f83b415d245f8c23dc2",
+      "source": "blk_0e7d0f83b415d245f8c23dc2",
       "source_short_id": "S9",
-      "target": "014ce77409a8733bccd0f8d0",
+      "target": "blk_014ce77409a8733bccd0f8d0",
       "target_short_id": "S8"
     }
   ],
   "export_mode": "compact",
-  "focus": "32c2f79214c85e15ed7111ca",
+  "focus": "blk_32c2f79214c85e15ed7111ca",
   "focus_label": "symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut",
   "focus_short_id": "S2",
   "frontier": [
     {
       "action": "hydrate_source",
-      "block_id": "32c2f79214c85e15ed7111ca",
+      "block_id": "blk_32c2f79214c85e15ed7111ca",
       "candidate_count": 0,
       "description": "Hydrate source for symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut",
       "priority": 120,
@@ -879,7 +879,7 @@ path finding, and coderef-backed source hydration.
     },
     {
       "action": "expand_dependents",
-      "block_id": "32c2f79214c85e15ed7111ca",
+      "block_id": "blk_32c2f79214c85e15ed7111ca",
       "candidate_count": 9,
       "description": "expand_dependents incoming neighbors via uses_symbol for symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut",
       "direction": "incoming",
@@ -889,7 +889,7 @@ path finding, and coderef-backed source hydration.
     },
     {
       "action": "collapse",
-      "block_id": "32c2f79214c85e15ed7111ca",
+      "block_id": "blk_32c2f79214c85e15ed7111ca",
       "candidate_count": 1,
       "description": "Collapse symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut from working set",
       "priority": 6,
@@ -902,7 +902,7 @@ path finding, and coderef-backed source hydration.
     "recommended_actions": [
       {
         "action": "expand_dependents",
-        "block_id": "32c2f79214c85e15ed7111ca",
+        "block_id": "blk_32c2f79214c85e15ed7111ca",
         "candidate_count": 9,
         "description": "expand_dependents incoming neighbors via uses_symbol for symbol:crates/ucp-cli/src/commands/agent.rs::get_session_mut",
         "direction": "incoming",
