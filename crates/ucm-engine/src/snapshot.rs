@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use ucm_core::{Document, DocumentVersion, Error, Result};
+use ucm_core::{Document, DocumentVersion, Error, PortableDocument, Result};
 
 /// Snapshot identifier
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -57,93 +57,20 @@ pub struct SerializedDocument {
 
 impl SerializedDocument {
     pub fn from_document(doc: &Document) -> Result<Self> {
-        // We need to serialize the document structure
-        // For now, we'll create a serializable version
-        let serializable = SerializableDocument::from(doc);
-        let json = serde_json::to_string(&serializable)
+        let json = serde_json::to_string(&doc.to_portable())
             .map_err(|e| Error::Internal(format!("Failed to serialize document: {}", e)))?;
         Ok(Self { json })
     }
 
     pub fn to_document(&self) -> Result<Document> {
-        let serializable: SerializableDocument = serde_json::from_str(&self.json)
+        let serializable: PortableDocument = serde_json::from_str(&self.json)
             .map_err(|e| Error::Internal(format!("Failed to deserialize document: {}", e)))?;
-        Ok(serializable.into())
+        serializable.to_document()
     }
-}
 
-/// Serializable version of Document
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SerializableDocument {
-    id: String,
-    root: String,
-    structure: HashMap<String, Vec<String>>,
-    blocks: HashMap<String, serde_json::Value>,
-    metadata: serde_json::Value,
-    version: DocumentVersion,
-}
-
-impl From<&Document> for SerializableDocument {
-    fn from(doc: &Document) -> Self {
-        let structure: HashMap<String, Vec<String>> = doc
-            .structure
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.iter().map(|id| id.to_string()).collect()))
-            .collect();
-
-        let blocks: HashMap<String, serde_json::Value> = doc
-            .blocks
-            .iter()
-            .map(|(k, v)| (k.to_string(), serde_json::to_value(v).unwrap_or_default()))
-            .collect();
-
-        Self {
-            id: doc.id.0.clone(),
-            root: doc.root.to_string(),
-            structure,
-            blocks,
-            metadata: serde_json::to_value(&doc.metadata).unwrap_or_default(),
-            version: doc.version.clone(),
-        }
-    }
-}
-
-impl From<SerializableDocument> for Document {
-    fn from(s: SerializableDocument) -> Self {
-        use ucm_core::{Block, BlockId, DocumentId, DocumentMetadata};
-
-        let root: BlockId = s.root.parse().unwrap_or_else(|_| BlockId::root());
-
-        let structure: HashMap<BlockId, Vec<BlockId>> = s
-            .structure
-            .into_iter()
-            .filter_map(|(k, v)| {
-                let key: BlockId = k.parse().ok()?;
-                let values: Vec<BlockId> = v.into_iter().filter_map(|id| id.parse().ok()).collect();
-                Some((key, values))
-            })
-            .collect();
-
-        let blocks: HashMap<BlockId, Block> = s
-            .blocks
-            .into_iter()
-            .filter_map(|(k, v)| {
-                let key: BlockId = k.parse().ok()?;
-                let block: Block = serde_json::from_value(v).ok()?;
-                Some((key, block))
-            })
-            .collect();
-
-        let metadata: DocumentMetadata = serde_json::from_value(s.metadata).unwrap_or_default();
-
-        let mut doc = Document::new(DocumentId::new(s.id));
-        doc.root = root;
-        doc.structure = structure;
-        doc.blocks = blocks;
-        doc.metadata = metadata;
-        doc.version = s.version;
-        doc.rebuild_indices();
-        doc
+    pub fn to_portable(&self) -> Result<PortableDocument> {
+        serde_json::from_str(&self.json)
+            .map_err(|e| Error::Internal(format!("Failed to deserialize document: {}", e)))
     }
 }
 

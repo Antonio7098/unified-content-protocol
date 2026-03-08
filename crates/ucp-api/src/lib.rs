@@ -26,6 +26,7 @@
 use std::str::FromStr;
 
 use ucl_parser::{parse, parse_commands, UclDocument};
+pub use ucm_core::PortableDocument;
 use ucm_core::{Block, BlockId, Content, Document, EdgeType, Error, Result};
 use ucm_engine::{Engine, Operation, OperationResult};
 
@@ -39,13 +40,24 @@ pub use ucp_codegraph::{
     CodeGraphBuildResult, CodeGraphBuildStatus, CodeGraphCoderef, CodeGraphContextEdgeExport,
     CodeGraphContextExport, CodeGraphContextFrontierAction, CodeGraphContextHeuristics,
     CodeGraphContextNodeExport, CodeGraphContextSession, CodeGraphContextSummary,
-    CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphDiagnostic, CodeGraphExportConfig,
-    CodeGraphExportMode, CodeGraphExtractorConfig, CodeGraphHiddenLevelSummary,
-    CodeGraphIncrementalBuildInput, CodeGraphIncrementalStats, CodeGraphPromptProjectionConfig,
-    CodeGraphPrunePolicy, CodeGraphRenderConfig, CodeGraphSelectionOrigin,
-    CodeGraphSelectionOriginKind, CodeGraphSeverity, CodeGraphStats, CodeGraphTraversalConfig,
-    CodeGraphValidationResult, HydratedSourceExcerpt, PortableDocument,
-    CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
+    CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphDiagnostic, CodeGraphExpandMode,
+    CodeGraphExportConfig, CodeGraphExportMode, CodeGraphExtractorConfig, CodeGraphFindQuery,
+    CodeGraphHiddenLevelSummary, CodeGraphIncrementalBuildInput, CodeGraphIncrementalStats,
+    CodeGraphNavigator, CodeGraphNavigatorSession, CodeGraphNodeSummary, CodeGraphPathHop,
+    CodeGraphPathResult, CodeGraphPromptProjectionConfig, CodeGraphPrunePolicy,
+    CodeGraphRecommendedActionsResult, CodeGraphRenderConfig, CodeGraphSelectionExplanation,
+    CodeGraphSelectionOrigin, CodeGraphSelectionOriginKind, CodeGraphSessionDiff,
+    CodeGraphSeverity, CodeGraphStats, CodeGraphTraversalConfig, CodeGraphValidationResult,
+    HydratedSourceExcerpt, CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER,
+    CODEGRAPH_PROFILE_VERSION,
+};
+#[cfg(not(target_arch = "wasm32"))]
+pub use ucp_graph::{
+    GraphDetailLevel, GraphExport, GraphExportEdge, GraphExportNode, GraphFindQuery,
+    GraphNavigator, GraphNeighborMode, GraphNodeRecord, GraphNodeSummary, GraphPathHop,
+    GraphPathResult, GraphSelectionExplanation, GraphSelectionOrigin, GraphSelectionOriginKind,
+    GraphSession, GraphSessionDiff, GraphSessionNode, GraphSessionSummary, GraphSessionUpdate,
+    GraphStoreObservability, GraphStoreStats, InMemoryGraphStore, SqliteGraphStore,
 };
 
 /// UCP client for document manipulation

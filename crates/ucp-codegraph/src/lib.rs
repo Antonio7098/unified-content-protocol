@@ -1,6 +1,7 @@
 mod context;
 mod legacy;
 mod model;
+mod programmatic;
 mod projection;
 
 pub use context::{
@@ -20,10 +21,16 @@ pub use legacy::{
 pub use model::{
     CodeGraphBuildInput, CodeGraphBuildResult, CodeGraphBuildStatus, CodeGraphDiagnostic,
     CodeGraphExtractorConfig, CodeGraphIncrementalBuildInput, CodeGraphIncrementalStats,
-    CodeGraphSeverity, CodeGraphStats, CodeGraphValidationResult, PortableDocument,
-    CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
+    CodeGraphSeverity, CodeGraphStats, CodeGraphValidationResult, CODEGRAPH_EXTRACTOR_VERSION,
+    CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
+};
+pub use programmatic::{
+    CodeGraphExpandMode, CodeGraphFindQuery, CodeGraphNavigator, CodeGraphNavigatorSession,
+    CodeGraphNodeSummary, CodeGraphPathHop, CodeGraphPathResult, CodeGraphRecommendedActionsResult,
+    CodeGraphSelectionExplanation, CodeGraphSessionDiff,
 };
 pub use projection::{
     codegraph_prompt_projection, codegraph_prompt_projection_with_config,
     CodeGraphPromptProjectionConfig,
 };
+pub use ucm_core::PortableDocument;

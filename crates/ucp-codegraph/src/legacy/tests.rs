@@ -7,7 +7,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use tempfile::tempdir;
-use ucm_core::{Block, BlockId, Content, Document, EdgeType};
+use ucm_core::{Block, BlockId, Content, Document, EdgeType, PortableDocument};
 
 fn default_build_input(repo_root: &Path, commit_hash: &str) -> CodeGraphBuildInput {
     CodeGraphBuildInput {

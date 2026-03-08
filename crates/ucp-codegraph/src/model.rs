@@ -1,9 +1,7 @@
-use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::str::FromStr;
-use ucm_core::{Block, BlockId, Document, DocumentId, DocumentMetadata};
+use ucm_core::Document;
 
 pub const CODEGRAPH_PROFILE: &str = "codegraph";
 pub const CODEGRAPH_PROFILE_VERSION: &str = "v1";
@@ -221,86 +219,6 @@ fn default_max_file_bytes() -> usize {
 
 fn default_emit_export_edges() -> bool {
     true
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PortableDocument {
-    pub id: String,
-    pub root: String,
-    pub structure: BTreeMap<String, Vec<String>>,
-    pub blocks: BTreeMap<String, Block>,
-    pub metadata: DocumentMetadata,
-    pub version: u64,
-}
-
-impl PortableDocument {
-    pub fn from_document(doc: &Document) -> Self {
-        let mut structure = BTreeMap::new();
-        for (parent, children) in &doc.structure {
-            let mut sorted = children.clone();
-            sorted.sort_by_key(|id| id.to_string());
-            structure.insert(
-                parent.to_string(),
-                sorted.into_iter().map(|id| id.to_string()).collect(),
-            );
-        }
-
-        let mut blocks = BTreeMap::new();
-        for (id, block) in &doc.blocks {
-            blocks.insert(id.to_string(), block.clone());
-        }
-
-        Self {
-            id: doc.id.0.clone(),
-            root: doc.root.to_string(),
-            structure,
-            blocks,
-            metadata: doc.metadata.clone(),
-            version: doc.version.counter,
-        }
-    }
-
-    pub fn to_document(&self) -> Result<Document> {
-        let root = BlockId::from_str(&self.root)
-            .map_err(|_| anyhow!("invalid root block id: {}", self.root))?;
-
-        let mut structure: HashMap<BlockId, Vec<BlockId>> = HashMap::new();
-        for (parent, children) in &self.structure {
-            let parent_id = BlockId::from_str(parent)
-                .map_err(|_| anyhow!("invalid structure parent id: {}", parent))?;
-            let mut parsed_children = Vec::with_capacity(children.len());
-            for child in children {
-                let child_id = BlockId::from_str(child)
-                    .map_err(|_| anyhow!("invalid structure child id: {}", child))?;
-                parsed_children.push(child_id);
-            }
-            structure.insert(parent_id, parsed_children);
-        }
-
-        let mut blocks: HashMap<BlockId, Block> = HashMap::new();
-        for (id, block) in &self.blocks {
-            let block_id = BlockId::from_str(id)
-                .map_err(|_| anyhow!("invalid block id in blocks map: {}", id))?;
-            blocks.insert(block_id, block.clone());
-        }
-
-        let mut doc = Document {
-            id: DocumentId::new(self.id.clone()),
-            root,
-            structure,
-            blocks,
-            metadata: self.metadata.clone(),
-            indices: Default::default(),
-            edge_index: Default::default(),
-            version: ucm_core::DocumentVersion {
-                counter: self.version,
-                timestamp: deterministic_timestamp(),
-                state_hash: [0u8; 8],
-            },
-        };
-        doc.rebuild_indices();
-        Ok(doc)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -576,10 +494,4 @@ impl ExtractedAlias {
             owner_identity: owner_identity.map(str::to_string),
         }
     }
-}
-
-fn deterministic_timestamp() -> chrono::DateTime<chrono::Utc> {
-    chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
-        .expect("valid deterministic timestamp")
-        .with_timezone(&chrono::Utc)
 }
