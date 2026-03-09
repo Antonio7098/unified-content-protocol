@@ -154,6 +154,7 @@ The generated `Document.metadata` includes contract data expected by downstream 
 ## Related Docs
 
 - `docs/ucp-api/graph-runtime.md` for the generic UCP graph runtime
+- `docs/ucp-api/python-query-tools.md` for the agent-facing Python query façade and query runner
 - `docs/ucp-cli/README.md` for `ucp codegraph` commands
 - `docs/ucp-cli/codegraph.md` for detailed CodeGraph coverage, selectors, context sessions, incremental rebuilds, and benchmark examples
 - `docs/ucp-api/codegraph-programmatic.md` for the programmatic Rust + Python navigation surface

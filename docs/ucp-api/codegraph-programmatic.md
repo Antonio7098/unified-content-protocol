@@ -1,6 +1,9 @@
 # Programmatic CodeGraph API
 
-CodeGraph now exposes a first-class programmatic navigation surface for agent workflows.
+CodeGraph now exposes both:
+
+- a low-level programmatic navigation surface for Rust/Python callers
+- an agent-facing Python façade for minimal, loop-friendly querying
 
 ## Design
 
@@ -41,26 +44,24 @@ let why = session.why_selected("symbol:src/lib.rs::add")?;
 
 ## Python entry points
 
-The Python bindings export `ucp.CodeGraph` and `ucp.CodeGraphSession`.
+The Python bindings export low-level `ucp.CodeGraph` / `ucp.CodeGraphSession`, plus the higher-level `ucp.query(...)` façade and `ucp.run_python_query(...)` helper.
 
 Example:
 
 ```python
 import ucp
 
-graph = ucp.CodeGraph.build("./repo")
+graph = ucp.query(ucp.CodeGraph.build("./repo"))
 session = graph.session()
-session.seed_overview(max_depth=3)
-session.expand("src/lib.rs", mode="file")
 
-for node in graph.find_nodes(node_class="symbol", name_regex="Session|Context"):
-    session.focus(node["logical_key"])
-    session.apply_recommended(top=1, padding=2)
+for node in graph.find(node_class="symbol", name_regex="Session|Context"):
+    session.add(node, detail="summary")
+    session.walk(node, mode="dependencies", depth=1)
 ```
 
 ## Core operations
 
-### Graph-level
+### Low-level graph/session surface
 
 - `resolve(selector)`
 - `describe(selector)`
@@ -85,6 +86,24 @@ for node in graph.find_nodes(node_class="symbol", name_regex="Session|Context"):
 - `apply_recommended(...)`
 - `fork()` / `diff(...)`
 
+### Agent-facing façade
+
+Wrap a raw graph with `ucp.query(...)` and use the thinner names:
+
+- `graph.find(...)`
+- `graph.describe(...)`
+- `graph.path(...)`
+- `graph.session()`
+- `session.add(...)`
+- `session.walk(...)`
+- `session.focus(...)`
+- `session.why(...)`
+- `session.export(...)`
+- `session.fork()` / `session.diff(...)`
+- `session.hydrate(...)` on CodeGraph
+
+Use `ucp.run_python_query(...)` when you want the model to mix those primitives with Python loops, regex, and branching logic.
+
 ## Agent-oriented patterns
 
 ### Regex-driven discovery
@@ -107,5 +126,6 @@ Use `path_between(...)` to inspect the shortest discovered chain between two sel
 
 - `docs/ucp-cli/codegraph.md`
 - `docs/ucp-api/README.md`
+- `docs/ucp-api/python-query-tools.md`
 - `crates/ucp-python/README.md`
 - `scripts/demo_codegraph_context_walk.py`

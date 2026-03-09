@@ -27,6 +27,7 @@ ucp-api = "0.1.13"
 ## API and Tools
 
 - [UCP API](./ucp-api/README.md)
+- [Agent-facing Python Query Tools](./ucp-api/python-query-tools.md)
 - [UCP CLI](./ucp-cli/README.md)
 - [UCP LLM Utilities](./ucp-llm/README.md)
 - [UCP Agent](./ucp-agent/index.md)

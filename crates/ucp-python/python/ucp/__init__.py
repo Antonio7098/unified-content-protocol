@@ -86,6 +86,16 @@ from ucp._core import (
     ValidationError,
     ParseError,
 )
+from ucp.query import (
+    CodeQueryGraph,
+    CodeQuerySession,
+    QueryExecutionError,
+    QueryGraph,
+    QueryRunResult,
+    QuerySession,
+    query,
+    run_python_query,
+)
 
 __version__ = "0.1.9"
 __all__ = [
@@ -163,4 +173,12 @@ __all__ = [
     "CycleDetectedError",
     "ValidationError",
     "ParseError",
+    "QueryGraph",
+    "CodeQueryGraph",
+    "QuerySession",
+    "CodeQuerySession",
+    "QueryRunResult",
+    "QueryExecutionError",
+    "query",
+    "run_python_query",
 ]

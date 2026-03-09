@@ -53,6 +53,7 @@ ucp llm prompt --capabilities all > system-prompt.txt
 
 - `docs/index.md`
 - `docs/ucp-api/README.md`
+- `docs/ucp-api/python-query-tools.md`
 - `docs/ucp-cli/README.md`
 - `docs/ucp-cli/codegraph.md`
 - `docs/ucp-llm/README.md`

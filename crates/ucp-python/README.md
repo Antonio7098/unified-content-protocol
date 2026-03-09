@@ -2,6 +2,8 @@
 
 Python bindings for the Rust UCP implementation, including both the generic UCP graph runtime and the specialized CodeGraph API.
 
+For agent workflows, prefer the thin Python façade exposed by `ucp.query(...)` and `ucp.run_python_query(...)`.
+
 ## Installation
 
 ```bash
@@ -38,6 +40,52 @@ for node in graph.find_nodes(node_class="symbol", name_regex="Session|Context"):
 exported = session.export(compact=True, max_frontier_actions=6)
 print(exported["summary"])
 ```
+
+## Agent-facing query façade
+
+```python
+import ucp
+
+graph = ucp.query(ucp.CodeGraph.build("./repo"))
+session = graph.session()
+
+for node in graph.find(node_class="symbol", name_regex="auth|login", limit=5):
+    branch = session.fork()
+    branch.add(node, detail="summary")
+    branch.walk(node, mode="dependencies", depth=1, limit=8)
+    if any("test" in (item.get("path") or "") for item in branch.export(compact=True)["nodes"]):
+        session.add(node, detail="summary")
+        session.walk(node, mode="dependencies", depth=1, limit=8)
+        break
+```
+
+Core façade methods:
+
+- `graph.find(...)`, `graph.describe(...)`, `graph.path(...)`
+- `session.add(...)`, `session.walk(...)`, `session.focus(...)`, `session.why(...)`
+- `session.export(...)`, `session.fork()`, `session.diff(...)`
+- `session.hydrate(...)` for CodeGraph
+
+## Python query runner
+
+```python
+run = ucp.run_python_query(
+    graph,
+    """
+candidates = graph.find(node_class="symbol", name_regex="auth|login", limit=5)
+for node in candidates:
+    session.add(node, detail="summary")
+    session.walk(node, mode="dependencies", depth=1)
+result = session.export(compact=True)
+""",
+    include_export=True,
+)
+
+print(run.ok)
+print(run.summary)
+```
+
+The runner prebinds `graph`, `session`, `re`, `json`, `math`, and `collections` so the caller can use loops, conditionals, regex, and branching without writing a graph DSL.
 
 ## Generic graph usage
 
@@ -91,6 +139,9 @@ print(session.export())
 ## Related docs
 
 - `docs/ucp-api/codegraph-programmatic.md`
+- `docs/ucp-api/python-query-tools.md`
 - `docs/ucp-api/graph-runtime.md`
 - `docs/ucp-cli/codegraph.md`
+- `scripts/demo_ucp_python_query.py`
+- `scripts/demo_codegraph_python_query.py`
 - `scripts/demo_codegraph_context_walk.py`
