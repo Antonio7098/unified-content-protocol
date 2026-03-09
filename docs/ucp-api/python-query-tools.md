@@ -31,6 +31,12 @@ session = graph.session()
 
 `ucp.query(...)` wraps either `ucp.Graph` or `ucp.CodeGraph` and exposes agent-friendly names.
 
+Additional integration helpers:
+
+- `ucp.QueryLimits(...)` for guarded execution
+- `ucp.PythonQueryTool(...)` for provider-facing tool definitions and execution
+- `ucp.QueryBenchmarkCase(...)` / `ucp.run_query_benchmark_suite(...)` for workflow evaluation
+
 ## Minimal façade
 
 ### Graph façade
@@ -77,6 +83,7 @@ Useful optional arguments:
 - `bindings={...}` to inject parameters or precomputed regexes into the query
 - `include_export=True` to return the final session export alongside the query result
 - `export_kwargs={...}` to control that export
+- `limits=ucp.QueryLimits(...)` to bound model-authored queries
 
 Example:
 
@@ -112,6 +119,52 @@ The result includes:
 Queries are automatically `textwrap.dedent(...)`-ed before execution, so normal indented triple-quoted snippets work as expected.
 
 For CodeGraph sessions, exported nodes include convenient top-level fields like `logical_key`, `path`, and `symbol_name`, which makes lightweight Python ranking/filtering much easier.
+
+## Guarded execution
+
+Use `QueryLimits` to keep model-authored queries bounded:
+
+- `max_seconds`
+- `max_operations`
+- `max_trace_events`
+- `max_stdout_chars`
+
+Example:
+
+```python
+run = ucp.run_python_query(
+    graph,
+    "result = graph.find(node_class='symbol', name_regex='auth', limit=5)",
+    limits=ucp.QueryLimits(max_seconds=2.0, max_operations=40, max_trace_events=2000),
+)
+```
+
+These guards are designed for agent workflows: they keep queries short and cheap without adding a separate graph DSL.
+
+## Provider-facing tool wrapper
+
+`PythonQueryTool` binds a graph/session once and exposes provider-friendly tool definitions plus execution helpers.
+
+```python
+tool = ucp.PythonQueryTool(
+    graph,
+    default_include_export=True,
+    default_limits=ucp.QueryLimits(max_seconds=2.0, max_operations=40),
+)
+
+openai_tool = tool.openai_tool()
+anthropic_tool = tool.anthropic_tool()
+result = tool.execute({"code": "result = graph.find(node_class='symbol', name_regex='auth', limit=5)"})
+```
+
+It also provides:
+
+- `execute_openai_tool_call(...)`
+- `execute_anthropic_tool_use(...)`
+
+See:
+
+- `scripts/demo_codegraph_query_tool_wrapper.py`
 
 ## Typical agent patterns
 
@@ -179,6 +232,22 @@ Start from regex hits like `session|context|render|export`, expand each candidat
 ### Find public wrappers before hydrating source
 
 Use `branch.walk(target, mode="dependents", depth=1)` and rank the exported nodes by top-level `path` / `symbol_name` to find small public wrappers around a deeper helper before spending budget on source hydration.
+
+## Benchmark / evaluation helpers
+
+Use `QueryBenchmarkCase` plus `run_query_benchmark_suite(...)` to encode repeatable agent workflows and track whether the API remains expressive and cheap enough over time.
+
+Typical benchmark cases include:
+
+- trace a public entrypoint to its implementation path
+- rank likely tests for a target symbol
+- compare mirrored handlers or implementations
+- rank candidates before hydrating source
+
+See:
+
+- `scripts/demo_codegraph_query_benchmarks.py`
+- `artifacts/codegraph-query-benchmarks-transcript.md`
 
 See:
 

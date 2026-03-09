@@ -6,8 +6,8 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
 
 ```json
 {
-  "node_count": 5557,
-  "repr": "CodeGraph(nodes=5557)"
+  "node_count": 5621,
+  "repr": "CodeGraph(nodes=5621)"
 }
 ```
 
@@ -17,6 +17,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": [
     {
@@ -50,6 +56,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
     "repositories": 0,
     "selected": 0,
     "symbols": 0
+  },
+  "usage": {
+    "elapsed_seconds": 1.612093,
+    "operation_count": 11,
+    "stdout_chars": 0,
+    "trace_events": 457
   }
 }
 ```
@@ -60,6 +72,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": {
     "ranked": [
@@ -104,14 +122,24 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
         "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_generic_query_facade_supports_agent_friendly_aliases"
       },
       {
-        "path": "crates/ucp-python/tests/test_codegraph.py",
-        "score": 2,
-        "test": "symbol:crates/ucp-python/tests/test_codegraph.py::test_codegraph_build_find_and_roundtrip"
+        "path": "crates/ucp-python/tests/test_query_tools.py",
+        "score": 4,
+        "test": "symbol:crates/ucp-python/tests/test_query_tools.py::test_run_python_query_enforces_max_operations"
       },
       {
-        "path": "crates/ucp-python/tests/test_codegraph.py",
-        "score": 2,
-        "test": "symbol:crates/ucp-python/tests/test_codegraph.py::test_codegraph_sessions_support_agentic_workflows"
+        "path": "crates/ucp-python/tests/test_query_tools.py",
+        "score": 4,
+        "test": "symbol:crates/ucp-python/tests/test_query_tools.py::test_run_python_query_enforces_max_seconds_via_monkeypatched_clock"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_tools.py",
+        "score": 4,
+        "test": "symbol:crates/ucp-python/tests/test_query_tools.py::test_run_python_query_enforces_max_stdout_chars"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_tools.py",
+        "score": 4,
+        "test": "symbol:crates/ucp-python/tests/test_query_tools.py::test_run_python_query_enforces_max_trace_events"
       }
     ],
     "target": "symbol:crates/ucp-python/python/ucp/query.py::run_python_query"
@@ -126,6 +154,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
     "repositories": 0,
     "selected": 0,
     "symbols": 0
+  },
+  "usage": {
+    "elapsed_seconds": 0.273682,
+    "operation_count": 2,
+    "stdout_chars": 0,
+    "trace_events": 1171
   }
 }
 ```
@@ -136,6 +170,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": [
     {
@@ -159,6 +199,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
     "repositories": 0,
     "selected": 0,
     "symbols": 0
+  },
+  "usage": {
+    "elapsed_seconds": 4.14365,
+    "operation_count": 12,
+    "stdout_chars": 0,
+    "trace_events": 478
   }
 }
 ```
@@ -169,8 +215,20 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": [
+    {
+      "edges": 9,
+      "score": 17,
+      "selected": 6,
+      "target": "symbol:crates/ucp-python/python/ucp/query.py::BaseQuerySession"
+    },
     {
       "edges": 8,
       "score": 15,
@@ -182,12 +240,6 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
       "score": 14,
       "selected": 4,
       "target": "symbol:crates/ucp-codegraph/src/context.rs::CodeGraphContextSession"
-    },
-    {
-      "edges": 5,
-      "score": 11,
-      "selected": 4,
-      "target": "symbol:crates/ucp-python/python/ucp/query.py::BaseQuerySession"
     },
     {
       "edges": 5,
@@ -218,6 +270,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
     "repositories": 0,
     "selected": 0,
     "symbols": 0
+  },
+  "usage": {
+    "elapsed_seconds": 7.528892,
+    "operation_count": 49,
+    "stdout_chars": 0,
+    "trace_events": 1967
   }
 }
 ```
@@ -228,6 +286,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": [
     {
@@ -261,6 +325,12 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
     "repositories": 0,
     "selected": 0,
     "symbols": 0
+  },
+  "usage": {
+    "elapsed_seconds": 0.780636,
+    "operation_count": 5,
+    "stdout_chars": 0,
+    "trace_events": 254
   }
 }
 ```

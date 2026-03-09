@@ -91,11 +91,22 @@ from ucp.query import (
     CodeQuerySession,
     QueryExecutionError,
     QueryGraph,
+    QueryLimitExceededError,
+    QueryLimits,
     QueryRunResult,
     QuerySession,
+    QueryUsage,
     query,
     run_python_query,
 )
+from ucp.query_benchmarks import (
+    QueryBenchmarkCase,
+    QueryBenchmarkResult,
+    run_query_benchmark,
+    run_query_benchmark_suite,
+    summarize_query_benchmark_suite,
+)
+from ucp.query_tools import PythonQueryTool, QueryToolResult
 
 __version__ = "0.1.9"
 __all__ = [
@@ -179,6 +190,16 @@ __all__ = [
     "CodeQuerySession",
     "QueryRunResult",
     "QueryExecutionError",
+    "QueryLimitExceededError",
+    "QueryLimits",
+    "QueryUsage",
+    "PythonQueryTool",
+    "QueryToolResult",
+    "QueryBenchmarkCase",
+    "QueryBenchmarkResult",
     "query",
     "run_python_query",
+    "run_query_benchmark",
+    "run_query_benchmark_suite",
+    "summarize_query_benchmark_suite",
 ]

@@ -6,8 +6,8 @@ This transcript demonstrates agent-style repository querying through the thin Py
 
 ```json
 {
-  "nodes": 5557,
-  "repr": "CodeGraph(nodes=5557)"
+  "nodes": 5621,
+  "repr": "CodeGraph(nodes=5621)"
 }
 ```
 
@@ -349,7 +349,7 @@ This transcript demonstrates agent-style repository querying through the thin Py
         "symbol_name": "read_stateful_document"
       }
     ],
-    "omitted_symbol_count": 5316,
+    "omitted_symbol_count": 5375,
     "summary": {
       "directories": 0,
       "files": 0,
@@ -361,6 +361,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
     },
     "total_selected_edges": 4,
     "visible_node_count": 5
+  },
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
   },
   "ok": true,
   "result": {
@@ -952,7 +958,7 @@ This transcript demonstrates agent-style repository querying through the thin Py
           "symbol_name": "read_stateful_document"
         }
       ],
-      "omitted_symbol_count": 5316,
+      "omitted_symbol_count": 5375,
       "summary": {
         "directories": 0,
         "files": 0,
@@ -982,6 +988,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
     "repositories": 0,
     "selected": 5,
     "symbols": 5
+  },
+  "usage": {
+    "elapsed_seconds": 3.421007,
+    "operation_count": 23,
+    "stdout_chars": 0,
+    "trace_events": 945
   }
 }
 ```
@@ -1225,7 +1237,7 @@ This transcript demonstrates agent-style repository querying through the thin Py
       "symbol_name": "read_stateful_document"
     }
   ],
-  "omitted_symbol_count": 5316,
+  "omitted_symbol_count": 5375,
   "summary": {
     "directories": 0,
     "files": 0,

@@ -4,6 +4,12 @@ Python bindings for the Rust UCP implementation, including both the generic UCP 
 
 For agent workflows, prefer the thin Python façade exposed by `ucp.query(...)` and `ucp.run_python_query(...)`.
 
+For model/runtime integration, also see:
+
+- `ucp.QueryLimits(...)`
+- `ucp.PythonQueryTool(...)`
+- `ucp.QueryBenchmarkCase(...)` and `ucp.run_query_benchmark_suite(...)`
+
 ## Installation
 
 ```bash
@@ -90,6 +96,50 @@ The runner prebinds `graph`, `session`, `re`, `json`, `math`, and `collections` 
 It also accepts `bindings={...}` for parameterized queries and automatically dedents normal triple-quoted snippets before execution.
 
 For CodeGraph, exported nodes also surface convenient top-level fields like `logical_key`, `path`, and `symbol_name`, so Python scoring/filtering code does not have to dig through nested `coderef` objects.
+
+### Guarded execution
+
+```python
+run = ucp.run_python_query(
+    graph,
+    "result = graph.find(node_class='symbol', name_regex='auth', limit=5)",
+    limits=ucp.QueryLimits(max_seconds=2.0, max_operations=40, max_trace_events=2000),
+)
+```
+
+`QueryLimits` keeps model-authored queries bounded by wall-clock time, graph/session operations, traced Python events, and stdout size.
+
+### Provider-facing tool wrapper
+
+```python
+tool = ucp.PythonQueryTool(
+    graph,
+    default_include_export=True,
+    default_limits=ucp.QueryLimits(max_seconds=2.0, max_operations=40),
+)
+
+openai_tool = tool.openai_tool()
+result = tool.execute({"code": "result = graph.find(node_class='symbol', name_regex='auth', limit=5)"})
+```
+
+The wrapper also supports:
+
+- `tool.execute_openai_tool_call(...)`
+- `tool.execute_anthropic_tool_use(...)`
+
+### Benchmark helpers
+
+```python
+cases = [
+    ucp.QueryBenchmarkCase(
+        name="rank-tests",
+        description="Rank likely tests for a symbol",
+        code="result = graph.find(node_class='symbol', path_regex=r'tests/.*', limit=10)",
+    )
+]
+results = ucp.run_query_benchmark_suite(graph, cases)
+summary = ucp.summarize_query_benchmark_suite(results)
+```
 
 Example with parameterized regexes:
 
@@ -181,6 +231,8 @@ print(session.export())
 - `docs/ucp-cli/codegraph.md`
 - `scripts/demo_ucp_python_query.py`
 - `scripts/demo_codegraph_python_query.py`
+- `scripts/demo_codegraph_query_tool_wrapper.py`
+- `scripts/demo_codegraph_query_benchmarks.py`
 - `scripts/demo_codegraph_query_recipes.py`
 - `scripts/demo_codegraph_query_edge_cases.py`
 - `scripts/demo_codegraph_context_walk.py`

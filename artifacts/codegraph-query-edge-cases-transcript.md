@@ -8,6 +8,12 @@ This transcript exercises common ergonomic edge cases for model-authored Python 
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": "symbol:crates/ucp-cli/src/commands/agent.rs::context_show",
   "selected_block_ids": [],
@@ -20,6 +26,12 @@ This transcript exercises common ergonomic edge cases for model-authored Python 
     "repositories": 0,
     "selected": 0,
     "symbols": 0
+  },
+  "usage": {
+    "elapsed_seconds": 0.183156,
+    "operation_count": 1,
+    "stdout_chars": 0,
+    "trace_events": 54
   }
 }
 ```
@@ -30,6 +42,12 @@ This transcript exercises common ergonomic edge cases for model-authored Python 
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": {
     "has_logical_key": true,
@@ -45,6 +63,12 @@ This transcript exercises common ergonomic edge cases for model-authored Python 
     "repositories": 0,
     "selected": 0,
     "symbols": 0
+  },
+  "usage": {
+    "elapsed_seconds": 0.177758,
+    "operation_count": 1,
+    "stdout_chars": 0,
+    "trace_events": 52
   }
 }
 ```
@@ -55,6 +79,12 @@ This transcript exercises common ergonomic edge cases for model-authored Python 
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": {
     "count": 4,
@@ -72,6 +102,12 @@ This transcript exercises common ergonomic edge cases for model-authored Python 
     "repositories": 0,
     "selected": 1,
     "symbols": 1
+  },
+  "usage": {
+    "elapsed_seconds": 0.325546,
+    "operation_count": 2,
+    "stdout_chars": 0,
+    "trace_events": 97
   }
 }
 ```
@@ -82,6 +118,12 @@ This transcript exercises common ergonomic edge cases for model-authored Python 
 {
   "error": null,
   "export": null,
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": 1,
   "selected_block_ids": [
@@ -96,6 +138,12 @@ This transcript exercises common ergonomic edge cases for model-authored Python 
     "repositories": 0,
     "selected": 1,
     "symbols": 1
+  },
+  "usage": {
+    "elapsed_seconds": 0.449877,
+    "operation_count": 3,
+    "stdout_chars": 0,
+    "trace_events": 130
   }
 }
 ```

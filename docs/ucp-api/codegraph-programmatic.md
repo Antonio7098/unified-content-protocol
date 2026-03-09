@@ -106,6 +106,8 @@ Use `ucp.run_python_query(...)` when you want the model to mix those primitives 
 
 For richer cookbook-style examples on the UCP repo itself, see `docs/ucp-api/python-query-tools.md` plus the recipe/edge-case smoke scripts under `scripts/`.
 
+For provider/tool integration, guarded execution, and benchmark-style workflow evaluation, also see the `PythonQueryTool`, `QueryLimits`, and `QueryBenchmarkCase` sections in `docs/ucp-api/python-query-tools.md`.
+
 ## Agent-oriented patterns
 
 ### Regex-driven discovery

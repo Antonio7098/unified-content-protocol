@@ -7,8 +7,8 @@ This transcript demonstrates the thin agent-facing Python façade over the gener
 ```json
 {
   "backend": "memory",
-  "captured_at": "2026-03-09T10:44:16.086571476Z",
-  "document_id": "doc_189b265c47ee8b1c",
+  "captured_at": "2026-03-09T11:08:42.630258370Z",
+  "document_id": "doc_189b27b1bcbe189a",
   "explicit_edge_count": 1,
   "node_count": 4,
   "root_block_id": "blk_ff0000000000000000000000",
@@ -103,6 +103,12 @@ This transcript demonstrates the thin agent-facing Python façade over the gener
       "selected": 2
     }
   },
+  "limits": {
+    "max_operations": null,
+    "max_seconds": null,
+    "max_stdout_chars": null,
+    "max_trace_events": null
+  },
   "ok": true,
   "result": {
     "labels": [
@@ -192,6 +198,12 @@ This transcript demonstrates the thin agent-facing Python façade over the gener
     "pinned": 0,
     "roots": 0,
     "selected": 2
+  },
+  "usage": {
+    "elapsed_seconds": 0.010325,
+    "operation_count": 5,
+    "stdout_chars": 0,
+    "trace_events": 701
   }
 }
 ```
