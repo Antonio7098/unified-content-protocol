@@ -11,7 +11,8 @@ pub(super) fn analyze_file(path: &str, source: &str, language: CodeLanguage) -> 
     let mut analysis = FileAnalysis::default();
     analysis.file_description = extract_file_description(source, language);
     let mut parser = Parser::new();
-    if parser.set_language(language_for(language)).is_err() {
+    let tree_sitter_language = language_for(language);
+    if parser.set_language(&tree_sitter_language).is_err() {
         analysis.diagnostics.push(
             CodeGraphDiagnostic::error(
                 "CG2010",
@@ -64,10 +65,10 @@ pub(super) fn analyze_file(path: &str, source: &str, language: CodeLanguage) -> 
 
 pub(super) fn language_for(language: CodeLanguage) -> Language {
     match language {
-        CodeLanguage::Rust => tree_sitter_rust::language(),
-        CodeLanguage::Python => tree_sitter_python::language(),
-        CodeLanguage::TypeScript => tree_sitter_typescript::language_typescript(),
-        CodeLanguage::JavaScript => tree_sitter_javascript::language(),
+        CodeLanguage::Rust => tree_sitter_rust::LANGUAGE.into(),
+        CodeLanguage::Python => tree_sitter_python::LANGUAGE.into(),
+        CodeLanguage::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+        CodeLanguage::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
     }
 }
 

@@ -19,13 +19,13 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 chrono = { workspace = true }
 # Pin exact Tree-sitter versions so manifest-path builds (maturin/wasm-pack)
-# stay on a single compatible API surface across workspace, Python, and WASM
-# builds even when they resolve outside the workspace lockfile.
-tree-sitter = "=0.20.10"
-tree-sitter-rust = "=0.20.3"
-tree-sitter-python = "=0.20.3"
-tree-sitter-typescript = "=0.20.3"
-tree-sitter-javascript = "=0.20.0"
+# stay on a single compatible API surface even when they resolve outside the
+# workspace lockfile.
+tree-sitter = "=0.26.6"
+tree-sitter-rust = "=0.24.0"
+tree-sitter-python = "=0.25.0"
+tree-sitter-typescript = "=0.23.2"
+tree-sitter-javascript = "=0.25.0"
 
 [dev-dependencies]
 tempfile = "3.10"
