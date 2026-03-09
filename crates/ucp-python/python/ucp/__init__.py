@@ -108,7 +108,7 @@ from ucp.query_benchmarks import (
 )
 from ucp.query_tools import PythonQueryTool, QueryToolResult
 
-__version__ = "0.1.9"
+__version__ = "0.1.14"
 __all__ = [
     # Classes
     "BlockId",

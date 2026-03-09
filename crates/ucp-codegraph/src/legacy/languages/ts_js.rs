@@ -636,9 +636,7 @@ pub(super) fn ts_commonjs_symbol_from_expression(
     export_name: &str,
 ) -> Option<ExtractedSymbol> {
     let kind = match node.kind() {
-        "function" | "function_expression" | "generator_function" | "arrow_function" => {
-            "function"
-        }
+        "function" | "function_expression" | "generator_function" | "arrow_function" => "function",
         "class" => "class",
         _ => return None,
     };

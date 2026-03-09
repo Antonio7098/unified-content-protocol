@@ -18,7 +18,7 @@ UCM Core is the foundation of the UCP ecosystem. It defines:
 === "Rust"
     ```toml
     [dependencies]
-    ucm-core = "0.1.13"
+    ucm-core = "0.1.14"
     ```
 
 === "Python"
