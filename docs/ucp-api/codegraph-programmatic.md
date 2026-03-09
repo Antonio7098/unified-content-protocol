@@ -104,6 +104,8 @@ Wrap a raw graph with `ucp.query(...)` and use the thinner names:
 
 Use `ucp.run_python_query(...)` when you want the model to mix those primitives with Python loops, regex, and branching logic.
 
+For richer cookbook-style examples on the UCP repo itself, see `docs/ucp-api/python-query-tools.md` plus the recipe/edge-case smoke scripts under `scripts/`.
+
 ## Agent-oriented patterns
 
 ### Regex-driven discovery

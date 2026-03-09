@@ -6,6 +6,7 @@ import io
 import json
 import math
 import re
+import textwrap
 import traceback as traceback_module
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional
@@ -18,6 +19,7 @@ _SAFE_BUILTINS = {
     "any": any,
     "AssertionError": AssertionError,
     "bool": bool,
+    "callable": callable,
     "dict": dict,
     "enumerate": enumerate,
     "Exception": Exception,
@@ -27,11 +29,13 @@ _SAFE_BUILTINS = {
     "hasattr": hasattr,
     "int": int,
     "isinstance": isinstance,
+    "iter": iter,
     "len": len,
     "list": list,
     "map": map,
     "max": max,
     "min": min,
+    "next": next,
     "print": print,
     "range": range,
     "repr": repr,
@@ -43,6 +47,7 @@ _SAFE_BUILTINS = {
     "str": str,
     "sum": sum,
     "tuple": tuple,
+    "type": type,
     "TypeError": TypeError,
     "ValueError": ValueError,
     "zip": zip,
@@ -313,7 +318,7 @@ def run_python_query(
 
 
 def _compile_query(code: str) -> tuple[str, Any]:
-    source = code.strip()
+    source = textwrap.dedent(code).strip()
     try:
         return "eval", compile(source, "<ucp-python-query>", "eval")
     except SyntaxError:

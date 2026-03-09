@@ -87,6 +87,24 @@ result = {
     assert run.as_dict()["ok"] is True
 
 
+def test_run_python_query_dedents_common_triple_quoted_snippets_and_exposes_common_builtins():
+    import ucp
+
+    graph = ucp.query(ucp.Graph.from_document(_build_doc(ucp)))
+    run = ucp.run_python_query(
+        graph,
+        """
+            hits = graph.find(label_regex="note|helper")
+            chosen = next(node for node in hits if node["label"] == "helper")
+            session.add(chosen, detail="summary")
+            result = type(chosen).__name__, session.summary()["selected"]
+        """,
+    )
+
+    assert run.ok is True
+    assert run.result == ("dict", 1)
+
+
 def test_run_python_query_reports_errors_and_can_raise():
     import ucp
 
@@ -118,6 +136,28 @@ def test_run_python_query_accepts_raw_graph_and_raw_session():
     assert run.ok is True
     assert run.result == 1
     assert run.summary["selected"] == 1
+
+
+def test_run_python_query_supports_bindings_for_parameterized_queries(tmp_path):
+    import ucp
+
+    _write_repo(tmp_path)
+    graph = ucp.query(ucp.CodeGraph.build(str(tmp_path)))
+    run = ucp.run_python_query(
+        graph,
+        """
+            candidates = graph.find(node_class="symbol", path_regex=path_rx, name_regex=name_rx, limit=4)
+            session.add(candidates[0], detail="summary")
+            result = candidates[0]["logical_key"]
+        """,
+        bindings={
+            "path_rx": r"src/lib\.rs|src/util\.rs",
+            "name_rx": r"add|util",
+        },
+    )
+
+    assert run.ok is True
+    assert run.result == "symbol:src/lib.rs::add"
 
 
 def test_codegraph_query_facade_supports_minimal_agent_surface(tmp_path):

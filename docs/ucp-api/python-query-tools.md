@@ -72,6 +72,12 @@ Use `ucp.run_python_query(...)` to execute short Python snippets against preboun
 - `raw_session`
 - `re`, `json`, `math`, `collections`
 
+Useful optional arguments:
+
+- `bindings={...}` to inject parameters or precomputed regexes into the query
+- `include_export=True` to return the final session export alongside the query result
+- `export_kwargs={...}` to control that export
+
 Example:
 
 ```python
@@ -103,6 +109,8 @@ The result includes:
 - optional `export`
 - structured error details if execution failed
 
+Queries are automatically `textwrap.dedent(...)`-ed before execution, so normal indented triple-quoted snippets work as expected.
+
 ## Typical agent patterns
 
 ### Regex discovery + walk
@@ -120,6 +128,25 @@ Use `graph.path(...)` or `session.path(...)` to connect two nodes without expand
 ### Hydrate only after ranking
 
 On CodeGraph, delay `session.hydrate(...)` until Python has already ranked the interesting symbols.
+
+## Concrete UCP-repo recipe ideas
+
+### Compare mirrored CLI handlers
+
+Use `find(...)` to locate both `agent.rs::context_show` and `codegraph.rs::context_show`, then fork a branch for each and compare dependency neighborhoods.
+
+### Explain a command-to-render path
+
+Use `graph.path(...)` to connect a CLI entrypoint like `context_show` to symbols such as `make_export_config` or `export_codegraph_context_with_config`.
+
+### Rank symbols by local evidence
+
+Start from regex hits like `session|context|render|export`, expand each candidate one hop in a branch, and score by selected-node count, visible edges, and frontier richness.
+
+See:
+
+- `scripts/demo_codegraph_query_recipes.py`
+- `scripts/demo_codegraph_query_edge_cases.py`
 
 ## Safety model
 

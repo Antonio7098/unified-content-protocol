@@ -7,8 +7,8 @@ This transcript demonstrates the thin agent-facing Python façade over the gener
 ```json
 {
   "backend": "memory",
-  "captured_at": "2026-03-08T21:29:48.619376606Z",
-  "document_id": "doc_189afb01d5781003",
+  "captured_at": "2026-03-09T10:23:46.163889716Z",
+  "document_id": "doc_189b253dead1f516",
   "explicit_edge_count": 1,
   "node_count": 4,
   "root_block_id": "blk_ff0000000000000000000000",

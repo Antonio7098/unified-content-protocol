@@ -87,6 +87,26 @@ print(run.summary)
 
 The runner prebinds `graph`, `session`, `re`, `json`, `math`, and `collections` so the caller can use loops, conditionals, regex, and branching without writing a graph DSL.
 
+It also accepts `bindings={...}` for parameterized queries and automatically dedents normal triple-quoted snippets before execution.
+
+Example with parameterized regexes:
+
+```python
+run = ucp.run_python_query(
+    graph,
+    """
+        hits = graph.find(node_class="symbol", path_regex=path_rx, name_regex=name_rx, limit=6)
+        best = next(node for node in hits if "context_show" in node["logical_key"])
+        session.add(best, detail="summary")
+        result = session.export(compact=True)
+    """,
+    bindings={
+        "path_rx": r"crates/ucp-cli/src/commands/(agent|codegraph)\.rs",
+        "name_rx": r"context_show|get_session_mut",
+    },
+)
+```
+
 ## Generic graph usage
 
 ```python
@@ -144,4 +164,6 @@ print(session.export())
 - `docs/ucp-cli/codegraph.md`
 - `scripts/demo_ucp_python_query.py`
 - `scripts/demo_codegraph_python_query.py`
+- `scripts/demo_codegraph_query_recipes.py`
+- `scripts/demo_codegraph_query_edge_cases.py`
 - `scripts/demo_codegraph_context_walk.py`

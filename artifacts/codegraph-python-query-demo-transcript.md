@@ -6,8 +6,8 @@ This transcript demonstrates agent-style repository querying through the thin Py
 
 ```json
 {
-  "nodes": 5548,
-  "repr": "CodeGraph(nodes=5548)"
+  "nodes": 5557,
+  "repr": "CodeGraph(nodes=5557)"
 }
 ```
 
@@ -339,7 +339,7 @@ This transcript demonstrates agent-style repository querying through the thin Py
         "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]"
       }
     ],
-    "omitted_symbol_count": 5309,
+    "omitted_symbol_count": 5316,
     "summary": {
       "directories": 0,
       "files": 0,
@@ -932,7 +932,7 @@ This transcript demonstrates agent-style repository querying through the thin Py
           "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]"
         }
       ],
-      "omitted_symbol_count": 5309,
+      "omitted_symbol_count": 5316,
       "summary": {
         "directories": 0,
         "files": 0,
@@ -1195,7 +1195,7 @@ This transcript demonstrates agent-style repository querying through the thin Py
       "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]"
     }
   ],
-  "omitted_symbol_count": 5309,
+  "omitted_symbol_count": 5316,
   "summary": {
     "directories": 0,
     "files": 0,
