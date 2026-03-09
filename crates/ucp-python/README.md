@@ -89,6 +89,8 @@ The runner prebinds `graph`, `session`, `re`, `json`, `math`, and `collections` 
 
 It also accepts `bindings={...}` for parameterized queries and automatically dedents normal triple-quoted snippets before execution.
 
+For CodeGraph, exported nodes also surface convenient top-level fields like `logical_key`, `path`, and `symbol_name`, so Python scoring/filtering code does not have to dig through nested `coderef` objects.
+
 Example with parameterized regexes:
 
 ```python
@@ -105,6 +107,21 @@ run = ucp.run_python_query(
         "name_rx": r"context_show|get_session_mut",
     },
 )
+```
+
+Example: rank likely tests for a symbol with plain Python heuristics:
+
+```python
+target = graph.find(node_class="symbol", path_regex=r"crates/ucp-python/python/ucp/query\.py", name_regex=r"^run_python_query$", limit=1)[0]
+tests = graph.find(node_class="symbol", path_regex=r"crates/ucp-python/tests/.*\.py", name_regex=r"test_.*query.*", limit=80)
+target_words = set(re.findall(r"[A-Za-z]+", target["logical_key"].lower()))
+ranked = []
+for node in tests:
+    words = set(re.findall(r"[A-Za-z]+", (node.get("logical_key") or "").lower()))
+    score = len((target_words & words) - {"symbol", "py", "python"})
+    if score:
+        ranked.append((score, node["logical_key"]))
+print(sorted(ranked, reverse=True)[:5])
 ```
 
 ## Generic graph usage

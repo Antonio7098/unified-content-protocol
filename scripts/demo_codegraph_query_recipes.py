@@ -67,6 +67,42 @@ def main():
         ),
         run_recipe(
             graph,
+            "Rank the most relevant tests for run_python_query",
+            r"""
+                target = graph.find(
+                    node_class="symbol",
+                    path_regex=r"crates/ucp-python/python/ucp/query\.py",
+                    name_regex=r"^run_python_query$",
+                    limit=1,
+                )[0]
+                tests = graph.find(
+                    node_class="symbol",
+                    path_regex=r"crates/ucp-python/tests/.*\.py",
+                    name_regex=r"test_.*query.*|test_.*python.*|test_.*codegraph.*",
+                    limit=80,
+                )
+                target_words = set(re.findall(r"[A-Za-z]+", target["logical_key"].lower()))
+                ranked = []
+                for node in tests:
+                    key = node.get("logical_key") or ""
+                    words = set(re.findall(r"[A-Za-z]+", key.lower()))
+                    score = len((target_words & words) - {"symbol", "py", "python"})
+                    if "query_api" in key:
+                        score += 2
+                    if score:
+                        ranked.append({
+                            "test": key,
+                            "path": node.get("path"),
+                            "score": score,
+                        })
+                result = {
+                    "target": target["logical_key"],
+                    "ranked": sorted(ranked, key=lambda item: (-item["score"], item["test"]))[:12],
+                }
+            """,
+        ),
+        run_recipe(
+            graph,
             "Trace context_show to render configuration symbols",
             """
                 starts = graph.find(node_class="symbol", path_regex=cli_rx, name_regex=r"^context_show$", limit=2)
@@ -114,6 +150,32 @@ def main():
                 result = sorted(scored, key=lambda item: (-item["score"], item["target"]))[:6]
             """,
             bindings={"path_rx": r"crates/ucp-(cli|codegraph|python)/"},
+        ),
+        run_recipe(
+            graph,
+            "Find lightweight public wrappers around run_python_query",
+            r"""
+                target = graph.find(
+                    node_class="symbol",
+                    path_regex=r"crates/ucp-python/python/ucp/query\.py",
+                    name_regex=r"^run_python_query$",
+                    limit=1,
+                )[0]
+                branch = session.fork()
+                branch.add(target, detail="summary")
+                branch.walk(target, mode="dependents", depth=1, limit=20)
+                exported = branch.export(compact=True, max_frontier_actions=8)
+                ranked = []
+                for node in exported["nodes"]:
+                    path = node.get("path") or ""
+                    if path == "crates/ucp-python/python/ucp/query.py":
+                        ranked.append({
+                            "logical_key": node.get("logical_key"),
+                            "path": path,
+                            "detail": node.get("detail_level"),
+                        })
+                result = ranked
+            """,
         ),
     ]
 

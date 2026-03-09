@@ -54,6 +54,82 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
 }
 ```
 
+## Rank the most relevant tests for run_python_query
+
+```json
+{
+  "error": null,
+  "export": null,
+  "ok": true,
+  "result": {
+    "ranked": [
+      {
+        "path": "crates/ucp-python/tests/test_query_api.py",
+        "score": 6,
+        "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_run_python_query_accepts_raw_graph_and_raw_session"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_api.py",
+        "score": 6,
+        "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_run_python_query_dedents_common_triple_quoted_snippets_and_exposes_common_builtins"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_api.py",
+        "score": 6,
+        "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_run_python_query_executes_python_control_flow_and_returns_state"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_api.py",
+        "score": 6,
+        "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_run_python_query_reports_errors_and_can_raise"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_api.py",
+        "score": 6,
+        "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_run_python_query_supports_bindings_for_parameterized_queries"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_api.py",
+        "score": 5,
+        "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_codegraph_query_facade_supports_minimal_agent_surface"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_api.py",
+        "score": 5,
+        "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_codegraph_query_runner_supports_branch_and_compare"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_query_api.py",
+        "score": 5,
+        "test": "symbol:crates/ucp-python/tests/test_query_api.py::test_generic_query_facade_supports_agent_friendly_aliases"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_codegraph.py",
+        "score": 2,
+        "test": "symbol:crates/ucp-python/tests/test_codegraph.py::test_codegraph_build_find_and_roundtrip"
+      },
+      {
+        "path": "crates/ucp-python/tests/test_codegraph.py",
+        "score": 2,
+        "test": "symbol:crates/ucp-python/tests/test_codegraph.py::test_codegraph_sessions_support_agentic_workflows"
+      }
+    ],
+    "target": "symbol:crates/ucp-python/python/ucp/query.py::run_python_query"
+  },
+  "selected_block_ids": [],
+  "stdout": "",
+  "summary": {
+    "directories": 0,
+    "files": 0,
+    "hydrated_sources": 0,
+    "max_selected": 48,
+    "repositories": 0,
+    "selected": 0,
+    "symbols": 0
+  }
+}
+```
+
 ## Trace context_show to render configuration symbols
 
 ```json
@@ -130,6 +206,49 @@ This transcript captures a few higher-level recipe patterns over the UCP codebas
       "score": 10,
       "selected": 3,
       "target": "symbol:crates/ucp-codegraph/src/context.rs::CodeGraphContextFrontierAction"
+    }
+  ],
+  "selected_block_ids": [],
+  "stdout": "",
+  "summary": {
+    "directories": 0,
+    "files": 0,
+    "hydrated_sources": 0,
+    "max_selected": 48,
+    "repositories": 0,
+    "selected": 0,
+    "symbols": 0
+  }
+}
+```
+
+## Find lightweight public wrappers around run_python_query
+
+```json
+{
+  "error": null,
+  "export": null,
+  "ok": true,
+  "result": [
+    {
+      "detail": "neighborhood",
+      "logical_key": "symbol:crates/ucp-python/python/ucp/query.py::run_python_query",
+      "path": "crates/ucp-python/python/ucp/query.py"
+    },
+    {
+      "detail": "symbol_card",
+      "logical_key": "symbol:crates/ucp-python/python/ucp/query.py::BaseQueryGraph::run",
+      "path": "crates/ucp-python/python/ucp/query.py"
+    },
+    {
+      "detail": "symbol_card",
+      "logical_key": "symbol:crates/ucp-python/python/ucp/query.py::BaseQuerySession::run",
+      "path": "crates/ucp-python/python/ucp/query.py"
+    },
+    {
+      "detail": "skeleton",
+      "logical_key": "file:crates/ucp-python/python/ucp/query.py",
+      "path": "crates/ucp-python/python/ucp/query.py"
     }
   ],
   "selected_block_ids": [],

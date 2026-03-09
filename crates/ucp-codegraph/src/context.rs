@@ -297,6 +297,10 @@ pub struct CodeGraphContextNodeExport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logical_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub docs: Option<String>,
@@ -1174,6 +1178,15 @@ impl CodeGraphContextSession {
                 .display_label(doc, &block_id)
                 .unwrap_or_else(|| block_id.to_string());
             let logical_key = block_logical_key(block);
+            let content_name = content_string(block, "name");
+            let symbol_name = block
+                .metadata
+                .custom
+                .get(META_SYMBOL_NAME)
+                .and_then(Value::as_str)
+                .or(content_name.as_deref())
+                .map(str::to_string);
+            let path = metadata_coderef_path(block).or_else(|| content_coderef_path(block));
             let distance_from_focus = distances.get(&block_id).copied();
             let relevance_score =
                 relevance_score_for_node(self, &index, block_id, distance_from_focus);
@@ -1228,6 +1241,8 @@ impl CodeGraphContextSession {
                 distance_from_focus,
                 relevance_score,
                 logical_key,
+                symbol_name,
+                path,
                 signature,
                 docs,
                 origin: node.origin.clone(),
@@ -3115,6 +3130,8 @@ mod tests {
         assert_eq!(export.focus, Some(add_id));
         assert!(export.nodes.iter().any(|node| {
             node.block_id == add_id
+                && node.symbol_name.as_deref() == Some("add")
+                && node.path.as_deref() == Some("src/lib.rs")
                 && node
                     .origin
                     .as_ref()

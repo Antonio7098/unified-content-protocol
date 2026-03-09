@@ -59,6 +59,11 @@ def test_codegraph_sessions_support_agentic_workflows(tmp_path):
     exported = branch.export(compact=True, max_frontier_actions=4)
     assert exported["nodes"]
     assert exported["frontier"] is not None
+    add_node = next(
+        node for node in exported["nodes"] if node["logical_key"] == "symbol:src/lib.rs::add"
+    )
+    assert add_node["symbol_name"] == "add"
+    assert add_node["path"] == "src/lib.rs"
 
     branch.focus("symbol:src/util.rs::util")
     collapsed = branch.collapse("symbol:src/util.rs::util")

@@ -111,7 +111,19 @@ The result includes:
 
 Queries are automatically `textwrap.dedent(...)`-ed before execution, so normal indented triple-quoted snippets work as expected.
 
+For CodeGraph sessions, exported nodes include convenient top-level fields like `logical_key`, `path`, and `symbol_name`, which makes lightweight Python ranking/filtering much easier.
+
 ## Typical agent patterns
+
+This style is especially good for agents that need to build context incrementally rather than request one giant dump.
+
+Common use cases include:
+
+- tracing an entrypoint to an implementation detail
+- ranking likely tests for a changed symbol
+- comparing multiple candidate entrypoints before hydrating source
+- finding mirrored implementations and diffing their neighborhoods
+- gathering the smallest working set that still explains a bug or feature
 
 ### Regex discovery + walk
 
@@ -129,6 +141,27 @@ Use `graph.path(...)` or `session.path(...)` to connect two nodes without expand
 
 On CodeGraph, delay `session.hydrate(...)` until Python has already ranked the interesting symbols.
 
+### Rank tests with lightweight Python heuristics
+
+An agent does not need a special backend primitive for “find the most relevant tests”. It can combine regex search with a small scoring function:
+
+```python
+target = graph.find(node_class="symbol", path_regex=target_rx, name_regex=r"^run_python_query$", limit=1)[0]
+tests = graph.find(node_class="symbol", path_regex=r"crates/ucp-python/tests/.*\.py", name_regex=r"test_.*query.*", limit=80)
+target_words = set(re.findall(r"[A-Za-z]+", target["logical_key"].lower()))
+ranked = []
+for node in tests:
+    words = set(re.findall(r"[A-Za-z]+", (node.get("logical_key") or "").lower()))
+    score = len((target_words & words) - {"symbol", "py", "python"})
+    if "query_api" in (node.get("path") or ""):
+        score += 2
+    if score:
+        ranked.append((score, node["logical_key"]))
+best = sorted(ranked, reverse=True)[:5]
+```
+
+This keeps the backend minimal while still enabling highly targeted evidence gathering.
+
 ## Concrete UCP-repo recipe ideas
 
 ### Compare mirrored CLI handlers
@@ -142,6 +175,10 @@ Use `graph.path(...)` to connect a CLI entrypoint like `context_show` to symbols
 ### Rank symbols by local evidence
 
 Start from regex hits like `session|context|render|export`, expand each candidate one hop in a branch, and score by selected-node count, visible edges, and frontier richness.
+
+### Find public wrappers before hydrating source
+
+Use `branch.walk(target, mode="dependents", depth=1)` and rank the exported nodes by top-level `path` / `symbol_name` to find small public wrappers around a deeper helper before spending budget on source hydration.
 
 See:
 

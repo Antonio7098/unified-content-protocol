@@ -240,10 +240,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
         "origin": {
           "kind": "manual"
         },
+        "path": "crates/ucp-cli/src/commands/codegraph.rs",
         "pinned": false,
         "relevance_score": 224,
         "short_id": "S1",
-        "signature": "function context_show(input: Option<String>, session: String, max_tokens: usize, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<String>, exclude: Option<String>, format: OutputFormat) -> Result<()>"
+        "signature": "function context_show(input: Option<String>, session: String, max_tokens: usize, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<String>, exclude: Option<String>, format: OutputFormat) -> Result<()>",
+        "symbol_name": "context_show"
       },
       {
         "block_id": "blk_53fa15e7333e649f4eb74d9c",
@@ -263,10 +265,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
           "kind": "dependencies",
           "relation": "uses_symbol"
         },
+        "path": "crates/ucp-cli/src/commands/codegraph.rs",
         "pinned": false,
         "relevance_score": 84,
         "short_id": "S2",
-        "signature": "function ensure_codegraph_document(doc: &Document) -> Result<()>"
+        "signature": "function ensure_codegraph_document(doc: &Document) -> Result<()>",
+        "symbol_name": "ensure_codegraph_document"
       },
       {
         "block_id": "blk_d1fab9b7f09d11d524cad890",
@@ -286,10 +290,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
           "kind": "dependencies",
           "relation": "uses_symbol"
         },
+        "path": "crates/ucp-cli/src/commands/codegraph.rs",
         "pinned": false,
         "relevance_score": 84,
         "short_id": "S3",
-        "signature": "function get_session(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState>"
+        "signature": "function get_session(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState>",
+        "symbol_name": "get_session"
       },
       {
         "block_id": "blk_384b68c8c1725eba6a9eb9da",
@@ -309,10 +315,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
           "kind": "dependencies",
           "relation": "uses_symbol"
         },
+        "path": "crates/ucp-cli/src/commands/codegraph.rs",
         "pinned": false,
         "relevance_score": 84,
         "short_id": "S4",
-        "signature": "function make_export_config(preferences: &CodeGraphSessionPreferences, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<&str>, exclude: Option<&str>) -> Result<CodeGraphExportConfig>"
+        "signature": "function make_export_config(preferences: &CodeGraphSessionPreferences, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<&str>, exclude: Option<&str>) -> Result<CodeGraphExportConfig>",
+        "symbol_name": "make_export_config"
       },
       {
         "block_id": "blk_0c6c13995a670d18a116596b",
@@ -333,10 +341,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
           "kind": "dependencies",
           "relation": "uses_symbol"
         },
+        "path": "crates/ucp-cli/src/state.rs",
         "pinned": false,
         "relevance_score": 84,
         "short_id": "S5",
-        "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]"
+        "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]",
+        "symbol_name": "read_stateful_document"
       }
     ],
     "omitted_symbol_count": 5316,
@@ -833,10 +843,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
           "origin": {
             "kind": "manual"
           },
+          "path": "crates/ucp-cli/src/commands/codegraph.rs",
           "pinned": false,
           "relevance_score": 224,
           "short_id": "S1",
-          "signature": "function context_show(input: Option<String>, session: String, max_tokens: usize, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<String>, exclude: Option<String>, format: OutputFormat) -> Result<()>"
+          "signature": "function context_show(input: Option<String>, session: String, max_tokens: usize, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<String>, exclude: Option<String>, format: OutputFormat) -> Result<()>",
+          "symbol_name": "context_show"
         },
         {
           "block_id": "blk_53fa15e7333e649f4eb74d9c",
@@ -856,10 +868,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
             "kind": "dependencies",
             "relation": "uses_symbol"
           },
+          "path": "crates/ucp-cli/src/commands/codegraph.rs",
           "pinned": false,
           "relevance_score": 84,
           "short_id": "S2",
-          "signature": "function ensure_codegraph_document(doc: &Document) -> Result<()>"
+          "signature": "function ensure_codegraph_document(doc: &Document) -> Result<()>",
+          "symbol_name": "ensure_codegraph_document"
         },
         {
           "block_id": "blk_d1fab9b7f09d11d524cad890",
@@ -879,10 +893,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
             "kind": "dependencies",
             "relation": "uses_symbol"
           },
+          "path": "crates/ucp-cli/src/commands/codegraph.rs",
           "pinned": false,
           "relevance_score": 84,
           "short_id": "S3",
-          "signature": "function get_session(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState>"
+          "signature": "function get_session(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState>",
+          "symbol_name": "get_session"
         },
         {
           "block_id": "blk_384b68c8c1725eba6a9eb9da",
@@ -902,10 +918,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
             "kind": "dependencies",
             "relation": "uses_symbol"
           },
+          "path": "crates/ucp-cli/src/commands/codegraph.rs",
           "pinned": false,
           "relevance_score": 84,
           "short_id": "S4",
-          "signature": "function make_export_config(preferences: &CodeGraphSessionPreferences, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<&str>, exclude: Option<&str>) -> Result<CodeGraphExportConfig>"
+          "signature": "function make_export_config(preferences: &CodeGraphSessionPreferences, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<&str>, exclude: Option<&str>) -> Result<CodeGraphExportConfig>",
+          "symbol_name": "make_export_config"
         },
         {
           "block_id": "blk_0c6c13995a670d18a116596b",
@@ -926,10 +944,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
             "kind": "dependencies",
             "relation": "uses_symbol"
           },
+          "path": "crates/ucp-cli/src/state.rs",
           "pinned": false,
           "relevance_score": 84,
           "short_id": "S5",
-          "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]"
+          "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]",
+          "symbol_name": "read_stateful_document"
         }
       ],
       "omitted_symbol_count": 5316,
@@ -1096,10 +1116,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
       "origin": {
         "kind": "manual"
       },
+      "path": "crates/ucp-cli/src/commands/codegraph.rs",
       "pinned": false,
       "relevance_score": 224,
       "short_id": "S1",
-      "signature": "function context_show(input: Option<String>, session: String, max_tokens: usize, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<String>, exclude: Option<String>, format: OutputFormat) -> Result<()>"
+      "signature": "function context_show(input: Option<String>, session: String, max_tokens: usize, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<String>, exclude: Option<String>, format: OutputFormat) -> Result<()>",
+      "symbol_name": "context_show"
     },
     {
       "block_id": "blk_53fa15e7333e649f4eb74d9c",
@@ -1119,10 +1141,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
         "kind": "dependencies",
         "relation": "uses_symbol"
       },
+      "path": "crates/ucp-cli/src/commands/codegraph.rs",
       "pinned": false,
       "relevance_score": 84,
       "short_id": "S2",
-      "signature": "function ensure_codegraph_document(doc: &Document) -> Result<()>"
+      "signature": "function ensure_codegraph_document(doc: &Document) -> Result<()>",
+      "symbol_name": "ensure_codegraph_document"
     },
     {
       "block_id": "blk_d1fab9b7f09d11d524cad890",
@@ -1142,10 +1166,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
         "kind": "dependencies",
         "relation": "uses_symbol"
       },
+      "path": "crates/ucp-cli/src/commands/codegraph.rs",
       "pinned": false,
       "relevance_score": 84,
       "short_id": "S3",
-      "signature": "function get_session(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState>"
+      "signature": "function get_session(stateful: &'a StatefulDocument, session: &str) -> Result<&'a AgentSessionState>",
+      "symbol_name": "get_session"
     },
     {
       "block_id": "blk_384b68c8c1725eba6a9eb9da",
@@ -1165,10 +1191,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
         "kind": "dependencies",
         "relation": "uses_symbol"
       },
+      "path": "crates/ucp-cli/src/commands/codegraph.rs",
       "pinned": false,
       "relevance_score": 84,
       "short_id": "S4",
-      "signature": "function make_export_config(preferences: &CodeGraphSessionPreferences, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<&str>, exclude: Option<&str>) -> Result<CodeGraphExportConfig>"
+      "signature": "function make_export_config(preferences: &CodeGraphSessionPreferences, compact: bool, no_rendered: bool, levels: Option<usize>, only: Option<&str>, exclude: Option<&str>) -> Result<CodeGraphExportConfig>",
+      "symbol_name": "make_export_config"
     },
     {
       "block_id": "blk_0c6c13995a670d18a116596b",
@@ -1189,10 +1217,12 @@ This transcript demonstrates agent-style repository querying through the thin Py
         "kind": "dependencies",
         "relation": "uses_symbol"
       },
+      "path": "crates/ucp-cli/src/state.rs",
       "pinned": false,
       "relevance_score": 84,
       "short_id": "S5",
-      "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]"
+      "signature": "function read_stateful_document(input: Option<String>) -> anyhow::Result<StatefulDocument> [public]",
+      "symbol_name": "read_stateful_document"
     }
   ],
   "omitted_symbol_count": 5316,
