@@ -20,6 +20,7 @@ pub struct PyCodeGraphSession {
 impl PyCodeGraph {
     #[staticmethod]
     #[pyo3(signature = (repo_path, commit_hash=None, include_hidden=false, continue_on_parse_error=true, max_file_bytes=None, emit_export_edges=true, include_extensions=None, exclude_dirs=None))]
+    #[allow(clippy::too_many_arguments)]
     fn build(
         repo_path: &str,
         commit_hash: Option<String>,
@@ -30,10 +31,12 @@ impl PyCodeGraph {
         include_extensions: Option<Vec<String>>,
         exclude_dirs: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let mut config = ucp_api::CodeGraphExtractorConfig::default();
-        config.include_hidden = include_hidden;
-        config.continue_on_parse_error = continue_on_parse_error;
-        config.emit_export_edges = emit_export_edges;
+        let mut config = ucp_api::CodeGraphExtractorConfig {
+            include_hidden,
+            continue_on_parse_error,
+            emit_export_edges,
+            ..Default::default()
+        };
         if let Some(value) = max_file_bytes {
             config.max_file_bytes = value;
         }
@@ -106,15 +109,15 @@ impl PyCodeGraph {
     }
 
     fn describe(&self, py: Python<'_>, selector: &str) -> PyResult<Option<PyObject>> {
-        Ok(self
-            .inner
+        self.inner
             .resolve_selector(selector)
             .and_then(|id| self.inner.describe_node(id))
             .map(|node| to_python_json(py, &node))
-            .transpose()?)
+            .transpose()
     }
 
     #[pyo3(signature = (node_class=None, name_regex=None, path_regex=None, logical_key_regex=None, exported=None, case_sensitive=false, limit=None))]
+    #[allow(clippy::too_many_arguments)]
     fn find_nodes(
         &self,
         py: Python<'_>,
@@ -207,6 +210,7 @@ impl PyCodeGraphSession {
     }
 
     #[pyo3(signature = (target, mode="dependencies", relation=None, relations=None, depth=1, max_add=None, priority_threshold=None))]
+    #[allow(clippy::too_many_arguments)]
     fn expand(
         &mut self,
         py: Python<'_>,
@@ -270,6 +274,7 @@ impl PyCodeGraphSession {
     }
 
     #[pyo3(signature = (max_tokens=None, compact=false, include_rendered=None, visible_levels=None, only_node_classes=None, exclude_node_classes=None, max_frontier_actions=None))]
+    #[allow(clippy::too_many_arguments)]
     fn export(
         &self,
         py: Python<'_>,
@@ -345,6 +350,7 @@ impl PyCodeGraphSession {
     }
 
     #[pyo3(signature = (node_class=None, name_regex=None, path_regex=None, logical_key_regex=None, exported=None, case_sensitive=false, limit=None))]
+    #[allow(clippy::too_many_arguments)]
     fn find_nodes(
         &self,
         py: Python<'_>,

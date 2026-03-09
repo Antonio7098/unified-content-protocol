@@ -535,6 +535,7 @@ fn context(cmd: CodegraphContextCommands, format: OutputFormat) -> Result<()> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn context_init(
     input: Option<String>,
     name: Option<String>,
@@ -654,6 +655,7 @@ fn context_init(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn context_show(
     input: Option<String>,
     session: String,
@@ -701,6 +703,7 @@ fn context_show(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn context_export(
     input: Option<String>,
     session: String,
@@ -1327,6 +1330,7 @@ fn context_focus(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn context_expand(
     input: Option<String>,
     session: String,
@@ -1375,6 +1379,7 @@ fn context_expand(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn context_expand_recommended(
     input: Option<String>,
     session: String,
@@ -1388,8 +1393,10 @@ fn context_expand_recommended(
     let mut stateful = read_stateful_document(input.clone())?;
     ensure_codegraph_document(&stateful.document)?;
     let document = stateful.document.clone();
-    let mut export_config = CodeGraphExportConfig::default();
-    export_config.max_frontier_actions = top.max(1).max(8);
+    let export_config = CodeGraphExportConfig {
+        max_frontier_actions: top.max(1).max(8),
+        ..Default::default()
+    };
 
     let actions = {
         let sess = get_session(&stateful, &session)?;

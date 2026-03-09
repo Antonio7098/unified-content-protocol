@@ -93,14 +93,14 @@ impl PyGraph {
     }
 
     fn describe(&self, py: Python<'_>, selector: &str) -> PyResult<Option<PyObject>> {
-        Ok(self
-            .inner
+        self.inner
             .describe(selector)
             .map(|node| to_python_json(py, &node))
-            .transpose()?)
+            .transpose()
     }
 
     #[pyo3(signature = (label_regex=None, content_type=None, semantic_role_regex=None, tag_regex=None, case_sensitive=false, limit=None))]
+    #[allow(clippy::too_many_arguments)]
     fn find_nodes(
         &self,
         py: Python<'_>,
@@ -139,11 +139,10 @@ impl PyGraph {
         let Some(end_id) = self.inner.resolve_selector(end) else {
             return Ok(None);
         };
-        Ok(self
-            .inner
+        self.inner
             .path_between(start_id, end_id, max_hops)
             .map(|path| to_python_json(py, &path))
-            .transpose()?)
+            .transpose()
     }
 }
 

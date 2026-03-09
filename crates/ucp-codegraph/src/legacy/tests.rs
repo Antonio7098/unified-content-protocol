@@ -3486,7 +3486,9 @@ fn test_incremental_build_falls_back_for_incompatible_state_metadata() {
     let input = default_incremental_input(dir.path(), &state_file, "incremental-incompatibilities");
     build_code_graph_incremental(&input).unwrap();
 
-    let scenarios: [(&str, fn(&mut serde_json::Value)); 3] = [
+    type StateMutation = fn(&mut serde_json::Value);
+
+    let scenarios: [(&str, StateMutation); 3] = [
         ("extractor_version_changed", |state| {
             state["extractor_version"] = json!("ucp-codegraph-extractor.v-next");
         }),
