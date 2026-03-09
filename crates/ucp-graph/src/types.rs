@@ -1,18 +1,13 @@
 use serde::{Deserialize, Serialize};
 use ucm_core::BlockId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum GraphDetailLevel {
     Stub,
+    #[default]
     Summary,
     Full,
-}
-
-impl Default for GraphDetailLevel {
-    fn default() -> Self {
-        Self::Summary
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

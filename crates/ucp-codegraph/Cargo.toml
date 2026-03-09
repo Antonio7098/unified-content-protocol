@@ -18,13 +18,14 @@ regex = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
 chrono = { workspace = true }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tree-sitter = "0.20"
-tree-sitter-rust = "0.20"
-tree-sitter-python = "0.20"
-tree-sitter-typescript = "0.20"
-tree-sitter-javascript = "0.20"
+# Pin exact Tree-sitter versions so manifest-path builds (maturin/wasm-pack)
+# stay on a single compatible API surface across workspace, Python, and WASM
+# builds even when they resolve outside the workspace lockfile.
+tree-sitter = "=0.20.10"
+tree-sitter-rust = "=0.20.3"
+tree-sitter-python = "=0.20.3"
+tree-sitter-typescript = "=0.20.3"
+tree-sitter-javascript = "=0.20.0"
 
 [dev-dependencies]
 tempfile = "3.10"
