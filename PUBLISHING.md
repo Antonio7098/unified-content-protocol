@@ -27,7 +27,7 @@ Publish each crate once manually:
 cargo login <YOUR_API_TOKEN>
 
 # Publish each crate in order
-for crate in ucm-core ucp-observe ucp-translator-markdown ucp-translator-html ucm-engine ucl-parser ucp-llm ucp-agent ucp-cli; do
+for crate in ucm-core ucp-observe ucp-translator-markdown ucp-translator-html ucm-engine ucl-parser ucp-llm ucp-agent ucp-graph ucp-codegraph ucp-api ucp-cli; do
     echo "Publishing $crate..."
     cargo publish -p $crate
     sleep 30  # Wait for crates.io to index
@@ -124,10 +124,15 @@ cargo publish -p ucl-parser
 # 4. LLM utilities (depends on core)
 cargo publish -p ucp-llm
 
-# 5. Agent (depends on core + engine + parser)
+# 5. Agent + graph runtime
 cargo publish -p ucp-agent
+cargo publish -p ucp-graph
 
-# 6. CLI (depends on everything above)
+# 6. CodeGraph + high-level API
+cargo publish -p ucp-codegraph
+cargo publish -p ucp-api
+
+# 7. CLI (depends on everything above)
 cargo publish -p ucp-cli
 ```
 

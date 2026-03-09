@@ -1,12 +1,12 @@
 # UCP API
 
-`ucp-api` is the high-level Rust entry point for document operations, UCL execution, and codebase-to-UCM CodeGraph extraction.
+`ucp-api` is the high-level Rust entry point for document operations, generic graph navigation, UCL execution, and codebase-to-UCM CodeGraph extraction.
 
 ## Installation
 
 ```toml
 [dependencies]
-ucp-api = "0.1.13"
+ucp-api = "0.1.14"
 ```
 
 ## Core Client (`UcpClient`)
@@ -29,6 +29,29 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
+
+## Generic graph runtime
+
+For graph traversal that should work across ordinary UCP documents, use `GraphNavigator` and `GraphSession`.
+
+```rust
+use ucp_api::{GraphFindQuery, GraphNavigator, GraphNeighborMode};
+
+let graph = GraphNavigator::from_document(doc);
+let matches = graph.find_nodes(&GraphFindQuery {
+    label_regex: Some("intro|section".into()),
+    ..Default::default()
+})?;
+
+let mut session = graph.session();
+session.seed_overview(Some(2));
+session.expand("root", GraphNeighborMode::Children, 2, Some(16))?;
+```
+
+Storage options:
+
+- in-memory / JSON via `from_document`, `from_json`, `load`, `to_json`, `save`
+- SQLite via `persist_sqlite(...)` and `GraphNavigator::open_sqlite(...)`
 
 ## CodeGraph API (Tree-sitter)
 
@@ -87,6 +110,38 @@ println!("{}", projection);
 
 Use this projection as the codebase summary input for prompt assembly and constitution checks.
 
+### Programmatic navigation for agents
+
+For stateful graph navigation, use `CodeGraphNavigator` and `CodeGraphNavigatorSession`.
+
+```rust
+use ucp_api::{CodeGraphBuildInput, CodeGraphExpandMode, CodeGraphNavigator};
+
+let graph = CodeGraphNavigator::build(&CodeGraphBuildInput {
+    repository_path: "./my-repo".into(),
+    commit_hash: "manual-test".into(),
+    config: Default::default(),
+})?;
+
+let mut session = graph.session();
+session.seed_overview(Some(3));
+session.expand("src/lib.rs", CodeGraphExpandMode::File, &Default::default())?;
+let why = session.why_selected("symbol:src/lib.rs::add")?;
+println!("{}", why.explanation);
+```
+
+Useful programmatic helpers include:
+
+- regex-driven `find_nodes(...)`
+- `path_between(...)`
+- `why_selected(...)`
+- `apply_recommended_actions(...)`
+- `fork()` and `diff(...)`
+
+### Incremental rebuilds
+
+`ucp-api` also exposes `build_code_graph_incremental(...)` plus `CodeGraphIncrementalBuildInput` and `CodeGraphIncrementalStats` for persisted per-file rebuilds with reuse, fallback reasons, and invalidation metrics.
+
 ## CodeGraph Contract Fields
 
 The generated `Document.metadata` includes contract data expected by downstream consumers:
@@ -98,5 +153,9 @@ The generated `Document.metadata` includes contract data expected by downstream 
 
 ## Related Docs
 
+- `docs/ucp-api/graph-runtime.md` for the generic UCP graph runtime
+- `docs/ucp-api/python-query-tools.md` for the agent-facing Python query façade and query runner
 - `docs/ucp-cli/README.md` for `ucp codegraph` commands
+- `docs/ucp-cli/codegraph.md` for detailed CodeGraph coverage, selectors, context sessions, incremental rebuilds, and benchmark examples
+- `docs/ucp-api/codegraph-programmatic.md` for the programmatic Rust + Python navigation surface
 - `docs/ucp-llm/README.md` for id mapping + prompt builder flow

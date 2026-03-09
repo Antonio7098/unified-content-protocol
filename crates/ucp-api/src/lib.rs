@@ -26,19 +26,38 @@
 use std::str::FromStr;
 
 use ucl_parser::{parse, parse_commands, UclDocument};
+pub use ucm_core::PortableDocument;
 use ucm_core::{Block, BlockId, Content, Document, EdgeType, Error, Result};
 use ucm_engine::{Engine, Operation, OperationResult};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub mod codegraph;
-
+pub use ucp_codegraph::{
+    approximate_prompt_tokens, build_code_graph, build_code_graph_incremental,
+    canonical_codegraph_json, canonical_fingerprint, codegraph_prompt_projection,
+    codegraph_prompt_projection_with_config, export_codegraph_context,
+    export_codegraph_context_with_config, is_codegraph_document, render_codegraph_context_prompt,
+    resolve_codegraph_selector, validate_code_graph_profile, CodeGraphBuildInput,
+    CodeGraphBuildResult, CodeGraphBuildStatus, CodeGraphCoderef, CodeGraphContextEdgeExport,
+    CodeGraphContextExport, CodeGraphContextFrontierAction, CodeGraphContextHeuristics,
+    CodeGraphContextNodeExport, CodeGraphContextSession, CodeGraphContextSummary,
+    CodeGraphContextUpdate, CodeGraphDetailLevel, CodeGraphDiagnostic, CodeGraphExpandMode,
+    CodeGraphExportConfig, CodeGraphExportMode, CodeGraphExtractorConfig, CodeGraphFindQuery,
+    CodeGraphHiddenLevelSummary, CodeGraphIncrementalBuildInput, CodeGraphIncrementalStats,
+    CodeGraphNavigator, CodeGraphNavigatorSession, CodeGraphNodeSummary, CodeGraphPathHop,
+    CodeGraphPathResult, CodeGraphPromptProjectionConfig, CodeGraphPrunePolicy,
+    CodeGraphRecommendedActionsResult, CodeGraphRenderConfig, CodeGraphSelectionExplanation,
+    CodeGraphSelectionOrigin, CodeGraphSelectionOriginKind, CodeGraphSessionDiff,
+    CodeGraphSeverity, CodeGraphStats, CodeGraphTraversalConfig, CodeGraphValidationResult,
+    HydratedSourceExcerpt, CODEGRAPH_EXTRACTOR_VERSION, CODEGRAPH_PROFILE_MARKER,
+    CODEGRAPH_PROFILE_VERSION,
+};
 #[cfg(not(target_arch = "wasm32"))]
-pub use codegraph::{
-    build_code_graph, canonical_codegraph_json, canonical_fingerprint, codegraph_prompt_projection,
-    validate_code_graph_profile, CodeGraphBuildInput, CodeGraphBuildResult, CodeGraphBuildStatus,
-    CodeGraphDiagnostic, CodeGraphExtractorConfig, CodeGraphSeverity, CodeGraphStats,
-    CodeGraphValidationResult, PortableDocument, CODEGRAPH_EXTRACTOR_VERSION,
-    CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
+pub use ucp_graph::{
+    GraphDetailLevel, GraphExport, GraphExportEdge, GraphExportNode, GraphFindQuery,
+    GraphNavigator, GraphNeighborMode, GraphNodeRecord, GraphNodeSummary, GraphPathHop,
+    GraphPathResult, GraphSelectionExplanation, GraphSelectionOrigin, GraphSelectionOriginKind,
+    GraphSession, GraphSessionDiff, GraphSessionNode, GraphSessionSummary, GraphSessionUpdate,
+    GraphStoreObservability, GraphStoreStats, InMemoryGraphStore, SqliteGraphStore,
 };
 
 /// UCP client for document manipulation

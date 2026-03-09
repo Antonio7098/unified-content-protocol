@@ -15,7 +15,7 @@ ucp --version
 
 ```toml
 [dependencies]
-ucp-api = "0.1.13"
+ucp-api = "0.1.14"
 ```
 
 ## Getting Started
@@ -27,6 +27,7 @@ ucp-api = "0.1.13"
 ## API and Tools
 
 - [UCP API](./ucp-api/README.md)
+- [Agent-facing Python Query Tools](./ucp-api/python-query-tools.md)
 - [UCP CLI](./ucp-cli/README.md)
 - [UCP LLM Utilities](./ucp-llm/README.md)
 - [UCP Agent](./ucp-agent/index.md)
@@ -37,6 +38,9 @@ ucp-api = "0.1.13"
 - Build graph: `ucp codegraph build`
 - Validate graph profile + fingerprint: `ucp codegraph inspect`
 - Create projection for LLM context: `ucp codegraph prompt`
+- Manage focused sessions: `ucp codegraph context ...`
+- Rebuild incrementally with state reuse: `ucp codegraph build --incremental`
+- Deep-dive guide: [CodeGraph Guide](./ucp-cli/codegraph.md)
 
 Example:
 

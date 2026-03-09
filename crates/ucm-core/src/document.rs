@@ -8,7 +8,8 @@ use crate::metadata::TokenModel;
 use crate::version::DocumentVersion;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::str::FromStr;
 
 /// Document identifier
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -185,6 +186,89 @@ impl DocumentIndices {
     }
 }
 
+/// Canonical JSON-safe representation of a [`Document`].
+///
+/// This is the shared storage/interchange form for UCP documents and graph-backed
+/// workflows that need deterministic serialization.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortableDocument {
+    pub id: String,
+    pub root: String,
+    pub structure: BTreeMap<String, Vec<String>>,
+    pub blocks: BTreeMap<String, Block>,
+    pub metadata: DocumentMetadata,
+    pub version: u64,
+}
+
+impl PortableDocument {
+    pub fn from_document(doc: &Document) -> Self {
+        let mut structure = BTreeMap::new();
+        for (parent, children) in &doc.structure {
+            let mut ordered = children.clone();
+            ordered.sort_by_key(|id| id.to_string());
+            structure.insert(
+                parent.to_string(),
+                ordered.into_iter().map(|id| id.to_string()).collect(),
+            );
+        }
+
+        let mut blocks = BTreeMap::new();
+        for (id, block) in &doc.blocks {
+            blocks.insert(id.to_string(), block.clone());
+        }
+
+        Self {
+            id: doc.id.0.clone(),
+            root: doc.root.to_string(),
+            structure,
+            blocks,
+            metadata: doc.metadata.clone(),
+            version: doc.version.counter,
+        }
+    }
+
+    pub fn to_document(&self) -> Result<Document> {
+        let root =
+            BlockId::from_str(&self.root).map_err(|_| Error::InvalidBlockId(self.root.clone()))?;
+
+        let mut structure = HashMap::new();
+        for (parent, children) in &self.structure {
+            let parent_id =
+                BlockId::from_str(parent).map_err(|_| Error::InvalidBlockId(parent.clone()))?;
+            let parsed_children = children
+                .iter()
+                .map(|child| {
+                    BlockId::from_str(child).map_err(|_| Error::InvalidBlockId(child.clone()))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            structure.insert(parent_id, parsed_children);
+        }
+
+        let mut blocks = HashMap::new();
+        for (id, block) in &self.blocks {
+            let block_id = BlockId::from_str(id).map_err(|_| Error::InvalidBlockId(id.clone()))?;
+            blocks.insert(block_id, block.clone());
+        }
+
+        let mut doc = Document {
+            id: DocumentId::new(self.id.clone()),
+            root,
+            structure,
+            blocks,
+            metadata: self.metadata.clone(),
+            indices: DocumentIndices::default(),
+            edge_index: EdgeIndex::default(),
+            version: DocumentVersion {
+                counter: self.version,
+                timestamp: Utc::now(),
+                state_hash: [0u8; 8],
+            },
+        };
+        doc.rebuild_indices();
+        Ok(doc)
+    }
+}
+
 /// A UCM document is a collection of blocks with hierarchical structure.
 #[derive(Debug, Clone)]
 pub struct Document {
@@ -237,6 +321,14 @@ impl Document {
     /// Create with a generated ID
     pub fn create() -> Self {
         Self::new(DocumentId::generate())
+    }
+
+    pub fn to_portable(&self) -> PortableDocument {
+        PortableDocument::from_document(self)
+    }
+
+    pub fn from_portable(portable: &PortableDocument) -> Result<Self> {
+        portable.to_document()
     }
 
     /// Set document metadata
@@ -340,7 +432,10 @@ impl Document {
         target: BlockId,
     ) {
         let edge = crate::edge::Edge::new(edge_type, target);
-        self.edge_index.add_edge(source, &edge);
+        if let Some(block) = self.blocks.get_mut(source) {
+            block.edges.push(edge.clone());
+            self.edge_index.add_edge(source, &edge);
+        }
     }
 
     /// Remove a block from the structure (makes it orphaned)

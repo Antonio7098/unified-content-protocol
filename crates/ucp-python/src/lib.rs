@@ -9,11 +9,14 @@ use pyo3::prelude::*;
 
 mod agent;
 mod block;
+mod codegraph;
 mod content;
 mod document;
 mod edge;
 mod engine;
 mod errors;
+mod graph;
+mod json;
 mod llm;
 mod observe;
 mod section;
@@ -26,6 +29,7 @@ use agent::{
     PySessionConfig, PyViewMode,
 };
 use block::PyBlock;
+use codegraph::{PyCodeGraph, PyCodeGraphSession};
 use content::PyContent;
 use document::PyDocument;
 use edge::{PyEdge, PyEdgeType};
@@ -38,6 +42,7 @@ use errors::{
     PyBlockNotFoundError, PyCycleDetectedError, PyInvalidBlockIdError, PyParseError, PyUcpError,
     PyValidationError,
 };
+use graph::{PyGraph, PyGraphSession};
 use llm::{PyIdMapper, PyPromptBuilder, PyPromptPresets, PyUclCapability};
 use observe::{PyAuditEntry, PyEventBus, PyMetricsRecorder, PyUcpEvent};
 use section::{write_section, PyClearResult, PyDeletedContent, PyWriteSectionResult};
@@ -166,6 +171,10 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyContent>()?;
     m.add_class::<PyBlock>()?;
     m.add_class::<PyDocument>()?;
+    m.add_class::<PyGraph>()?;
+    m.add_class::<PyGraphSession>()?;
+    m.add_class::<PyCodeGraph>()?;
+    m.add_class::<PyCodeGraphSession>()?;
     m.add_class::<PyEdge>()?;
     m.add_class::<PyEdgeType>()?;
     m.add_class::<PyAgentTraversal>()?;

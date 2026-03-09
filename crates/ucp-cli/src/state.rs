@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use ucm_core::{BlockId, Document};
+use ucp_api::CodeGraphContextSession;
 
 use crate::output::DocumentJson;
 
@@ -32,6 +33,24 @@ impl CliState {
 }
 
 /// Serializable agent session state
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CodeGraphSessionPreferences {
+    #[serde(default)]
+    pub compact: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub levels: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relation_preset: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub relation_filters: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expand_depth: Option<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub only_node_classes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_node_classes: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSessionState {
     pub id: String,
@@ -39,6 +58,10 @@ pub struct AgentSessionState {
     pub current_block: Option<String>,
     pub history: Vec<String>,
     pub context_blocks: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codegraph_context: Option<CodeGraphContextSession>,
+    #[serde(default)]
+    pub codegraph_preferences: CodeGraphSessionPreferences,
     pub state: String,
     pub created_at: String,
 }
@@ -51,6 +74,8 @@ impl AgentSessionState {
             current_block: start_block.map(|b| b.to_string()),
             history: Vec::new(),
             context_blocks: Vec::new(),
+            codegraph_context: None,
+            codegraph_preferences: CodeGraphSessionPreferences::default(),
             state: "active".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
         }
@@ -90,6 +115,24 @@ impl AgentSessionState {
     #[allow(dead_code)]
     pub fn clear_context(&mut self) {
         self.context_blocks.clear();
+        if let Some(context) = self.codegraph_context.as_mut() {
+            context.clear();
+        }
+    }
+
+    pub fn ensure_codegraph_context(&mut self) -> &mut CodeGraphContextSession {
+        self.codegraph_context
+            .get_or_insert_with(CodeGraphContextSession::new)
+    }
+
+    pub fn sync_context_blocks_from_codegraph(&mut self) {
+        if let Some(context) = self.codegraph_context.as_ref() {
+            self.context_blocks = context
+                .selected_block_ids()
+                .into_iter()
+                .map(|block_id| block_id.to_string())
+                .collect();
+        }
     }
 }
 

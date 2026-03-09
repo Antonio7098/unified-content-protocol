@@ -15,6 +15,7 @@ readme = "README.md"
 ucm-core = { workspace = true }
 ucm-engine = { workspace = true }
 ucl-parser = { workspace = true }
+ucp-codegraph = { workspace = true }
 
 # Async support
 async-trait = { workspace = true }
@@ -31,3 +32,4 @@ regex = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread"] }
+tempfile = "3.10"

@@ -1,6 +1,6 @@
 # Unified Content Protocol (UCP)
 
-> Latest release: v0.1.13
+> Latest release: v0.1.14
 
 Unified Content Protocol is a graph-based intermediate representation (IR) for structured documents. It provides deterministic, token-efficient building blocks so teams can ingest, transform, and serve complex knowledge graphs to both traditional applications and LLM-powered agents.
 
@@ -65,20 +65,20 @@ Unified Content Protocol is a graph-based intermediate representation (IR) for s
 4. **Add the Rust API to another project**:
    ```toml
    [dependencies]
-   ucp-api = "0.1.13"
+   ucp-api = "0.1.14"
    ```
 
 ### SDK Installation Matrix
 
 | Target | Command |
 | --- | --- |
-| Rust | `ucp-api = "0.1.13"` (or depend on individual crates at the same version). |
-| Python | `pip install ucp-content==0.1.13` |
-| JavaScript / TypeScript | `npm install @ucp-core/core@0.1.13` |
+| Rust | `ucp-api = "0.1.14"` (or depend on individual crates at the same version). |
+| Python | `pip install ucp-content==0.1.14` |
+| JavaScript / TypeScript | `npm install @ucp-core/core@0.1.14` |
 
 ## Documentation & CLI Guide
 
-The full docs live in [`/docs`](./docs/index.md). Highlights include Getting Started sequences, crate deep dives, translator walkthroughs, agent architecture notes, and an end-to-end CLI usage guide. Every CLI subcommand mirrors the Rust `Commands` enum, so the documentation always stays in sync with the source.
+The full docs live in [`/docs`](./docs/index.md). Highlights include Getting Started sequences, crate deep dives, translator walkthroughs, agent architecture notes, an end-to-end CLI usage guide, and a dedicated [CodeGraph guide](./docs/ucp-cli/codegraph.md) covering build, inspect, prompt, context sessions, incremental rebuilds, selectors, and benchmarking.
 
 ## Example: Deterministic Edits with IdMapper
 

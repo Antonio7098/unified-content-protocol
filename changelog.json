@@ -19,6 +19,107 @@
   },
   "entries": [
     {
+      "version": "v0.1.14",
+      "date": "2026-03-09",
+      "changes": [
+        {
+          "type": "added",
+          "area": "graph.runtime",
+          "description": "Added the new `ucp-graph` crate with generic graph navigation, JSON persistence, SQLite persistence, session diffing, and path/search/export APIs for arbitrary UCP documents.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-graph/**",
+            "crates/ucp-api/src/lib.rs",
+            "crates/ucp-api/tests/graph_runtime.rs",
+            "docs/ucp-api/graph-runtime.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "codegraph.programmatic",
+          "description": "Extracted CodeGraph into the new `ucp-codegraph` crate and added stateful navigator/session APIs, selector resolution, context export/rendering, prompt projection, and recommended frontier actions.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-codegraph/**",
+            "crates/ucp-api/src/lib.rs",
+            "docs/ucp-api/codegraph-programmatic.md",
+            "docs/ucp-cli/codegraph.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "codegraph.incremental",
+          "description": "Added incremental codegraph rebuilds with persisted per-file state, API-aware invalidation, reuse/fallback metrics, and CLI support for state-file driven rebuilds.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-codegraph/src/legacy/incremental.rs",
+            "crates/ucp-codegraph/examples/incremental_benchmark.rs",
+            "crates/ucp-cli/src/commands/codegraph.rs",
+            "plan-codegraph-incremental-rebuilds.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "python.query",
+          "description": "Added Python graph/codegraph facades plus guarded Python query execution, tool wrappers, benchmark helpers, docs, demos, and tests for agent-driven graph workflows.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/python/ucp/query.py",
+            "crates/ucp-python/python/ucp/query_tools.py",
+            "crates/ucp-python/python/ucp/query_benchmarks.py",
+            "crates/ucp-python/tests/**",
+            "docs/ucp-api/python-query-tools.md",
+            "scripts/demo_codegraph_python_query.py"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "cli.codegraph",
+          "description": "Expanded `ucp codegraph` with context session commands, richer inspect/prompt/export flows, and end-to-end docs for traversal, hydration, pruning, and benchmarking.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-cli/src/cli.rs",
+            "crates/ucp-cli/src/commands/codegraph.rs",
+            "crates/ucp-cli/tests/integration_tests.rs",
+            "docs/ucp-cli/codegraph.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "fixed",
+          "area": "release.publish-crates",
+          "description": "Updated release automation to publish `ucp-graph`, `ucp-codegraph`, and `ucp-api` in dependency order and aligned Python package version checks with the exported `__version__`.",
+          "commit": "pending",
+          "files_affected": [
+            ".github/workflows/publish-crates.yml",
+            "PUBLISHING.md",
+            "scripts/check_version_sync.py",
+            "crates/ucp-python/python/ucp/__init__.py"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped workspace and public package versions to 0.1.14 and updated release/install references.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "crates/ucp-wasm/Cargo.toml",
+            "crates/ucp-python/pyproject.toml",
+            "README.md",
+            "docs/getting-started/installation.md",
+            "changelog.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.13",
       "date": "2026-02-17",
       "changes": [

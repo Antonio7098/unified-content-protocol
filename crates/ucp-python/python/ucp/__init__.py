@@ -15,6 +15,10 @@ from ucp._core import (
     BlockId,
     Content,
     Block,
+    Graph,
+    GraphSession,
+    CodeGraph,
+    CodeGraphSession,
     Document,
     Edge,
     EdgeType,
@@ -82,13 +86,38 @@ from ucp._core import (
     ValidationError,
     ParseError,
 )
+from ucp.query import (
+    CodeQueryGraph,
+    CodeQuerySession,
+    QueryExecutionError,
+    QueryGraph,
+    QueryLimitExceededError,
+    QueryLimits,
+    QueryRunResult,
+    QuerySession,
+    QueryUsage,
+    query,
+    run_python_query,
+)
+from ucp.query_benchmarks import (
+    QueryBenchmarkCase,
+    QueryBenchmarkResult,
+    run_query_benchmark,
+    run_query_benchmark_suite,
+    summarize_query_benchmark_suite,
+)
+from ucp.query_tools import PythonQueryTool, QueryToolResult
 
-__version__ = "0.1.9"
+__version__ = "0.1.14"
 __all__ = [
     # Classes
     "BlockId",
     "Content",
     "Block",
+    "Graph",
+    "GraphSession",
+    "CodeGraph",
+    "CodeGraphSession",
     "Document",
     "Edge",
     "EdgeType",
@@ -155,4 +184,22 @@ __all__ = [
     "CycleDetectedError",
     "ValidationError",
     "ParseError",
+    "QueryGraph",
+    "CodeQueryGraph",
+    "QuerySession",
+    "CodeQuerySession",
+    "QueryRunResult",
+    "QueryExecutionError",
+    "QueryLimitExceededError",
+    "QueryLimits",
+    "QueryUsage",
+    "PythonQueryTool",
+    "QueryToolResult",
+    "QueryBenchmarkCase",
+    "QueryBenchmarkResult",
+    "query",
+    "run_python_query",
+    "run_query_benchmark",
+    "run_query_benchmark_suite",
+    "summarize_query_benchmark_suite",
 ]

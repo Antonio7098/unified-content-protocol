@@ -5,10 +5,16 @@ use colored::Colorize;
 use serde::Serialize;
 use std::str::FromStr;
 use ucm_core::BlockId;
+use ucp_api::{
+    approximate_prompt_tokens, is_codegraph_document, render_codegraph_context_prompt,
+    resolve_codegraph_selector, CodeGraphContextSession, CodeGraphDetailLevel,
+    CodeGraphRenderConfig,
+};
 use ucp_llm::{IdMapper, PromptBuilder, UclCapability};
 
 use crate::cli::{LlmCommands, OutputFormat};
 use crate::output::{content_preview, print_success, read_document, read_file, write_output};
+use crate::state::read_stateful_document;
 
 pub fn handle(cmd: LlmCommands, format: OutputFormat) -> Result<()> {
     match cmd {
@@ -18,9 +24,10 @@ pub fn handle(cmd: LlmCommands, format: OutputFormat) -> Result<()> {
         LlmCommands::Prompt { capabilities } => prompt(capabilities, format),
         LlmCommands::Context {
             input,
+            session,
             max_tokens,
             blocks,
-        } => context(input, max_tokens, blocks, format),
+        } => context(input, session, max_tokens, blocks, format),
     }
 }
 
@@ -206,10 +213,83 @@ fn prompt(capabilities: String, format: OutputFormat) -> Result<()> {
 
 fn context(
     input: Option<String>,
+    session: Option<String>,
     max_tokens: usize,
     blocks: Option<String>,
     format: OutputFormat,
 ) -> Result<()> {
+    let stateful = read_stateful_document(input.clone())?;
+    let doc = &stateful.document;
+
+    if is_codegraph_document(doc) {
+        let rendered = if let Some(session_id) = session.as_ref() {
+            let agent_session = stateful
+                .state()
+                .sessions
+                .get(session_id)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
+            let context = agent_session.codegraph_context.as_ref().ok_or_else(|| {
+                anyhow!(
+                    "Session {} has no codegraph context; run `agent context seed` first",
+                    session_id
+                )
+            })?;
+            render_codegraph_context_prompt(
+                doc,
+                context,
+                &CodeGraphRenderConfig::for_max_tokens(max_tokens),
+            )
+        } else {
+            let mut context = CodeGraphContextSession::new();
+            context.seed_overview(doc);
+            if let Some(blocks) = blocks.as_ref() {
+                for selector in blocks
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                {
+                    let block_id = resolve_codegraph_selector(doc, selector)
+                        .or_else(|| BlockId::from_str(selector).ok())
+                        .ok_or_else(|| anyhow!("Could not resolve block selector: {}", selector))?;
+                    context.select_block(doc, block_id, CodeGraphDetailLevel::SymbolCard);
+                }
+            }
+            render_codegraph_context_prompt(
+                doc,
+                &context,
+                &CodeGraphRenderConfig::for_max_tokens(max_tokens),
+            )
+        };
+
+        let used_tokens = approximate_prompt_tokens(&rendered);
+        match format {
+            OutputFormat::Json => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "mode": "codegraph_context",
+                        "session": session,
+                        "max_tokens": max_tokens,
+                        "used_tokens": used_tokens,
+                        "rendered": rendered
+                    }))?
+                );
+            }
+            OutputFormat::Text => {
+                println!("{}", "CodeGraph LLM Context".cyan().bold());
+                println!("{}", "─".repeat(60));
+                println!(
+                    "Approximate tokens: {} / {}",
+                    used_tokens.to_string().green(),
+                    max_tokens
+                );
+                println!();
+                println!("{}", rendered);
+            }
+        }
+        return Ok(());
+    }
+
     let doc = read_document(input)?;
 
     // Collect blocks for context

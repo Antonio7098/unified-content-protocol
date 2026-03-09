@@ -10,6 +10,10 @@ use std::sync::{Arc, RwLock};
 use std::time::Instant;
 use ucm_core::{BlockId, Document, EdgeType};
 use ucm_engine::traversal::{NavigateDirection, TraversalEngine, TraversalFilter, TraversalOutput};
+use ucp_codegraph::{
+    is_codegraph_document, render_codegraph_context_prompt, CodeGraphContextUpdate,
+    CodeGraphDetailLevel, CodeGraphRenderConfig,
+};
 
 /// Result of a navigation operation.
 #[derive(Debug, Clone)]
@@ -779,6 +783,15 @@ impl AgentTraversal {
         _reason: Option<String>,
         _relevance: Option<f32>,
     ) -> Result<()> {
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
+        if doc.get_block(&block_id).is_none() {
+            return Err(AgentError::BlockNotFound(block_id));
+        }
+        let codegraph_doc = is_codegraph_document(&doc);
+
         let mut sessions = self
             .sessions
             .write()
@@ -789,27 +802,28 @@ impl AgentTraversal {
             .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_modify_context()?;
-
-        // For now, we just verify the block exists
-        let doc = self
-            .document
-            .read()
-            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
-
-        if doc.get_block(&block_id).is_none() {
-            return Err(AgentError::BlockNotFound(block_id));
+        session.context_blocks.insert(block_id);
+        if codegraph_doc {
+            session.ensure_codegraph_context().select_block(
+                &doc,
+                block_id,
+                CodeGraphDetailLevel::SymbolCard,
+            );
         }
 
         session.metrics.record_context_add(1);
         session.touch();
-
-        // Context management is handled by the external context manager
-        // This is a placeholder for integration
         Ok(())
     }
 
     /// Add all last results to context.
     pub fn context_add_results(&self, session_id: &AgentSessionId) -> Result<Vec<BlockId>> {
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
+        let codegraph_doc = is_codegraph_document(&doc);
+
         let mut sessions = self
             .sessions
             .write()
@@ -822,6 +836,16 @@ impl AgentTraversal {
         session.check_can_modify_context()?;
 
         let results = session.get_last_results()?.to_vec();
+        for block_id in &results {
+            session.context_blocks.insert(*block_id);
+            if codegraph_doc {
+                session.ensure_codegraph_context().select_block(
+                    &doc,
+                    *block_id,
+                    CodeGraphDetailLevel::SymbolCard,
+                );
+            }
+        }
         session.metrics.record_context_add(results.len());
         session.touch();
 
@@ -829,7 +853,7 @@ impl AgentTraversal {
     }
 
     /// Remove a block from context.
-    pub fn context_remove(&self, session_id: &AgentSessionId, _block_id: BlockId) -> Result<()> {
+    pub fn context_remove(&self, session_id: &AgentSessionId, block_id: BlockId) -> Result<()> {
         let mut sessions = self
             .sessions
             .write()
@@ -840,6 +864,10 @@ impl AgentTraversal {
             .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_modify_context()?;
+        session.context_blocks.remove(&block_id);
+        if let Some(context) = session.codegraph_context.as_mut() {
+            context.remove_block(block_id);
+        }
         session.metrics.record_context_remove();
         session.touch();
 
@@ -858,6 +886,10 @@ impl AgentTraversal {
             .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
         session.check_can_modify_context()?;
+        session.context_blocks.clear();
+        if let Some(context) = session.codegraph_context.as_mut() {
+            context.clear();
+        }
         session.touch();
 
         Ok(())
@@ -869,6 +901,17 @@ impl AgentTraversal {
         session_id: &AgentSessionId,
         block_id: Option<BlockId>,
     ) -> Result<()> {
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
+        if let Some(block_id) = block_id {
+            if doc.get_block(&block_id).is_none() {
+                return Err(AgentError::BlockNotFound(block_id));
+            }
+        }
+        let codegraph_doc = is_codegraph_document(&doc);
+
         let mut sessions = self
             .sessions
             .write()
@@ -878,13 +921,167 @@ impl AgentTraversal {
             .get_mut(session_id)
             .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
 
+        session.check_can_modify_context()?;
         session.set_focus(block_id);
+        if codegraph_doc {
+            session.ensure_codegraph_context().set_focus(&doc, block_id);
+        }
         session.touch();
 
         Ok(())
     }
 
+    pub fn codegraph_seed_overview(
+        &self,
+        session_id: &AgentSessionId,
+    ) -> Result<CodeGraphContextUpdate> {
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
+        if !is_codegraph_document(&doc) {
+            return Err(AgentError::Internal(
+                "document is not a codegraph".to_string(),
+            ));
+        }
+
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
+        session.check_can_modify_context()?;
+
+        let update = session.ensure_codegraph_context().seed_overview(&doc);
+        for block_id in session.ensure_codegraph_context().selected_block_ids() {
+            session.context_blocks.insert(block_id);
+        }
+        session.focus_block = update.focus;
+        session.touch();
+        Ok(update)
+    }
+
+    pub fn codegraph_expand_file(
+        &self,
+        session_id: &AgentSessionId,
+        block_id: BlockId,
+    ) -> Result<CodeGraphContextUpdate> {
+        self.codegraph_update(session_id, |doc, context| {
+            context.expand_file(doc, block_id)
+        })
+    }
+
+    pub fn codegraph_expand_dependencies(
+        &self,
+        session_id: &AgentSessionId,
+        block_id: BlockId,
+        relation_filter: Option<&str>,
+    ) -> Result<CodeGraphContextUpdate> {
+        self.codegraph_update(session_id, |doc, context| {
+            context.expand_dependencies(doc, block_id, relation_filter)
+        })
+    }
+
+    pub fn codegraph_expand_dependents(
+        &self,
+        session_id: &AgentSessionId,
+        block_id: BlockId,
+        relation_filter: Option<&str>,
+    ) -> Result<CodeGraphContextUpdate> {
+        self.codegraph_update(session_id, |doc, context| {
+            context.expand_dependents(doc, block_id, relation_filter)
+        })
+    }
+
+    pub fn codegraph_hydrate_source(
+        &self,
+        session_id: &AgentSessionId,
+        block_id: BlockId,
+        padding: usize,
+    ) -> Result<CodeGraphContextUpdate> {
+        self.codegraph_update(session_id, |doc, context| {
+            context.hydrate_source(doc, block_id, padding)
+        })
+    }
+
+    pub fn codegraph_collapse(
+        &self,
+        session_id: &AgentSessionId,
+        block_id: BlockId,
+        include_descendants: bool,
+    ) -> Result<CodeGraphContextUpdate> {
+        self.codegraph_update(session_id, |doc, context| {
+            context.collapse(doc, block_id, include_descendants)
+        })
+    }
+
+    pub fn render_codegraph_context(
+        &self,
+        session_id: &AgentSessionId,
+        config: CodeGraphRenderConfig,
+    ) -> Result<String> {
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
+        if !is_codegraph_document(&doc) {
+            return Err(AgentError::Internal(
+                "document is not a codegraph".to_string(),
+            ));
+        }
+
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
+        let context = session.codegraph_context.as_ref().ok_or_else(|| {
+            AgentError::Internal("codegraph context has not been initialized".to_string())
+        })?;
+        Ok(render_codegraph_context_prompt(&doc, context, &config))
+    }
+
     // ==================== Internal Helpers ====================
+
+    fn codegraph_update<F>(
+        &self,
+        session_id: &AgentSessionId,
+        update_fn: F,
+    ) -> Result<CodeGraphContextUpdate>
+    where
+        F: FnOnce(&Document, &mut ucp_codegraph::CodeGraphContextSession) -> CodeGraphContextUpdate,
+    {
+        let doc = self
+            .document
+            .read()
+            .map_err(|_| AgentError::Internal("Failed to acquire document lock".to_string()))?;
+        if !is_codegraph_document(&doc) {
+            return Err(AgentError::Internal(
+                "document is not a codegraph".to_string(),
+            ));
+        }
+
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| AgentError::Internal("Failed to acquire sessions lock".to_string()))?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AgentError::SessionNotFound(session_id.clone()))?;
+        session.check_can_modify_context()?;
+
+        let update = update_fn(&doc, session.ensure_codegraph_context());
+        if let Some(context) = session.codegraph_context.as_ref() {
+            session.context_blocks = context.selected.keys().copied().collect();
+        }
+        session.focus_block = update.focus;
+        session.touch();
+        Ok(update)
+    }
 
     fn compute_neighborhood(
         &self,

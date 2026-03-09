@@ -19,6 +19,8 @@ ucp --help
 
 ## CodeGraph Commands
 
+The detailed CodeGraph guide lives at [`docs/ucp-cli/codegraph.md`](./codegraph.md). Use it for the full build/inspect/prompt/context workflow, selector rules, incremental metrics, test targets, and benchmark usage.
+
 ### Build graph from a repository
 
 ```bash
@@ -36,6 +38,8 @@ Useful flags:
 - `--fail-on-parse-error`
 - `--max-file-bytes <N>`
 - `--allow-partial`
+- `--incremental`
+- `--state-file <PATH>`
 
 ### Inspect profile compliance + fingerprint
 
@@ -50,6 +54,10 @@ Returns `valid`, `canonical_fingerprint`, and diagnostics.
 ```bash
 ucp codegraph prompt --input graph.json --output graph-projection.txt
 ```
+
+### Work with a focused context session
+
+Use `ucp codegraph context ...` to seed a working set, expand dependencies/dependents, hydrate source, export a compact JSON snapshot, and prune or pin important nodes.
 
 ## LLM Utilities with CodeGraph
 

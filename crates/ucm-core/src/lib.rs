@@ -40,7 +40,7 @@ pub use content::{
     LineRange, Math, MathFormat, Media, MediaSource, MediaType, Row, Table, TableSchema, Text,
     TextFormat,
 };
-pub use document::{Document, DocumentId, DocumentMetadata};
+pub use document::{Document, DocumentId, DocumentMetadata, PortableDocument};
 pub use edge::{Edge, EdgeIndex, EdgeMetadata, EdgeType};
 pub use error::{Error, ErrorCode, Result, ValidationIssue, ValidationSeverity};
 pub use id::{BlockId, ContentHash, IdGenerator, IdGeneratorConfig};
