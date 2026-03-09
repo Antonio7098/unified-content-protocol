@@ -560,10 +560,8 @@ pub(super) fn ts_commonjs_object_export_bindings(
             } else {
                 None
             }
-        } else if let Some(name) = leading_js_identifier(node_text(source, property).trim()) {
-            Some(name)
         } else {
-            None
+            leading_js_identifier(node_text(source, property).trim())
         };
 
         if let Some(local_name) = local_name {

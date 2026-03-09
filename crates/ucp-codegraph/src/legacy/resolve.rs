@@ -54,6 +54,7 @@ pub(super) fn resolve_relationship_target_ids(
     unique_ids
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn resolve_alias_target_ids(
     source_file: &str,
     language: CodeLanguage,
@@ -170,6 +171,7 @@ pub(super) fn resolve_alias_target_ids(
     unique_ids
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn resolve_usage_target_ids(
     source_file: &str,
     language: CodeLanguage,

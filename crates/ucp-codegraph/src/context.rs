@@ -1956,7 +1956,7 @@ impl CodeGraphQueryIndex {
             for child in doc.children(&block_id) {
                 let child_class = self
                     .node_classes
-                    .get(&child)
+                    .get(child)
                     .map(String::as_str)
                     .unwrap_or("unknown");
                 if matches!(child_class, "repository" | "directory" | "file") {
@@ -2187,6 +2187,7 @@ fn path_selector_rank(node_class: &str) -> u8 {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_edge_section(
     out: &mut String,
     label: &str,
@@ -2229,6 +2230,7 @@ fn render_edge_section(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn append_relation_frontier(
     out: &mut Vec<CodeGraphContextFrontierAction>,
     block_id: BlockId,

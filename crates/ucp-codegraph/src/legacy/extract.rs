@@ -330,7 +330,7 @@ pub(super) fn extract_function_like_signature_ts_js(
 
 pub(super) fn extract_single_param_arrow_signature(
     header: &str,
-    language: CodeLanguage,
+    _language: CodeLanguage,
 ) -> Option<(ExtractedInput, Option<String>)> {
     let arrow_index = header.find("=>")?;
     let before_arrow = header[..arrow_index].trim_end();
@@ -348,11 +348,7 @@ pub(super) fn extract_single_param_arrow_signature(
         name: normalize_parameter_name(&name_part),
         type_name: normalize_signature_fragment(type_part.trim(), 120),
     };
-    let output = if language == CodeLanguage::TypeScript {
-        None
-    } else {
-        None
-    };
+    let output = None;
     Some((input, output))
 }
 
@@ -725,10 +721,7 @@ pub(super) fn extract_leading_line_comment_block(
     }
 }
 
-pub(super) fn strip_line_comment_prefix<'a>(
-    line: &'a str,
-    language: CodeLanguage,
-) -> Option<&'a str> {
+pub(super) fn strip_line_comment_prefix(line: &str, language: CodeLanguage) -> Option<&str> {
     match language {
         CodeLanguage::Rust => line
             .strip_prefix("//!")
@@ -887,10 +880,7 @@ pub(super) fn extract_preceding_line_comment_block_before(
     }
 }
 
-pub(super) fn strip_symbol_line_comment_prefix<'a>(
-    line: &'a str,
-    language: CodeLanguage,
-) -> Option<&'a str> {
+pub(super) fn strip_symbol_line_comment_prefix(line: &str, language: CodeLanguage) -> Option<&str> {
     match language {
         CodeLanguage::Rust => line.strip_prefix("///").or_else(|| line.strip_prefix("//")),
         CodeLanguage::Python => line.strip_prefix('#'),
@@ -969,6 +959,7 @@ pub(super) fn first_named_identifier(node: Node<'_>, source: &str) -> Option<Str
     None
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn make_extracted_symbol(
     name: String,
     kind: &str,

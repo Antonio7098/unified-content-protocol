@@ -187,7 +187,7 @@ fn rendered_edges(doc: &Document, block: &Block) -> Vec<String> {
                 .custom
                 .get("relation")
                 .and_then(|value| value.as_str())
-                .or_else(|| match &edge.edge_type {
+                .or(match &edge.edge_type {
                     EdgeType::Custom(value) => Some(value.as_str()),
                     _ => None,
                 })
@@ -254,7 +254,7 @@ fn symbol_descendants(doc: &Document, root: BlockId) -> Vec<BlockId> {
 fn child_symbol_ids(doc: &Document, root: BlockId) -> Vec<BlockId> {
     let mut children = doc
         .children(&root)
-        .into_iter()
+        .iter()
         .copied()
         .filter(|child| {
             doc.get_block(child)

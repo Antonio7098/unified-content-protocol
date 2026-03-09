@@ -244,8 +244,10 @@ impl CodeGraphNavigatorSession {
         max_add: Option<usize>,
         priority_threshold: Option<u16>,
     ) -> Result<CodeGraphRecommendedActionsResult> {
-        let mut export_config = CodeGraphExportConfig::default();
-        export_config.max_frontier_actions = top.max(1).max(8);
+        let export_config = CodeGraphExportConfig {
+            max_frontier_actions: top.max(1).max(8),
+            ..Default::default()
+        };
         let actions = self
             .export(&CodeGraphRenderConfig::default(), &export_config)
             .frontier

@@ -8,8 +8,10 @@ use super::{
 };
 
 pub(super) fn analyze_file(path: &str, source: &str, language: CodeLanguage) -> FileAnalysis {
-    let mut analysis = FileAnalysis::default();
-    analysis.file_description = extract_file_description(source, language);
+    let mut analysis = FileAnalysis {
+        file_description: extract_file_description(source, language),
+        ..Default::default()
+    };
     let mut parser = Parser::new();
     let tree_sitter_language = language_for(language);
     if parser.set_language(&tree_sitter_language).is_err() {

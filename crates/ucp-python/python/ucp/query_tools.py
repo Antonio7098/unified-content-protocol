@@ -9,7 +9,6 @@ from .query import (
     BaseQueryGraph,
     BaseQuerySession,
     QueryLimits,
-    QueryRunResult,
     _merge_limits,
     _wrap_session,
     query,
