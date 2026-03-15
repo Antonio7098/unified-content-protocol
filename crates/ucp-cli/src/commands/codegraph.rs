@@ -1210,6 +1210,7 @@ fn build_traversal_config(
         relation_filters,
         max_add,
         priority_threshold,
+        budget: None,
     })
 }
 
@@ -1440,6 +1441,7 @@ fn context_expand_recommended(
             relation_filters: action.relation.clone().into_iter().collect(),
             max_add,
             priority_threshold,
+            budget: None,
         };
         let next = match action.action.as_str() {
             "hydrate_source" => {

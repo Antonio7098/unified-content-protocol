@@ -6,8 +6,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_SRC = ROOT / "crates" / "ucp-python" / "python"
 ARTIFACTS = ROOT / "artifacts"
-TRANSCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ARTIFACTS / "codegraph-python-query-demo-transcript.md"
-TARGET_REGEX = "context_show|get_session_mut|print_context_update|resolve_codegraph_selector"
+TRANSCRIPT = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1
+    else ARTIFACTS / "codegraph-python-query-demo-transcript.md"
+)
+TARGET_REGEX = (
+    "context_show|get_session_mut|print_context_update|resolve_codegraph_selector"
+)
 PATH_REGEX = r"crates/ucp-cli/src/commands/codegraph\.rs|crates/ucp-cli/src/commands/agent\.rs|crates/ucp-codegraph/src/context\.rs"
 
 sys.path.insert(0, str(PYTHON_SRC))
@@ -19,7 +25,11 @@ except ImportError as exc:  # pragma: no cover
 
 
 def record(handle, title, payload):
-    rendered = payload if isinstance(payload, str) else json.dumps(payload, indent=2, sort_keys=True)
+    rendered = (
+        payload
+        if isinstance(payload, str)
+        else json.dumps(payload, indent=2, sort_keys=True)
+    )
     handle.write(f"\n## {title}\n\n```json\n{rendered}\n```\n")
 
 
@@ -75,8 +85,16 @@ result = {{
             "This transcript demonstrates agent-style repository querying through the thin Python façade and query runner, "
             "using regex discovery, loops, branch-and-compare, and targeted hydration.\n"
         )
-        record(handle, "Raw CodeGraph summary", {"nodes": len(raw_graph.to_document().blocks), "repr": repr(raw_graph)})
-        record(handle, "Facade graph.find(...) seed candidates", graph.find(node_class="symbol", name_regex=TARGET_REGEX, limit=6))
+        record(
+            handle,
+            "Raw CodeGraph summary",
+            {"nodes": len(raw_graph.to_document().blocks), "repr": repr(raw_graph)},
+        )
+        record(
+            handle,
+            "Facade graph.find(...) seed candidates",
+            graph.find(node_class="symbol", name_regex=TARGET_REGEX, limit=6),
+        )
         record(handle, "Python query runner result", run.as_dict())
         record(handle, "Final export", run.export)
         handle.write("\n## Final summary\n\n")

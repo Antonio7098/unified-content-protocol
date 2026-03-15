@@ -3,7 +3,7 @@ use std::fs;
 use tempfile::tempdir;
 use ucp_codegraph::{
     CodeGraphBuildInput, CodeGraphExpandMode, CodeGraphExportConfig, CodeGraphFindQuery,
-    CodeGraphNavigator, CodeGraphRenderConfig, CodeGraphTraversalConfig,
+    CodeGraphNavigator, CodeGraphOperationBudget, CodeGraphRenderConfig, CodeGraphTraversalConfig,
 };
 
 fn build_graph() -> CodeGraphNavigator {
@@ -118,4 +118,93 @@ fn apply_recommended_actions_hydrates_or_expands_frontier() {
         &CodeGraphExportConfig::compact(),
     );
     assert!(export.nodes.len() >= 3);
+}
+
+#[test]
+fn session_observability_and_persistence_surface_work() {
+    let graph = build_graph();
+    let mut session = graph.session();
+    session.seed_overview(Some(3));
+    let update = session
+        .expand(
+            "src/lib.rs",
+            CodeGraphExpandMode::File,
+            &CodeGraphTraversalConfig {
+                budget: Some(CodeGraphOperationBudget {
+                    max_nodes_visited: Some(8),
+                    max_emitted_telemetry_events: Some(4),
+                    ..CodeGraphOperationBudget::default()
+                }),
+                ..CodeGraphTraversalConfig::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(update.telemetry.len(), 1);
+    assert_eq!(session.mutation_log().len(), 2);
+    assert!(session
+        .event_log()
+        .iter()
+        .any(|event| matches!(event, ucp_codegraph::CodeGraphSessionEvent::Mutation { .. })));
+
+    let selector = session.explain_selector("src/lib.rs");
+    assert!(!selector.ambiguous);
+    assert_eq!(selector.match_kind.as_deref(), Some("path"));
+
+    let estimate = session
+        .estimate_expand(
+            "symbol:src/lib.rs::add",
+            CodeGraphExpandMode::Dependencies,
+            &CodeGraphTraversalConfig::default(),
+        )
+        .unwrap();
+    assert!(estimate.estimated_nodes_added >= 1);
+
+    let recommendations = session.recommendations(2);
+    assert!(!recommendations.is_empty());
+    assert!(!recommendations[0].explanation.is_empty());
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("session.json");
+    session.save(&path).unwrap();
+    let restored = graph.load_session(&path).unwrap();
+    assert_eq!(restored.selected_block_ids(), session.selected_block_ids());
+    assert_eq!(restored.session_id(), session.session_id());
+}
+
+#[test]
+fn omission_and_prune_explanations_are_reported() {
+    let graph = build_graph();
+    let mut session = graph.session();
+    session.seed_overview(Some(3));
+    session
+        .expand(
+            "src/lib.rs",
+            CodeGraphExpandMode::File,
+            &CodeGraphTraversalConfig::default(),
+        )
+        .unwrap();
+    session
+        .expand(
+            "symbol:src/lib.rs::add",
+            CodeGraphExpandMode::Dependencies,
+            &CodeGraphTraversalConfig::default(),
+        )
+        .unwrap();
+
+    let omission = session
+        .explain_export_omission(
+            "symbol:src/util.rs::util",
+            &CodeGraphRenderConfig::default(),
+            &CodeGraphExportConfig {
+                visible_levels: Some(0),
+                ..CodeGraphExportConfig::compact()
+            },
+        )
+        .unwrap();
+    assert!(omission.omitted);
+
+    session.prune(Some(2));
+    let pruned = session.why_pruned("symbol:src/util.rs::util").unwrap();
+    assert!(pruned.pruned);
+    assert!(pruned.explanation.contains("prune"));
 }

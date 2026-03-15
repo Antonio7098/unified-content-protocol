@@ -3,7 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional
 
-from .query import BaseQueryGraph, BaseQuerySession, QueryLimits, QueryRunResult, _merge_limits, run_python_query
+from .query import (
+    BaseQueryGraph,
+    BaseQuerySession,
+    QueryLimits,
+    QueryRunResult,
+    _merge_limits,
+    run_python_query,
+)
 
 
 @dataclass(frozen=True)
@@ -83,8 +90,12 @@ def summarize_query_benchmark_suite(
         "cases": len(materialized),
         "ok": sum(1 for result in materialized if result.ok),
         "failed": sum(1 for result in materialized if not result.ok),
-        "total_operations": sum(result.run.usage.operation_count for result in materialized),
-        "total_trace_events": sum(result.run.usage.trace_events for result in materialized),
+        "total_operations": sum(
+            result.run.usage.operation_count for result in materialized
+        ),
+        "total_trace_events": sum(
+            result.run.usage.trace_events for result in materialized
+        ),
         "total_elapsed_seconds": round(
             sum(result.run.usage.elapsed_seconds for result in materialized), 6
         ),

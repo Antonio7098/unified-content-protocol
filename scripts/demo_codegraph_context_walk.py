@@ -5,13 +5,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_SRC = ROOT / "crates" / "ucp-python" / "python"
-TRANSCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "artifacts/codegraph-context-demo-transcript.md"
+TRANSCRIPT = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1
+    else ROOT / "artifacts/codegraph-context-demo-transcript.md"
+)
 TARGET_FILES = {
     "crates/ucp-cli/src/commands/codegraph.rs",
     "crates/ucp-cli/src/commands/agent.rs",
     "crates/ucp-codegraph/src/context.rs",
 }
-SEED_NAME_REGEX = "context_show|get_session_mut|print_context_update|resolve_codegraph_selector"
+SEED_NAME_REGEX = (
+    "context_show|get_session_mut|print_context_update|resolve_codegraph_selector"
+)
 MAX_OUTPUT_LINES = 80
 
 sys.path.insert(0, str(PYTHON_SRC))
@@ -36,15 +42,24 @@ def clip(text: str) -> str:
     lines = text.splitlines()
     if len(lines) <= MAX_OUTPUT_LINES:
         return text
-    return "\n".join(lines[:MAX_OUTPUT_LINES]) + f"\n... clipped {len(lines) - MAX_OUTPUT_LINES} more lines ...\n"
+    return (
+        "\n".join(lines[:MAX_OUTPUT_LINES])
+        + f"\n... clipped {len(lines) - MAX_OUTPUT_LINES} more lines ...\n"
+    )
 
 
 def record(title: str, payload) -> None:
-    rendered = json.dumps(payload, indent=2, sort_keys=True) if not isinstance(payload, str) else payload
+    rendered = (
+        json.dumps(payload, indent=2, sort_keys=True)
+        if not isinstance(payload, str)
+        else payload
+    )
     write(f"\n## {title}\n\n```json\n{clip(rendered)}\n```\n")
 
 
-def read_excerpt(path: Path, start: int | None, end: int | None, padding: int = 2) -> str:
+def read_excerpt(
+    path: Path, start: int | None, end: int | None, padding: int = 2
+) -> str:
     lines = path.read_text(encoding="utf-8").splitlines()
     first = max(1, (start or 1) - padding)
     last = min(len(lines), (end or start or 1) + padding)
@@ -63,13 +78,19 @@ def main() -> None:
     )
 
     graph = ucp.CodeGraph.build(str(ROOT), continue_on_parse_error=True)
-    record("Build repository graph", {"nodes": len(graph.to_document().blocks), "repr": repr(graph)})
+    record(
+        "Build repository graph",
+        {"nodes": len(graph.to_document().blocks), "repr": repr(graph)},
+    )
 
     session = graph.session()
     record("Seed overview", session.seed_overview(max_depth=3))
 
     for path in sorted(TARGET_FILES):
-        record(f"Expand file symbols for {path}", session.expand(path, mode="file", depth=2))
+        record(
+            f"Expand file symbols for {path}",
+            session.expand(path, mode="file", depth=2),
+        )
 
     seeds = graph.find_nodes(
         node_class="symbol",
@@ -92,18 +113,27 @@ def main() -> None:
         record(f"Why is {logical_key} selected?", branch.why_selected(logical_key))
         record(f"Hydrate {logical_key}", branch.hydrate(logical_key, padding=2))
         try:
-            record(f"Apply recommended action near {logical_key}", branch.apply_recommended(top=1, padding=2))
+            record(
+                f"Apply recommended action near {logical_key}",
+                branch.apply_recommended(top=1, padding=2),
+            )
         except RuntimeError as exc:
-            record(f"Apply recommended action near {logical_key}", {"warning": str(exc)})
+            record(
+                f"Apply recommended action near {logical_key}", {"warning": str(exc)}
+            )
 
     if len(seeds) >= 2:
-        path = branch.path_between(seeds[0]["logical_key"], seeds[1]["logical_key"], max_hops=8)
+        path = branch.path_between(
+            seeds[0]["logical_key"], seeds[1]["logical_key"], max_hops=8
+        )
         record("Path between the first two seed symbols", path)
 
     diff = session.diff(branch)
     record("Diff between base session and exploration branch", diff)
 
-    exported = branch.export(compact=True, include_rendered=False, max_frontier_actions=8)
+    exported = branch.export(
+        compact=True, include_rendered=False, max_frontier_actions=8
+    )
     record("Compact structured export from the exploration branch", exported)
 
     write("\n## Read coderef-backed excerpts from the final working set\n")
@@ -116,9 +146,15 @@ def main() -> None:
         excerpt_path = ROOT / path
         if not excerpt_path.is_file():
             continue
-        excerpt = read_excerpt(excerpt_path, coderef.get("start_line"), coderef.get("end_line"))
-        write(f"\n### {node.get('short_id', node['block_id'])} `{node.get('logical_key') or node.get('label')}`\n\n")
-        write(f"- ref: `{path}:{coderef.get('start_line')}-{coderef.get('end_line')}`\n\n")
+        excerpt = read_excerpt(
+            excerpt_path, coderef.get("start_line"), coderef.get("end_line")
+        )
+        write(
+            f"\n### {node.get('short_id', node['block_id'])} `{node.get('logical_key') or node.get('label')}`\n\n"
+        )
+        write(
+            f"- ref: `{path}:{coderef.get('start_line')}-{coderef.get('end_line')}`\n\n"
+        )
         write(f"```rust\n{excerpt}\n```\n")
         emitted += 1
         if emitted >= 6:

@@ -16,7 +16,7 @@ The engine is the execution layer of UCP, responsible for:
 === "Rust"
     ```toml
     [dependencies]
-    ucm-engine = "0.1.14"
+    ucm-engine = "0.1.15"
     ```
 
 === "Python"
@@ -279,4 +279,3 @@ Validate document integrity:
 - [Transactions](./transactions.md) - Transaction management
 - [Snapshots](./snapshots.md) - Snapshot system
 - [Validation](./validation.md) - Validation pipeline
-

@@ -6,7 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_SRC = ROOT / "crates" / "ucp-python" / "python"
 ARTIFACTS = ROOT / "artifacts"
-TRANSCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ARTIFACTS / "ucp-python-query-demo-transcript.md"
+TRANSCRIPT = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1
+    else ARTIFACTS / "ucp-python-query-demo-transcript.md"
+)
 
 sys.path.insert(0, str(PYTHON_SRC))
 
@@ -19,14 +23,20 @@ except ImportError as exc:  # pragma: no cover
 def build_document():
     doc = ucp.create("Python query demo")
     section = doc.add_block(doc.root_id, "Section", role="section", label="section")
-    note = doc.add_block(section, "Important note", role="paragraph", label="note", tags=["important"])
+    note = doc.add_block(
+        section, "Important note", role="paragraph", label="note", tags=["important"]
+    )
     helper = doc.add_code(section, "rust", "fn helper() -> i32 { 1 }", label="helper")
     doc.add_edge(note, ucp.EdgeType.References, helper)
     return doc
 
 
 def record(handle, title, payload):
-    rendered = payload if isinstance(payload, str) else json.dumps(payload, indent=2, sort_keys=True)
+    rendered = (
+        payload
+        if isinstance(payload, str)
+        else json.dumps(payload, indent=2, sort_keys=True)
+    )
     handle.write(f"\n## {title}\n\n```json\n{rendered}\n```\n")
 
 
@@ -63,7 +73,11 @@ result = {
             "using loops, regex, and conditional traversal without a separate graph DSL.\n"
         )
         record(handle, "Raw graph stats", raw_graph.store_stats())
-        record(handle, "Facade graph.find(...) results", graph.find(label_regex="note|helper"))
+        record(
+            handle,
+            "Facade graph.find(...) results",
+            graph.find(label_regex="note|helper"),
+        )
         record(handle, "Query runner result", run.as_dict())
         record(handle, "Final session export", run.export)
         handle.write("\n## Final summary\n\n")

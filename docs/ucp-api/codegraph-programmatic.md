@@ -22,7 +22,10 @@ This avoids forcing agents to write graph-database queries while still enabling 
 - `CodeGraphNavigatorSession`
 - `CodeGraphFindQuery`
 - `CodeGraphExpandMode`
+- `CodeGraphOperationBudget`
 - `CodeGraphSelectionExplanation`
+- `CodeGraphSelectorResolutionExplanation`
+- `CodeGraphMutationEstimate`
 - `CodeGraphSessionDiff`
 
 Example:
@@ -83,7 +86,14 @@ for node in graph.find(node_class="symbol", name_regex="Session|Context"):
 - `export(...)`
 - `render_prompt(...)`
 - `why_selected(...)`
+- `explain_selector(...)`
+- `explain_export_omission(...)`
+- `why_pruned(...)`
 - `apply_recommended(...)`
+- `recommendations(...)`
+- `estimate_expand(...)` / `estimate_hydrate(...)`
+- `mutation_log()` / `event_log()`
+- `to_json()` / `save(...)`
 - `fork()` / `diff(...)`
 
 ### Agent-facing façade
@@ -98,9 +108,74 @@ Wrap a raw graph with `ucp.query(...)` and use the thinner names:
 - `session.walk(...)`
 - `session.focus(...)`
 - `session.why(...)`
+- `session.explain_export_omission(...)`
+- `session.why_pruned(...)`
 - `session.export(...)`
 - `session.fork()` / `session.diff(...)`
 - `session.hydrate(...)` on CodeGraph
+- `session.recommendations(...)`
+- `session.estimate_expand(...)` / `session.estimate_hydrate(...)`
+
+## Session observability
+
+Every session mutation now emits a typed telemetry record on the returned update and into the session log.
+
+Recorded fields include:
+
+- operation kind
+- selector and resolved block ids
+- traversal and budget parameters
+- nodes added, removed, and changed
+- focus before/after
+- elapsed time
+- mutation reason
+
+Example:
+
+```rust
+use ucp_api::{CodeGraphExpandMode, CodeGraphOperationBudget, CodeGraphTraversalConfig};
+
+let update = session.expand(
+    "src/lib.rs",
+    CodeGraphExpandMode::File,
+    &CodeGraphTraversalConfig {
+        budget: Some(CodeGraphOperationBudget {
+            max_nodes_visited: Some(16),
+            max_emitted_telemetry_events: Some(4),
+            ..Default::default()
+        }),
+        ..Default::default()
+    },
+)?;
+
+assert!(!update.telemetry.is_empty());
+assert!(!session.mutation_log().is_empty());
+```
+
+## Persistence and replayability
+
+Sessions are now stable persisted artifacts with:
+
+- schema versioning
+- session identity
+- graph snapshot hash
+- session snapshot hash
+- structured mutation history
+
+```rust
+let payload = session.to_json()?;
+let restored = graph.load_session_json(&payload)?;
+assert_eq!(restored.selected_block_ids(), session.selected_block_ids());
+```
+
+## Recommendations and negative explanations
+
+The richer recommendation/explanation APIs are designed for auditability and benchmark evaluation:
+
+- `session.recommendations(top)` returns rationale, relation sets, evidence gain, and estimated token/hydration cost.
+- `session.explain_export_omission(...)` explains hidden nodes caused by visible-level limits, class filters, or render budgets.
+- `session.why_pruned(...)` explains the latest recorded prune outcome for a selector.
+- `graph.explain_selector(...)` explains how selector resolution behaved, including ambiguity.
 
 Use `ucp.run_python_query(...)` when you want the model to mix those primitives with Python loops, regex, and branching logic.
 
@@ -120,7 +195,7 @@ Fork a session, explore two hypotheses independently, then compare them with `di
 
 ### Explainability
 
-Use `why_selected(...)` to understand how a node entered the current working set and which anchor introduced it.
+Use `why_selected(...)` to understand how a node entered the current working set, which anchor introduced it, and the full provenance chain.
 
 ### Focused path-finding
 
@@ -133,3 +208,4 @@ Use `path_between(...)` to inspect the shortest discovered chain between two sel
 - `docs/ucp-api/python-query-tools.md`
 - `crates/ucp-python/README.md`
 - `scripts/demo_codegraph_context_walk.py`
+- `scripts/demo_codegraph_session_observability.py`

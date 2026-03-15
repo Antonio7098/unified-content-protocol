@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -164,6 +165,8 @@ pub struct CodeGraphContextUpdate {
     pub focus: Option<BlockId>,
     #[serde(default)]
     pub warnings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub telemetry: Vec<CodeGraphSessionMutation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,6 +184,10 @@ pub struct CodeGraphContextSummary {
 pub struct CodeGraphRenderConfig {
     pub max_edges_per_node: usize,
     pub max_source_lines: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_rendered_bytes: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_rendered_tokens: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -218,6 +225,24 @@ pub struct CodeGraphTraversalConfig {
     pub max_add: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority_threshold: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget: Option<CodeGraphOperationBudget>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CodeGraphOperationBudget {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_depth: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_nodes_visited: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_nodes_added: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_hydrated_bytes: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_elapsed_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_emitted_telemetry_events: Option<usize>,
 }
 
 impl Default for CodeGraphExportConfig {
@@ -241,6 +266,7 @@ impl Default for CodeGraphTraversalConfig {
             relation_filters: Vec::new(),
             max_add: None,
             priority_threshold: None,
+            budget: None,
         }
     }
 }
@@ -271,6 +297,150 @@ impl CodeGraphTraversalConfig {
             Some(self.relation_filters.iter().cloned().collect())
         }
     }
+}
+
+fn min_optional_usize(left: Option<usize>, right: Option<usize>) -> Option<usize> {
+    match (left, right) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CodeGraphSessionMutationKind {
+    Select,
+    Focus,
+    ExpandFile,
+    ExpandDependencies,
+    ExpandDependents,
+    Hydrate,
+    Collapse,
+    Pin,
+    Unpin,
+    Prune,
+    SeedOverview,
+    ApplyRecommendedActions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphSessionMutation {
+    pub sequence: usize,
+    pub kind: CodeGraphSessionMutationKind,
+    pub operation: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_block_id: Option<BlockId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resolved_block_ids: Vec<BlockId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub traversal: Option<CodeGraphTraversalConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget: Option<CodeGraphOperationBudget>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes_added: Vec<BlockId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes_removed: Vec<BlockId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes_changed: Vec<BlockId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_before: Option<BlockId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_after: Option<BlockId>,
+    pub elapsed_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphRecommendation {
+    pub action_kind: String,
+    pub target_block_id: BlockId,
+    pub target_short_id: String,
+    pub target_label: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub relation_set: Vec<String>,
+    pub priority: u16,
+    pub candidate_count: usize,
+    pub estimated_evidence_gain: usize,
+    pub estimated_token_cost: u32,
+    pub estimated_hydration_bytes: usize,
+    pub explanation: String,
+    pub rationale: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CodeGraphExportOmissionReason {
+    VisibleLevelLimit,
+    ClassFilter,
+    RenderBudget,
+    HydratedExcerptSupersededSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphExportOmissionDetail {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_id: Option<BlockId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    pub reason: CodeGraphExportOmissionReason,
+    pub explanation: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CodeGraphExportOmissionReport {
+    pub hidden_by_visible_levels: usize,
+    pub excluded_by_class_filters: usize,
+    pub dropped_by_render_budget: usize,
+    pub suppressed_by_hydrated_excerpt: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub details: Vec<CodeGraphExportOmissionDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "event", rename_all = "snake_case")]
+pub enum CodeGraphSessionEvent {
+    Mutation {
+        mutation: Box<CodeGraphSessionMutation>,
+    },
+    Recommendation {
+        recommendation: Box<CodeGraphRecommendation>,
+    },
+    SessionSaved {
+        metadata: CodeGraphSessionPersistenceMetadata,
+    },
+    SessionLoaded {
+        metadata: CodeGraphSessionPersistenceMetadata,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphSessionPersistenceMetadata {
+    pub schema_version: String,
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_session_id: Option<String>,
+    pub graph_snapshot_hash: String,
+    pub session_snapshot_hash: String,
+    pub mutation_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeGraphPersistedSession {
+    pub metadata: CodeGraphSessionPersistenceMetadata,
+    pub context: CodeGraphContextSession,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mutation_log: Vec<CodeGraphSessionMutation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub event_log: Vec<CodeGraphSessionEvent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -335,6 +505,8 @@ pub struct CodeGraphContextFrontierAction {
     pub candidate_count: usize,
     pub priority: u16,
     pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explanation: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -348,6 +520,8 @@ pub struct CodeGraphContextHeuristics {
     pub recommended_next_action: Option<CodeGraphContextFrontierAction>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recommended_actions: Vec<CodeGraphContextFrontierAction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recommendations: Vec<CodeGraphRecommendation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -383,6 +557,8 @@ pub struct CodeGraphContextExport {
     pub edges: Vec<CodeGraphContextEdgeExport>,
     pub omitted_symbol_count: usize,
     pub total_selected_edges: usize,
+    #[serde(default)]
+    pub omissions: CodeGraphExportOmissionReport,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub rendered: String,
 }
@@ -392,6 +568,8 @@ impl Default for CodeGraphRenderConfig {
         Self {
             max_edges_per_node: 6,
             max_source_lines: 12,
+            max_rendered_bytes: None,
+            max_rendered_tokens: None,
         }
     }
 }
@@ -402,19 +580,28 @@ impl CodeGraphRenderConfig {
             Self {
                 max_edges_per_node: 2,
                 max_source_lines: 4,
+                max_rendered_bytes: None,
+                max_rendered_tokens: Some(max_tokens as u32),
             }
         } else if max_tokens <= 1024 {
             Self {
                 max_edges_per_node: 3,
                 max_source_lines: 6,
+                max_rendered_bytes: None,
+                max_rendered_tokens: Some(max_tokens as u32),
             }
         } else if max_tokens <= 2048 {
             Self {
                 max_edges_per_node: 4,
                 max_source_lines: 8,
+                max_rendered_bytes: None,
+                max_rendered_tokens: Some(max_tokens as u32),
             }
         } else {
-            Self::default()
+            Self {
+                max_rendered_tokens: Some(max_tokens as u32),
+                ..Self::default()
+            }
         }
     }
 }
@@ -650,6 +837,17 @@ impl CodeGraphContextSession {
     ) -> CodeGraphContextUpdate {
         let index = CodeGraphQueryIndex::new(doc);
         let mut update = CodeGraphContextUpdate::default();
+        let budget = traversal.budget.as_ref();
+        let start = Instant::now();
+        let effective_depth = traversal.depth().min(
+            budget
+                .and_then(|value| value.max_depth)
+                .unwrap_or(usize::MAX),
+        );
+        let max_add = min_optional_usize(
+            traversal.max_add,
+            budget.and_then(|value| value.max_nodes_added),
+        );
         self.ensure_selected_with_origin(
             file_id,
             CodeGraphDetailLevel::Neighborhood,
@@ -657,15 +855,41 @@ impl CodeGraphContextSession {
             &mut update,
         );
         let mut added_count = 0usize;
+        let mut visited_count = 0usize;
         let mut skipped_for_threshold = 0usize;
         let mut budget_exhausted = false;
-        if traversal.depth() > 0 {
+        if effective_depth > 0 {
             let mut queue: VecDeque<(BlockId, usize)> = index
                 .file_symbols(&file_id)
                 .into_iter()
                 .map(|symbol_id| (symbol_id, 1usize))
                 .collect();
             while let Some((symbol_id, symbol_depth)) = queue.pop_front() {
+                visited_count += 1;
+                if budget
+                    .and_then(|value| value.max_nodes_visited)
+                    .map(|limit| visited_count > limit)
+                    .unwrap_or(false)
+                {
+                    update.warnings.push(format!(
+                        "stopped file expansion after visiting {} nodes due to max_nodes_visited budget",
+                        visited_count - 1
+                    ));
+                    budget_exhausted = true;
+                    break;
+                }
+                if budget
+                    .and_then(|value| value.max_elapsed_ms)
+                    .map(|limit| start.elapsed().as_millis() as u64 >= limit)
+                    .unwrap_or(false)
+                {
+                    update.warnings.push(format!(
+                        "stopped file expansion after {} ms due to max_elapsed_ms budget",
+                        start.elapsed().as_millis()
+                    ));
+                    budget_exhausted = true;
+                    break;
+                }
                 let candidate_priority = frontier_priority("expand_file", None, 1, false);
                 if traversal
                     .priority_threshold
@@ -675,11 +899,7 @@ impl CodeGraphContextSession {
                     skipped_for_threshold += 1;
                     continue;
                 }
-                if traversal
-                    .max_add
-                    .map(|limit| added_count >= limit)
-                    .unwrap_or(false)
-                {
+                if max_add.map(|limit| added_count >= limit).unwrap_or(false) {
                     budget_exhausted = true;
                     break;
                 }
@@ -697,7 +917,7 @@ impl CodeGraphContextSession {
                 if !was_selected && self.selected.contains_key(&symbol_id) {
                     added_count += 1;
                 }
-                if symbol_depth >= traversal.depth() {
+                if symbol_depth >= effective_depth {
                     continue;
                 }
                 for child in index.symbol_children(&symbol_id) {
@@ -723,9 +943,8 @@ impl CodeGraphContextSession {
         self.history.push(format!(
             "expand:file:{}:{}:{}:{}",
             file_id,
-            traversal.depth(),
-            traversal
-                .max_add
+            effective_depth,
+            max_add
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "*".to_string()),
             traversal
@@ -875,6 +1094,16 @@ impl CodeGraphContextSession {
         block_id: BlockId,
         padding: usize,
     ) -> CodeGraphContextUpdate {
+        self.hydrate_source_with_budget(doc, block_id, padding, None)
+    }
+
+    pub fn hydrate_source_with_budget(
+        &mut self,
+        doc: &Document,
+        block_id: BlockId,
+        padding: usize,
+        budget: Option<&CodeGraphOperationBudget>,
+    ) -> CodeGraphContextUpdate {
         let mut update = CodeGraphContextUpdate::default();
         self.ensure_selected_with_origin(
             block_id,
@@ -883,7 +1112,16 @@ impl CodeGraphContextSession {
             &mut update,
         );
         match hydrate_source_excerpt(doc, block_id, padding) {
-            Ok(Some(excerpt)) => {
+            Ok(Some(mut excerpt)) => {
+                if let Some(max_bytes) = budget.and_then(|value| value.max_hydrated_bytes) {
+                    if excerpt.snippet.len() > max_bytes {
+                        excerpt.snippet = truncate_utf8(&excerpt.snippet, max_bytes);
+                        update.warnings.push(format!(
+                            "hydrated source for {} was truncated to {} bytes due to max_hydrated_bytes budget",
+                            block_id, max_bytes
+                        ));
+                    }
+                }
                 if let Some(node) = self.selected.get_mut(&block_id) {
                     node.detail_level = CodeGraphDetailLevel::Source;
                     node.hydrated_source = Some(excerpt);
@@ -1133,6 +1371,7 @@ impl CodeGraphContextSession {
         let summary = self.summary(doc);
         let short_ids = make_short_ids(self, &index);
         let selected_ids: HashSet<_> = self.selected.keys().copied().collect();
+        let mut omissions = CodeGraphExportOmissionReport::default();
         let distances = focus_distances(doc, self.focus, &selected_ids, &index);
         let visible_selected_ids = visible_selected_ids(
             self.focus,
@@ -1154,13 +1393,45 @@ impl CodeGraphContextSession {
                 !visible_selected_ids.contains(block_id) && !distances.contains_key(block_id)
             })
             .count();
+        for block_id in selected_ids
+            .difference(&visible_selected_ids)
+            .copied()
+            .collect::<Vec<_>>()
+        {
+            omissions.hidden_by_visible_levels += 1;
+            omissions.details.push(CodeGraphExportOmissionDetail {
+                block_id: Some(block_id),
+                short_id: short_ids.get(&block_id).cloned(),
+                label: index.display_label(doc, &block_id),
+                reason: CodeGraphExportOmissionReason::VisibleLevelLimit,
+                explanation: format!(
+                    "Node is outside the visible level budget from the current focus (visible_levels={}).",
+                    export_config
+                        .visible_levels
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "none".to_string())
+                ),
+            });
+        }
         let filtered_selected_ids =
             class_filtered_selected_ids(&index, &visible_selected_ids, export_config);
-        let rendered = if export_config.include_rendered {
-            self.render_for_prompt(doc, config)
-        } else {
-            String::new()
-        };
+        for block_id in visible_selected_ids
+            .difference(&filtered_selected_ids)
+            .copied()
+            .collect::<Vec<_>>()
+        {
+            omissions.excluded_by_class_filters += 1;
+            omissions.details.push(CodeGraphExportOmissionDetail {
+                block_id: Some(block_id),
+                short_id: short_ids.get(&block_id).cloned(),
+                label: index.display_label(doc, &block_id),
+                reason: CodeGraphExportOmissionReason::ClassFilter,
+                explanation: format!(
+                    "Node was excluded by export node-class filters (only={:?}, exclude={:?}).",
+                    export_config.only_node_classes, export_config.exclude_node_classes
+                ),
+            });
+        }
 
         let mut nodes = Vec::new();
         for block_id in self.selected_block_ids() {
@@ -1227,6 +1498,18 @@ impl CodeGraphContextSession {
             } else {
                 None
             };
+            if hydrated_source.is_some() && docs.is_none() {
+                omissions.suppressed_by_hydrated_excerpt += 1;
+                omissions.details.push(CodeGraphExportOmissionDetail {
+                    block_id: Some(block_id),
+                    short_id: short_ids.get(&block_id).cloned(),
+                    label: Some(label.clone()),
+                    reason: CodeGraphExportOmissionReason::HydratedExcerptSupersededSummary,
+                    explanation:
+                        "Hydrated source excerpt superseded the shorter summary/docs view for this node."
+                            .to_string(),
+                });
+            }
 
             nodes.push(CodeGraphContextNodeExport {
                 block_id,
@@ -1258,12 +1541,24 @@ impl CodeGraphContextSession {
             )
         });
 
+        apply_render_budget_to_nodes(&mut nodes, &mut omissions, config);
+
+        let budget_node_ids = nodes
+            .iter()
+            .map(|node| node.block_id)
+            .collect::<HashSet<_>>();
+
         let (edges, total_selected_edges) =
-            export_edges(&index, &filtered_selected_ids, &short_ids, export_config);
+            export_edges(&index, &budget_node_ids, &short_ids, export_config);
 
         let frontier = self.export_frontier(doc, &index, &short_ids, &selected_ids);
-        let heuristics = self.compute_heuristics(&index, &frontier);
+        let heuristics = self.compute_heuristics(doc, &index, &short_ids, &frontier);
         let omitted_symbol_count = index.total_symbols().saturating_sub(summary.symbols);
+        let rendered = if export_config.include_rendered {
+            apply_rendered_text_budget(self.render_for_prompt(doc, config), config, &mut omissions)
+        } else {
+            String::new()
+        };
 
         CodeGraphContextExport {
             summary,
@@ -1284,6 +1579,7 @@ impl CodeGraphContextSession {
             heuristics,
             omitted_symbol_count,
             total_selected_edges,
+            omissions,
             rendered,
         }
     }
@@ -1321,6 +1617,10 @@ impl CodeGraphContextSession {
                     candidate_count: hidden,
                     priority: frontier_priority("expand_file", None, hidden, false),
                     description: format!("Expand file symbols for {}", label),
+                    explanation: Some(format!(
+                        "{} hidden symbol candidates remain under the focused file",
+                        hidden
+                    )),
                 }];
                 actions.push(CodeGraphContextFrontierAction {
                     block_id: focus_id,
@@ -1346,6 +1646,10 @@ impl CodeGraphContextSession {
                         false,
                     ),
                     description: format!("Hydrate source for file {}", label),
+                    explanation: Some(format!(
+                        "Hydrating {} will add source lines to the working set export",
+                        label
+                    )),
                 });
                 actions.sort_by_key(|action| {
                     (
@@ -1402,6 +1706,10 @@ impl CodeGraphContextSession {
                         false,
                     ),
                     description: format!("Hydrate source for {}", label),
+                    explanation: Some(format!(
+                        "Hydrating {} will surface an anchored source excerpt for the focused symbol",
+                        label
+                    )),
                 });
                 actions.push(CodeGraphContextFrontierAction {
                     block_id: focus_id,
@@ -1412,6 +1720,10 @@ impl CodeGraphContextSession {
                     candidate_count: 1,
                     priority: frontier_priority("collapse", None, 1, false),
                     description: format!("Collapse {} from working set", label),
+                    explanation: Some(format!(
+                        "Collapse removes {} from the active working set when the current branch is no longer useful",
+                        label
+                    )),
                 });
                 actions.sort_by_key(|action| {
                     (
@@ -1428,7 +1740,9 @@ impl CodeGraphContextSession {
 
     fn compute_heuristics(
         &self,
+        doc: &Document,
         index: &CodeGraphQueryIndex,
+        short_ids: &HashMap<BlockId, String>,
         frontier: &[CodeGraphContextFrontierAction],
     ) -> CodeGraphContextHeuristics {
         let focus_node = self.focus.and_then(|id| self.selected.get(&id));
@@ -1451,6 +1765,10 @@ impl CodeGraphContextSession {
             .take(3)
             .cloned()
             .collect();
+        let recommendations = recommended_actions
+            .iter()
+            .map(|action| recommendation_from_frontier(doc, index, short_ids, action))
+            .collect::<Vec<_>>();
         let recommended_next_action = recommended_actions.first().cloned();
 
         let mut reasons = Vec::new();
@@ -1509,6 +1827,7 @@ impl CodeGraphContextSession {
             low_value_candidate_count,
             recommended_next_action,
             recommended_actions,
+            recommendations,
         }
     }
 
@@ -1557,6 +1876,17 @@ impl CodeGraphContextSession {
         let index = CodeGraphQueryIndex::new(doc);
         let mut update = CodeGraphContextUpdate::default();
         let relation_filters = traversal_config.relation_filter_set();
+        let budget = traversal_config.budget.as_ref();
+        let start = Instant::now();
+        let effective_depth = traversal_config.depth().min(
+            budget
+                .and_then(|value| value.max_depth)
+                .unwrap_or(usize::MAX),
+        );
+        let max_add = min_optional_usize(
+            traversal_config.max_add,
+            budget.and_then(|value| value.max_nodes_added),
+        );
         self.ensure_selected_with_origin(
             block_id,
             CodeGraphDetailLevel::Neighborhood,
@@ -1573,10 +1903,36 @@ impl CodeGraphContextSession {
         let mut queue = VecDeque::from([(block_id, 0usize)]);
         let mut visited = HashSet::from([block_id]);
         let mut added_count = 0usize;
+        let mut visited_count = 0usize;
         let mut skipped_for_threshold = 0usize;
         let mut budget_exhausted = false;
         while let Some((current, current_depth)) = queue.pop_front() {
-            if current_depth >= traversal_config.depth() {
+            visited_count += 1;
+            if budget
+                .and_then(|value| value.max_nodes_visited)
+                .map(|limit| visited_count > limit)
+                .unwrap_or(false)
+            {
+                update.warnings.push(format!(
+                    "stopped expansion after visiting {} nodes due to max_nodes_visited budget",
+                    visited_count - 1
+                ));
+                budget_exhausted = true;
+                break;
+            }
+            if budget
+                .and_then(|value| value.max_elapsed_ms)
+                .map(|limit| start.elapsed().as_millis() as u64 >= limit)
+                .unwrap_or(false)
+            {
+                update.warnings.push(format!(
+                    "stopped expansion after {} ms due to max_elapsed_ms budget",
+                    start.elapsed().as_millis()
+                ));
+                budget_exhausted = true;
+                break;
+            }
+            if current_depth >= effective_depth {
                 continue;
             }
             let edges = match traversal_kind {
@@ -1606,11 +1962,7 @@ impl CodeGraphContextSession {
                     skipped_for_threshold += 1;
                     continue;
                 }
-                if traversal_config
-                    .max_add
-                    .map(|limit| added_count >= limit)
-                    .unwrap_or(false)
-                {
+                if max_add.map(|limit| added_count >= limit).unwrap_or(false) {
                     budget_exhausted = true;
                     break;
                 }
@@ -1673,9 +2025,8 @@ impl CodeGraphContextSession {
                 .as_ref()
                 .map(join_relation_filter_string)
                 .unwrap_or_else(|| "*".to_string()),
-            traversal_config.depth(),
-            traversal_config
-                .max_add
+            effective_depth,
+            max_add
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "*".to_string()),
             traversal_config
@@ -2099,6 +2450,51 @@ pub fn approximate_prompt_tokens(rendered: &str) -> u32 {
     ((rendered.len() as f32) / 4.0).ceil() as u32
 }
 
+fn approximate_tokens_for_bytes(bytes: usize) -> u32 {
+    ((bytes as f32) / 4.0).ceil() as u32
+}
+
+fn truncate_utf8(value: &str, max_bytes: usize) -> String {
+    if value.len() <= max_bytes {
+        return value.to_string();
+    }
+    let mut end = 0usize;
+    for (index, _) in value.char_indices() {
+        if index > max_bytes {
+            break;
+        }
+        end = index;
+    }
+    if end == 0 {
+        String::new()
+    } else {
+        value[..end].to_string()
+    }
+}
+
+fn estimated_export_node_bytes(node: &CodeGraphContextNodeExport) -> usize {
+    node.label.len()
+        + node.short_id.len()
+        + node.logical_key.as_ref().map(String::len).unwrap_or(0)
+        + node.symbol_name.as_ref().map(String::len).unwrap_or(0)
+        + node.path.as_ref().map(String::len).unwrap_or(0)
+        + node.signature.as_ref().map(String::len).unwrap_or(0)
+        + node.docs.as_ref().map(String::len).unwrap_or(0)
+        + node
+            .hydrated_source
+            .as_ref()
+            .map(|source| source.snippet.len())
+            .unwrap_or(0)
+}
+
+fn content_source_bytes(block: &Block) -> Option<usize> {
+    match &block.content {
+        Content::Code(code) => Some(code.source.len()),
+        Content::Text(text) => Some(text.text.len()),
+        _ => Some(block.content.size_bytes()),
+    }
+}
+
 fn origin_is_more_protective(
     next: Option<&CodeGraphSelectionOrigin>,
     current: Option<&CodeGraphSelectionOrigin>,
@@ -2267,8 +2663,151 @@ fn append_relation_frontier(
                 "{} {} neighbors via {} for {}",
                 action, direction, relation, label
             ),
+            explanation: Some(format!(
+                "{} hidden {} candidate{} remain for {} via {}",
+                candidate_count,
+                direction,
+                if candidate_count == 1 { "" } else { "s" },
+                label,
+                relation
+            )),
         });
     }
+}
+
+fn recommendation_from_frontier(
+    doc: &Document,
+    index: &CodeGraphQueryIndex,
+    short_ids: &HashMap<BlockId, String>,
+    action: &CodeGraphContextFrontierAction,
+) -> CodeGraphRecommendation {
+    let target_label = index
+        .display_label(doc, &action.block_id)
+        .unwrap_or_else(|| action.block_id.to_string());
+    let estimated_evidence_gain = match action.action.as_str() {
+        "hydrate_source" => 4,
+        "collapse" => 1,
+        _ => action.candidate_count.max(1),
+    };
+    let estimated_hydration_bytes = if action.action == "hydrate_source" {
+        doc.get_block(&action.block_id)
+            .map(|block| content_source_bytes(block).unwrap_or(0))
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    let estimated_token_cost = if estimated_hydration_bytes > 0 {
+        approximate_tokens_for_bytes(estimated_hydration_bytes)
+    } else {
+        (action.candidate_count as u32).saturating_mul(24)
+    };
+    let rationale = action
+        .explanation
+        .clone()
+        .unwrap_or_else(|| action.description.clone());
+    CodeGraphRecommendation {
+        action_kind: action.action.clone(),
+        target_block_id: action.block_id,
+        target_short_id: short_ids
+            .get(&action.block_id)
+            .cloned()
+            .unwrap_or_else(|| action.block_id.to_string()),
+        target_label,
+        relation_set: action.relation.clone().into_iter().collect(),
+        priority: action.priority,
+        candidate_count: action.candidate_count,
+        estimated_evidence_gain,
+        estimated_token_cost,
+        estimated_hydration_bytes,
+        explanation: action.description.clone(),
+        rationale,
+    }
+}
+
+fn apply_render_budget_to_nodes(
+    nodes: &mut Vec<CodeGraphContextNodeExport>,
+    omissions: &mut CodeGraphExportOmissionReport,
+    config: &CodeGraphRenderConfig,
+) {
+    let max_bytes = config.max_rendered_bytes;
+    let max_tokens = config.max_rendered_tokens;
+    if max_bytes.is_none() && max_tokens.is_none() {
+        return;
+    }
+
+    let mut kept = Vec::new();
+    let mut used_bytes = 0usize;
+    let mut used_tokens = 0u32;
+    for node in nodes.drain(..) {
+        let node_bytes = estimated_export_node_bytes(&node);
+        let node_tokens = approximate_tokens_for_bytes(node_bytes);
+        let within_bytes = max_bytes
+            .map(|limit| used_bytes + node_bytes <= limit)
+            .unwrap_or(true);
+        let within_tokens = max_tokens
+            .map(|limit| used_tokens + node_tokens <= limit)
+            .unwrap_or(true);
+        if within_bytes && within_tokens {
+            used_bytes += node_bytes;
+            used_tokens = used_tokens.saturating_add(node_tokens);
+            kept.push(node);
+            continue;
+        }
+        omissions.dropped_by_render_budget += 1;
+        omissions.details.push(CodeGraphExportOmissionDetail {
+            block_id: Some(node.block_id),
+            short_id: Some(node.short_id.clone()),
+            label: Some(node.label.clone()),
+            reason: CodeGraphExportOmissionReason::RenderBudget,
+            explanation: format!(
+                "Node exceeded export/render budget (bytes_used={} tokens_used={}).",
+                used_bytes, used_tokens
+            ),
+        });
+    }
+    *nodes = kept;
+}
+
+fn apply_rendered_text_budget(
+    rendered: String,
+    config: &CodeGraphRenderConfig,
+    omissions: &mut CodeGraphExportOmissionReport,
+) -> String {
+    let mut limited = rendered;
+    if let Some(max_bytes) = config.max_rendered_bytes {
+        if limited.len() > max_bytes {
+            limited = truncate_utf8(&limited, max_bytes);
+            omissions.dropped_by_render_budget += 1;
+            omissions.details.push(CodeGraphExportOmissionDetail {
+                block_id: None,
+                short_id: None,
+                label: Some("rendered".to_string()),
+                reason: CodeGraphExportOmissionReason::RenderBudget,
+                explanation: format!(
+                    "Rendered prompt text was truncated to {} bytes by max_rendered_bytes.",
+                    max_bytes
+                ),
+            });
+        }
+    }
+    if let Some(max_tokens) = config.max_rendered_tokens {
+        if approximate_prompt_tokens(&limited) > max_tokens {
+            let max_bytes = (max_tokens as usize).saturating_mul(4);
+            limited = truncate_utf8(&limited, max_bytes);
+            omissions.dropped_by_render_budget += 1;
+            omissions.details.push(CodeGraphExportOmissionDetail {
+                block_id: None,
+                short_id: None,
+                label: Some("rendered".to_string()),
+                reason: CodeGraphExportOmissionReason::RenderBudget,
+                explanation: format!(
+                    "Rendered prompt text was truncated to approximately {} tokens.",
+                    max_tokens
+                ),
+            });
+        }
+    }
+    limited
 }
 
 fn is_low_value_relation(action: &str, relation: &str) -> bool {

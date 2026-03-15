@@ -18,7 +18,7 @@ UCM Core is the foundation of the UCP ecosystem. It defines:
 === "Rust"
     ```toml
     [dependencies]
-    ucm-core = "0.1.14"
+    ucm-core = "0.1.15"
     ```
 
 === "Python"
@@ -222,4 +222,3 @@ Built-in support for LLM workflows:
 - [Edges](./edges.md) - Relationship types
 - [ID Generation](./id-generation.md) - How IDs are generated
 - [Metadata](./metadata.md) - Semantic roles and metadata
-

@@ -46,7 +46,9 @@ def test_codegraph_sessions_support_agentic_workflows(tmp_path):
     assert why["block_id"] == str(graph.resolve("symbol:src/util.rs::util"))
 
     diff = session.diff(branch)
-    assert any(node["logical_key"] == "symbol:src/util.rs::util" for node in diff["added"])
+    assert any(
+        node["logical_key"] == "symbol:src/util.rs::util" for node in diff["added"]
+    )
 
     path = branch.path_between("symbol:src/lib.rs::add", "symbol:src/util.rs::util")
     assert path is not None
@@ -60,7 +62,9 @@ def test_codegraph_sessions_support_agentic_workflows(tmp_path):
     assert exported["nodes"]
     assert exported["frontier"] is not None
     add_node = next(
-        node for node in exported["nodes"] if node["logical_key"] == "symbol:src/lib.rs::add"
+        node
+        for node in exported["nodes"]
+        if node["logical_key"] == "symbol:src/lib.rs::add"
     )
     assert add_node["symbol_name"] == "add"
     assert add_node["path"] == "src/lib.rs"
@@ -71,3 +75,47 @@ def test_codegraph_sessions_support_agentic_workflows(tmp_path):
     cleared_focus = branch.focus(None)
     assert "focus" in cleared_focus
     assert cleared_focus["focus"] is None
+
+
+def test_codegraph_session_observability_persistence_and_estimates(tmp_path):
+    import ucp
+
+    _write_repo(tmp_path)
+    graph = ucp.CodeGraph.build(str(tmp_path))
+    session = graph.session()
+
+    session.seed_overview(max_depth=3)
+    expanded = session.expand("src/lib.rs", mode="file", max_nodes_visited=8)
+    assert expanded["telemetry"][0]["kind"] == "expand_file"
+    assert session.mutation_log()
+    assert session.event_log()
+
+    selector = graph.explain_selector("src/lib.rs")
+    assert selector["match_kind"] == "path"
+
+    estimate = session.estimate_expand(
+        "symbol:src/lib.rs::add", mode="dependencies", depth=1
+    )
+    assert estimate["estimated_nodes_added"] >= 1
+
+    recommendations = session.recommendations(top=2)
+    assert recommendations
+    assert recommendations[0]["explanation"]
+
+    session.expand("symbol:src/lib.rs::add", mode="dependencies")
+    omission = session.explain_export_omission(
+        "symbol:src/util.rs::util",
+        compact=True,
+        visible_levels=0,
+    )
+    assert omission["omitted"] is True
+
+    session.prune(max_selected=2)
+    why_pruned = session.why_pruned("symbol:src/util.rs::util")
+    assert why_pruned["pruned"] is True
+
+    session_path = tmp_path / "session.json"
+    session.save(str(session_path))
+    restored = graph.load_session(str(session_path))
+    assert restored.session_id() == session.session_id()
+    assert restored.selected_block_ids() == session.selected_block_ids()

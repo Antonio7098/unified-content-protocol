@@ -16,7 +16,7 @@ The Markdown translator enables:
 === "Rust"
     ```toml
     [dependencies]
-    ucp-translator-markdown = "0.1.14"
+    ucp-translator-markdown = "0.1.15"
     ```
 
 === "Python"
@@ -513,4 +513,3 @@ For nested documents (e.g., embedding in another document):
 - [UCM Core Content Types](../ucm-core/content-types.md) - Content type reference
 - [Metadata](../ucm-core/metadata.md) - Semantic roles
 - [Documents](../ucm-core/documents.md) - Document structure
-

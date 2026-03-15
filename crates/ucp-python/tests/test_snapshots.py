@@ -1,7 +1,6 @@
 """Tests for Snapshot management."""
 
 
-
 class TestSnapshotManager:
     """Test SnapshotManager for document versioning."""
 
@@ -22,6 +21,7 @@ class TestSnapshotManager:
     def test_create_snapshot(self, doc_with_blocks):
         """Test creating a snapshot."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()
@@ -33,6 +33,7 @@ class TestSnapshotManager:
     def test_create_snapshot_with_description(self, doc_with_blocks):
         """Test creating a snapshot with description."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()
@@ -44,6 +45,7 @@ class TestSnapshotManager:
     def test_restore_snapshot(self, doc_with_blocks):
         """Test restoring from a snapshot."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()
@@ -62,6 +64,7 @@ class TestSnapshotManager:
     def test_get_snapshot_info(self, doc_with_blocks):
         """Test getting snapshot information."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()
@@ -85,6 +88,7 @@ class TestSnapshotManager:
     def test_list_snapshots(self, doc_with_blocks):
         """Test listing all snapshots."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()
@@ -103,6 +107,7 @@ class TestSnapshotManager:
     def test_delete_snapshot(self, doc_with_blocks):
         """Test deleting a snapshot."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()
@@ -125,6 +130,7 @@ class TestSnapshotManager:
     def test_exists(self, doc_with_blocks):
         """Test checking if snapshot exists."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()
@@ -136,6 +142,7 @@ class TestSnapshotManager:
     def test_snapshot_eviction(self, doc_with_blocks):
         """Test that old snapshots are evicted when max is reached."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager(max_snapshots=2)
@@ -151,6 +158,7 @@ class TestSnapshotManager:
     def test_restore_preserves_content(self, doc_with_blocks):
         """Test that restore preserves document content."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         # Get original content
@@ -174,6 +182,7 @@ class TestSnapshotManager:
     def test_multiple_snapshots_independent(self, doc_with_blocks):
         """Test that multiple snapshots are independent."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()
@@ -202,6 +211,7 @@ class TestSnapshotInfo:
     def test_snapshot_info_repr(self, doc_with_blocks):
         """Test SnapshotInfo string representation."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mgr = ucp.SnapshotManager()

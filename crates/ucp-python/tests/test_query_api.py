@@ -168,11 +168,19 @@ def test_codegraph_query_facade_supports_minimal_agent_surface(tmp_path):
     matches = graph.find(node_class="symbol", name_regex="add|util", limit=4)
     assert any(node["logical_key"] == "symbol:src/lib.rs::add" for node in matches)
 
-    add_symbol = next(node for node in matches if node["logical_key"] == "symbol:src/lib.rs::add")
+    add_symbol = next(
+        node for node in matches if node["logical_key"] == "symbol:src/lib.rs::add"
+    )
     session = graph.session()
     session.add(add_symbol, detail="summary")
     why_add = session.why(add_symbol)
     assert why_add["detail_level"] == "symbol_card"
+    assert (
+        session.estimate_expand(add_symbol, mode="dependencies", depth=1)[
+            "estimated_nodes_added"
+        ]
+        >= 1
+    )
 
     walked = session.walk(add_symbol, mode="dependencies", depth=1, limit=6)
     assert walked["added"]
@@ -180,6 +188,13 @@ def test_codegraph_query_facade_supports_minimal_agent_surface(tmp_path):
 
     hydrated = session.hydrate(add_symbol, padding=1)
     assert "changed" in hydrated
+    assert session.recommendations(top=2)
+    assert (
+        session.explain_export_omission(
+            "symbol:src/util.rs::util", compact=True, visible_levels=0
+        )["omitted"]
+        is True
+    )
     path = session.path(add_symbol, "symbol:src/util.rs::util")
     assert path is not None
     assert path["hops"]
@@ -219,4 +234,7 @@ result = {
     assert run.result["best"] == "symbol:src/lib.rs::add"
     assert all(size >= 1 for size in run.result["diff_sizes"])
     assert run.export["nodes"]
-    assert any(node["logical_key"] == "symbol:src/util.rs::util" for node in run.export["nodes"])
+    assert any(
+        node["logical_key"] == "symbol:src/util.rs::util"
+        for node in run.export["nodes"]
+    )

@@ -42,6 +42,7 @@ def hello():
     def test_render_document(self, doc_with_blocks):
         """Test rendering document to markdown."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         md = ucp.render(doc)
@@ -74,6 +75,7 @@ class TestUclExecution:
     def test_execute_edit(self, doc_with_blocks):
         """Test executing EDIT command."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         ucl = f'EDIT {block1} SET text = "Updated text"'
@@ -86,6 +88,7 @@ class TestUclExecution:
     def test_execute_append(self, doc_with_blocks):
         """Test executing APPEND command."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         initial_count = doc.block_count
@@ -98,10 +101,11 @@ class TestUclExecution:
     def test_execute_move(self, doc_with_blocks):
         """Test executing MOVE command."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         # Move block3 from block1 to block2
-        ucl = f'MOVE {block3} TO {block2}'
+        ucl = f"MOVE {block3} TO {block2}"
         results = ucp.execute_ucl(doc, ucl)
 
         assert len(results) > 0
@@ -112,10 +116,11 @@ class TestUclExecution:
     def test_execute_delete(self, doc_with_blocks):
         """Test executing DELETE command."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         initial_count = doc.block_count
-        ucl = f'DELETE {block2}'
+        ucl = f"DELETE {block2}"
         results = ucp.execute_ucl(doc, ucl)
 
         assert len(results) > 0
@@ -124,12 +129,13 @@ class TestUclExecution:
     def test_execute_multiple_commands(self, doc_with_blocks):
         """Test executing multiple UCL commands."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
-        ucl = f'''
+        ucl = f"""
         EDIT {block1} SET text = "Modified"
         APPEND {root} text :: "New block"
-        '''
+        """
         results = ucp.execute_ucl(doc, ucl)
 
         assert len(results) >= 2
@@ -137,14 +143,17 @@ class TestUclExecution:
     def test_execute_link(self, doc_with_blocks):
         """Test executing LINK command."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
-        ucl = f'LINK {block1} references {block2}'
+        ucl = f"LINK {block1} references {block2}"
         results = ucp.execute_ucl(doc, ucl)
 
         assert len(results) > 0
         edges = doc.outgoing_edges(block1)
-        found = any(et == ucp.EdgeType.References and target == block2 for et, target in edges)
+        found = any(
+            et == ucp.EdgeType.References and target == block2 for et, target in edges
+        )
         assert found is True
 
 

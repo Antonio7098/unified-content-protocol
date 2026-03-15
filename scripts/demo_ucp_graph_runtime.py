@@ -6,7 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_SRC = ROOT / "crates" / "ucp-python" / "python"
 ARTIFACTS = ROOT / "artifacts"
-TRANSCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ARTIFACTS / "ucp-graph-runtime-demo-transcript.md"
+TRANSCRIPT = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1
+    else ARTIFACTS / "ucp-graph-runtime-demo-transcript.md"
+)
 JSON_PATH = ARTIFACTS / "ucp-graph-runtime-demo.json"
 SQLITE_PATH = ARTIFACTS / "ucp-graph-runtime-demo.db"
 
@@ -51,7 +55,7 @@ def main():
     doc = build_document()
     graph = ucp.Graph.from_document(doc)
     graph.save(str(JSON_PATH))
-    sqlite = graph.persist_sqlite(str(SQLITE_PATH), "demo")
+    graph.persist_sqlite(str(SQLITE_PATH), "demo")
     reopened = ucp.Graph.from_sqlite(str(SQLITE_PATH), "demo")
 
     session = reopened.session()
@@ -69,8 +73,14 @@ def main():
         )
         record(handle, "In-memory graph stats", graph.store_stats())
         record(handle, "SQLite graph observability", reopened.observability())
-        record(handle, "Regex graph search", reopened.find_nodes(label_regex="note|helper"))
-        record(handle, "Path between note and helper", reopened.path_between("note", "helper", max_hops=3))
+        record(
+            handle, "Regex graph search", reopened.find_nodes(label_regex="note|helper")
+        )
+        record(
+            handle,
+            "Path between note and helper",
+            reopened.path_between("note", "helper", max_hops=3),
+        )
         record(handle, "Seed overview", seeded)
         record(handle, "Select note", selected)
         record(handle, "Expand outgoing edges from note", expanded)
