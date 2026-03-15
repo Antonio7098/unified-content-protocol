@@ -15,7 +15,9 @@ import tomllib
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CARGO_TOML = REPO_ROOT / "Cargo.toml"
 PYPROJECT_TOML = REPO_ROOT / "crates" / "ucp-python" / "pyproject.toml"
-PYTHON_INIT_PATH = REPO_ROOT / "crates" / "ucp-python" / "python" / "ucp" / "__init__.py"
+PYTHON_INIT_PATH = (
+    REPO_ROOT / "crates" / "ucp-python" / "python" / "ucp" / "__init__.py"
+)
 WASM_PACK_TOML = REPO_ROOT / "crates" / "ucp-wasm" / "Cargo.toml"
 # WASM package.json is generated in pkg/, but we can check the Cargo.toml metadata or the editor package
 # For now, let's point to ucm-editor as the representative JS package, or skip JS check if not applicable
@@ -164,7 +166,9 @@ def load_wasm_pack_version() -> str:
     try:
         return data["package"]["metadata"]["wasm-pack"]["package"]["version"]
     except KeyError as exc:  # pragma: no cover
-        raise SystemExit("crates/ucp-wasm/Cargo.toml is missing [package.metadata.wasm-pack.package].version") from exc
+        raise SystemExit(
+            "crates/ucp-wasm/Cargo.toml is missing [package.metadata.wasm-pack.package].version"
+        ) from exc
 
 
 def load_js_version() -> str:

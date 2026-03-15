@@ -6,7 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_SRC = ROOT / "crates" / "ucp-python" / "python"
 ARTIFACTS = ROOT / "artifacts"
-TRANSCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ARTIFACTS / "codegraph-query-recipes-transcript.md"
+TRANSCRIPT = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1
+    else ARTIFACTS / "codegraph-query-recipes-transcript.md"
+)
 
 sys.path.insert(0, str(PYTHON_SRC))
 
@@ -17,11 +21,17 @@ except ImportError as exc:  # pragma: no cover
 
 
 def record(handle, title, payload):
-    rendered = payload if isinstance(payload, str) else json.dumps(payload, indent=2, sort_keys=True)
+    rendered = (
+        payload
+        if isinstance(payload, str)
+        else json.dumps(payload, indent=2, sort_keys=True)
+    )
     handle.write(f"\n## {title}\n\n```json\n{rendered}\n```\n")
 
 
-def run_recipe(graph, title, code, *, bindings=None, include_export=False, export_kwargs=None):
+def run_recipe(
+    graph, title, code, *, bindings=None, include_export=False, export_kwargs=None
+):
     return title, ucp.run_python_query(
         graph,
         code,
@@ -185,7 +195,14 @@ def main():
             "This transcript captures a few higher-level recipe patterns over the UCP codebase graph: "
             "branch-and-compare, explanation paths, and lightweight ranking via Python control flow.\n"
         )
-        record(handle, "CodeGraph summary", {"repr": repr(graph.raw), "node_count": len(graph.raw.to_document().blocks)})
+        record(
+            handle,
+            "CodeGraph summary",
+            {
+                "repr": repr(graph.raw),
+                "node_count": len(graph.raw.to_document().blocks),
+            },
+        )
         for title, run in recipes:
             record(handle, title, run.as_dict())
 

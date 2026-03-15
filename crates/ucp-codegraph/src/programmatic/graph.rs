@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fs, path::Path, sync::Arc};
 
 use anyhow::Result;
 use ucm_core::{BlockId, Document};
@@ -8,7 +8,10 @@ use crate::{build_code_graph, CodeGraphBuildInput};
 use super::{
     query,
     session::CodeGraphNavigatorSession,
-    types::{CodeGraphFindQuery, CodeGraphNodeSummary, CodeGraphPathResult},
+    types::{
+        CodeGraphFindQuery, CodeGraphNodeSummary, CodeGraphPathResult,
+        CodeGraphSelectorResolutionExplanation,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -51,6 +54,10 @@ impl CodeGraphNavigator {
         query::describe_node(self.document(), block_id)
     }
 
+    pub fn explain_selector(&self, selector: &str) -> CodeGraphSelectorResolutionExplanation {
+        query::explain_selector(self.document(), selector)
+    }
+
     pub fn find_nodes(&self, query: &CodeGraphFindQuery) -> Result<Vec<CodeGraphNodeSummary>> {
         query::find_nodes(self.document(), query)
     }
@@ -66,5 +73,14 @@ impl CodeGraphNavigator {
 
     pub(crate) fn resolve_required(&self, selector: &str) -> Result<BlockId> {
         query::resolve_required(self.document(), selector)
+    }
+
+    pub fn load_session_json(&self, payload: &str) -> Result<CodeGraphNavigatorSession> {
+        let persisted = serde_json::from_str(payload)?;
+        CodeGraphNavigatorSession::from_persisted(self.clone(), persisted)
+    }
+
+    pub fn load_session(&self, path: impl AsRef<Path>) -> Result<CodeGraphNavigatorSession> {
+        self.load_session_json(&fs::read_to_string(path)?)
     }
 }

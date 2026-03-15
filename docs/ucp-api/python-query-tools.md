@@ -43,6 +43,7 @@ Additional integration helpers:
 
 - `graph.find(...)`
 - `graph.describe(selector)`
+- `graph.explain_selector(selector)`
 - `graph.resolve(selector)`
 - `graph.path(start, end, max_hops=8)`
 - `graph.session()`
@@ -54,13 +55,20 @@ Additional integration helpers:
 - `session.walk(target, ...)`
 - `session.focus(target=None)`
 - `session.why(target)`
+- `session.explain_export_omission(target, ...)`
+- `session.why_pruned(target)`
 - `session.export(...)`
 - `session.fork()` / `session.diff(other)`
+- `session.mutation_log()`
+- `session.event_log()`
 - `session.run(code, ...)`
 
 CodeGraph sessions also expose:
 
 - `session.hydrate(target, padding=2)`
+- `session.recommendations(top=3)`
+- `session.estimate_expand(...)`
+- `session.estimate_hydrate(...)`
 
 Selectors can be:
 
@@ -119,6 +127,29 @@ The result includes:
 Queries are automatically `textwrap.dedent(...)`-ed before execution, so normal indented triple-quoted snippets work as expected.
 
 For CodeGraph sessions, exported nodes include convenient top-level fields like `logical_key`, `path`, and `symbol_name`, which makes lightweight Python ranking/filtering much easier.
+
+## Session observability and persistence
+
+CodeGraph sessions now expose first-class observability primitives that are useful for agents, benchmarks, and UI tooling:
+
+- mutation telemetry on every update (`update["telemetry"]`)
+- cumulative `session.mutation_log()` and `session.event_log()`
+- selector resolution explanations via `graph.explain_selector(...)`
+- omission explanations via `session.explain_export_omission(...)`
+- prune explanations via `session.why_pruned(...)`
+- replayable session persistence via `session.save(...)`, `session.to_json()`, `graph.load_session(...)`, and `graph.load_session_json(...)`
+
+Example:
+
+```python
+session = ucp.CodeGraph.build("./repo").session()
+session.seed_overview(max_depth=3)
+update = session.expand("src/lib.rs", mode="file", max_nodes_visited=16)
+print(update["telemetry"][0]["operation"])
+print(session.mutation_log()[-1]["elapsed_ms"])
+```
+
+Recommendations are now structured objects rather than bare action strings, so agents can rank them by evidence gain or estimated hydration/token cost before applying them.
 
 ## Guarded execution
 
@@ -253,6 +284,7 @@ See:
 
 - `scripts/demo_codegraph_query_recipes.py`
 - `scripts/demo_codegraph_query_edge_cases.py`
+- `scripts/demo_codegraph_session_observability.py`
 
 ## Safety model
 

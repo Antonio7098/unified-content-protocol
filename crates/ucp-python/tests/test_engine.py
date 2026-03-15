@@ -1,7 +1,6 @@
 """Tests for Engine, ValidationPipeline, and TraversalEngine."""
 
 
-
 class TestEngine:
     """Test Engine class with transaction support."""
 
@@ -20,7 +19,7 @@ class TestEngine:
             validate_on_operation=False,
             max_batch_size=5000,
             enable_transactions=True,
-            enable_snapshots=False
+            enable_snapshots=False,
         )
         assert config.validate_on_operation is False
         assert config.max_batch_size == 5000
@@ -128,9 +127,7 @@ class TestResourceLimits:
         import ucp
 
         limits = ucp.ResourceLimits(
-            max_block_count=1000,
-            max_nesting_depth=10,
-            max_edges_per_block=50
+            max_block_count=1000, max_nesting_depth=10, max_edges_per_block=50
         )
         assert limits.max_block_count == 1000
         assert limits.max_nesting_depth == 10

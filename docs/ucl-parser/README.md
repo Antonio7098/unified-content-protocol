@@ -15,7 +15,7 @@ UCL is designed for:
 === "Rust"
     ```toml
     [dependencies]
-    ucl-parser = "0.1.14"
+    ucl-parser = "0.1.15"
     ```
 
 === "Python"
@@ -194,4 +194,3 @@ DELETE blk_old CASCADE
 - [Syntax Reference](./syntax.md) - Complete syntax documentation
 - [Commands Reference](./commands.md) - Detailed command documentation
 - [Expressions](./expressions.md) - Path and condition expressions
-

@@ -1,7 +1,6 @@
 """Tests for Edge operations."""
 
 
-
 class TestEdgeTypes:
     """Test edge type enumeration."""
 
@@ -78,6 +77,7 @@ class TestEdgeOperations:
     def test_add_edge(self, doc_with_blocks):
         """Test adding an edge between blocks."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         doc.add_edge(block1, ucp.EdgeType.References, block2)
@@ -85,12 +85,15 @@ class TestEdgeOperations:
         edges = doc.outgoing_edges(block1)
         assert len(edges) > 0
         # Check if the edge exists
-        found = any(et == ucp.EdgeType.References and target == block2 for et, target in edges)
+        found = any(
+            et == ucp.EdgeType.References and target == block2 for et, target in edges
+        )
         assert found is True
 
     def test_remove_edge(self, doc_with_blocks):
         """Test removing an edge."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         # Add then remove
@@ -102,6 +105,7 @@ class TestEdgeOperations:
     def test_outgoing_edges(self, doc_with_blocks):
         """Test getting outgoing edges."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         doc.add_edge(block1, ucp.EdgeType.References, block2)
@@ -113,6 +117,7 @@ class TestEdgeOperations:
     def test_incoming_edges(self, doc_with_blocks):
         """Test getting incoming edges."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         doc.add_edge(block1, ucp.EdgeType.References, block2)
@@ -128,6 +133,7 @@ class TestBlockEdges:
     def test_block_edges(self, doc_with_blocks):
         """Test getting edges from a block."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         doc.add_edge(block1, ucp.EdgeType.References, block2)
@@ -139,6 +145,7 @@ class TestBlockEdges:
     def test_block_edges_of_type(self, doc_with_blocks):
         """Test getting edges of a specific type from a block."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         doc.add_edge(block1, ucp.EdgeType.References, block2)

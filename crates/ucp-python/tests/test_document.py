@@ -1,7 +1,6 @@
 """Tests for Document operations."""
 
 
-
 class TestDocumentCreation:
     """Test document creation and basic properties."""
 
@@ -70,7 +69,9 @@ class TestBlockOperations:
     def test_add_block_with_tags(self, empty_doc):
         """Test adding a block with tags."""
         root = empty_doc.root_id
-        block_id = empty_doc.add_block(root, "Tagged block", tags=["important", "reviewed"])
+        block_id = empty_doc.add_block(
+            root, "Tagged block", tags=["important", "reviewed"]
+        )
 
         block = empty_doc.get_block(block_id)
         assert "important" in block.tags
@@ -87,6 +88,7 @@ class TestBlockOperations:
     def test_add_block_with_content(self, empty_doc):
         """Test adding a block with specific content type."""
         import ucp
+
         root = empty_doc.root_id
         content = ucp.Content.markdown("# Heading")
         block_id = empty_doc.add_block_with_content(root, content)
@@ -105,6 +107,7 @@ class TestBlockOperations:
     def test_get_nonexistent_block(self, empty_doc):
         """Test getting a nonexistent block returns None."""
         import ucp
+
         fake_id = ucp.BlockId("blk_000000000000000000000000")
         block = empty_doc.get_block(fake_id)
         assert block is None

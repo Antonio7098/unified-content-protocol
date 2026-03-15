@@ -11,6 +11,7 @@ use crate::{resolve_codegraph_selector, CodeGraphCoderef};
 
 use super::types::{
     CodeGraphFindQuery, CodeGraphNodeSummary, CodeGraphPathHop, CodeGraphPathResult,
+    CodeGraphSelectorResolutionExplanation,
 };
 
 pub(super) fn describe_node(doc: &Document, block_id: BlockId) -> Option<CodeGraphNodeSummary> {
@@ -130,6 +131,106 @@ pub(super) fn path_between(
 pub(super) fn resolve_required(doc: &Document, selector: &str) -> anyhow::Result<BlockId> {
     resolve_codegraph_selector(doc, selector)
         .ok_or_else(|| anyhow::anyhow!("No codegraph node matches selector: {}", selector))
+}
+
+pub(super) fn explain_selector(
+    doc: &Document,
+    selector: &str,
+) -> CodeGraphSelectorResolutionExplanation {
+    let mut candidates = Vec::new();
+    let mut match_kind = None;
+    let mut resolved_block_id = None;
+
+    if let Ok(block_id) = selector.parse::<BlockId>() {
+        match_kind = Some("block_id".to_string());
+        resolved_block_id = Some(block_id);
+        push_unique_candidate(doc, &mut candidates, block_id);
+    }
+
+    for (block_id, block) in &doc.blocks {
+        if string_meta(block, META_LOGICAL_KEY).as_deref() == Some(selector) {
+            match_kind = Some("logical_key".to_string());
+            resolved_block_id = Some(*block_id);
+            push_unique_candidate(doc, &mut candidates, *block_id);
+        }
+        if coderef(block)
+            .as_ref()
+            .map(|value| value.path.as_str() == selector || value.display.as_str() == selector)
+            .unwrap_or(false)
+        {
+            if match_kind.is_none() {
+                match_kind = Some(
+                    if coderef(block)
+                        .as_ref()
+                        .map(|value| value.path.as_str() == selector)
+                        .unwrap_or(false)
+                    {
+                        "path".to_string()
+                    } else {
+                        "display".to_string()
+                    },
+                );
+            }
+            if resolved_block_id.is_none() {
+                resolved_block_id = Some(*block_id);
+            }
+            push_unique_candidate(doc, &mut candidates, *block_id);
+        }
+        if string_meta(block, META_SYMBOL_NAME).as_deref() == Some(selector) {
+            if match_kind.is_none() {
+                match_kind = Some("symbol_name".to_string());
+            }
+            push_unique_candidate(doc, &mut candidates, *block_id);
+            if candidates.len() == 1 {
+                resolved_block_id = Some(*block_id);
+            } else {
+                resolved_block_id = None;
+            }
+        }
+    }
+
+    candidates.sort_by(|left, right| {
+        left.label
+            .cmp(&right.label)
+            .then(left.block_id.to_string().cmp(&right.block_id.to_string()))
+    });
+    let ambiguous = candidates.len() > 1 && match_kind.as_deref() == Some("symbol_name");
+    let explanation = if let Some(block_id) = resolved_block_id {
+        format!(
+            "Selector resolved via {} to {}.",
+            match_kind.as_deref().unwrap_or("unknown"),
+            block_id
+        )
+    } else if ambiguous {
+        format!(
+            "Selector matched {} candidates by symbol name and is ambiguous.",
+            candidates.len()
+        )
+    } else {
+        "Selector did not resolve to a codegraph node.".to_string()
+    };
+
+    CodeGraphSelectorResolutionExplanation {
+        selector: selector.to_string(),
+        resolved_block_id,
+        match_kind,
+        ambiguous,
+        explanation,
+        candidates,
+    }
+}
+
+fn push_unique_candidate(
+    doc: &Document,
+    candidates: &mut Vec<CodeGraphNodeSummary>,
+    block_id: BlockId,
+) {
+    if candidates.iter().any(|node| node.block_id == block_id) {
+        return;
+    }
+    if let Some(node) = describe_node(doc, block_id) {
+        candidates.push(node);
+    }
 }
 
 fn neighbors(doc: &Document, current: BlockId) -> Vec<CodeGraphPathHop> {

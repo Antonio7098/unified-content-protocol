@@ -15,7 +15,7 @@ UCP Observe helps you:
 === "Rust"
     ```toml
     [dependencies]
-    ucp-observe = "0.1.14"
+    ucp-observe = "0.1.15"
     ```
 
 === "Python"
@@ -587,4 +587,3 @@ Simple metrics collection:
 
 - [UCM Engine](../ucm-engine/README.md) - Engine with tracing support
 - [UCP API](../ucp-api/README.md) - High-level API
-

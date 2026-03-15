@@ -6,7 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_SRC = ROOT / "crates" / "ucp-python" / "python"
 ARTIFACTS = ROOT / "artifacts"
-TRANSCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ARTIFACTS / "codegraph-query-benchmarks-transcript.md"
+TRANSCRIPT = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1
+    else ARTIFACTS / "codegraph-query-benchmarks-transcript.md"
+)
 
 sys.path.insert(0, str(PYTHON_SRC))
 
@@ -17,7 +21,11 @@ except ImportError as exc:  # pragma: no cover
 
 
 def record(handle, title, payload):
-    rendered = payload if isinstance(payload, str) else json.dumps(payload, indent=2, sort_keys=True)
+    rendered = (
+        payload
+        if isinstance(payload, str)
+        else json.dumps(payload, indent=2, sort_keys=True)
+    )
     handle.write(f"\n## {title}\n\n```json\n{rendered}\n```\n")
 
 
@@ -107,7 +115,9 @@ def main():
     results = ucp.run_query_benchmark_suite(
         graph,
         cases,
-        default_limits=ucp.QueryLimits(max_seconds=8.0, max_operations=120, max_trace_events=8000),
+        default_limits=ucp.QueryLimits(
+            max_seconds=8.0, max_operations=120, max_trace_events=8000
+        ),
     )
     summary = ucp.summarize_query_benchmark_suite(results)
 

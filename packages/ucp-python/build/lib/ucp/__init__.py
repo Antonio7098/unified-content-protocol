@@ -51,6 +51,7 @@ __all__ = [
 
 class ContentType(str, Enum):
     """Content types supported by UCM."""
+
     TEXT = "text"
     CODE = "code"
     TABLE = "table"
@@ -61,6 +62,7 @@ class ContentType(str, Enum):
 
 class SemanticRole(str, Enum):
     """Semantic roles for blocks."""
+
     HEADING1 = "heading1"
     HEADING2 = "heading2"
     HEADING3 = "heading3"
@@ -79,6 +81,7 @@ class SemanticRole(str, Enum):
 
 class Capability(str, Enum):
     """UCL command capabilities."""
+
     EDIT = "edit"
     APPEND = "append"
     MOVE = "move"
@@ -105,6 +108,7 @@ def _generate_id() -> str:
 @dataclass
 class Block:
     """A content block in the document."""
+
     id: str
     content: str
     type: ContentType = ContentType.TEXT
@@ -116,6 +120,7 @@ class Block:
 @dataclass
 class Document:
     """A UCM document."""
+
     id: str
     root: str
     blocks: Dict[str, Block] = field(default_factory=dict)
@@ -228,7 +233,9 @@ def parse(markdown: str) -> Document:
             while i < len(lines) and lines[i].startswith("> "):
                 quote_lines.append(lines[i][2:])
                 i += 1
-            doc.add_block(current_parent, "\n".join(quote_lines), role=SemanticRole.QUOTE)
+            doc.add_block(
+                current_parent, "\n".join(quote_lines), role=SemanticRole.QUOTE
+            )
             continue
 
         # Paragraph
@@ -243,7 +250,9 @@ def parse(markdown: str) -> Document:
             i += 1
 
         if para_lines:
-            doc.add_block(current_parent, "\n".join(para_lines), role=SemanticRole.PARAGRAPH)
+            doc.add_block(
+                current_parent, "\n".join(para_lines), role=SemanticRole.PARAGRAPH
+            )
 
     return doc
 
@@ -515,6 +524,7 @@ class IdMapper:
         ]
 
         for pattern in patterns:
+
             def replacer(match: re.Match[str]) -> str:
                 prefix = match.group(1)
                 num = int(match.group(2))
@@ -588,7 +598,9 @@ class UclBuilder:
     ) -> "UclBuilder":
         """Add an APPEND command."""
         label_part = f' WITH label = "{label}"' if label else ""
-        self._commands.append(f"APPEND {parent_id} {type.value}{label_part} :: {content}")
+        self._commands.append(
+            f"APPEND {parent_id} {type.value}{label_part} :: {content}"
+        )
         return self
 
     def move_to(self, block_id: object, new_parent: object) -> "UclBuilder":

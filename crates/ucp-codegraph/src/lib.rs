@@ -10,9 +10,13 @@ pub use context::{
     CodeGraphCoderef, CodeGraphContextEdgeExport, CodeGraphContextExport,
     CodeGraphContextFrontierAction, CodeGraphContextHeuristics, CodeGraphContextNodeExport,
     CodeGraphContextSession, CodeGraphContextSummary, CodeGraphContextUpdate, CodeGraphDetailLevel,
-    CodeGraphExportConfig, CodeGraphExportMode, CodeGraphHiddenLevelSummary, CodeGraphPrunePolicy,
-    CodeGraphRenderConfig, CodeGraphSelectionOrigin, CodeGraphSelectionOriginKind,
-    CodeGraphTraversalConfig, HydratedSourceExcerpt,
+    CodeGraphExportConfig, CodeGraphExportMode, CodeGraphExportOmissionDetail,
+    CodeGraphExportOmissionReason, CodeGraphExportOmissionReport, CodeGraphHiddenLevelSummary,
+    CodeGraphOperationBudget, CodeGraphPersistedSession, CodeGraphPrunePolicy,
+    CodeGraphRecommendation, CodeGraphRenderConfig, CodeGraphSelectionOrigin,
+    CodeGraphSelectionOriginKind, CodeGraphSessionEvent, CodeGraphSessionMutation,
+    CodeGraphSessionMutationKind, CodeGraphSessionPersistenceMetadata, CodeGraphTraversalConfig,
+    HydratedSourceExcerpt,
 };
 pub use legacy::{
     build_code_graph, build_code_graph_incremental, canonical_codegraph_json,
@@ -25,9 +29,11 @@ pub use model::{
     CODEGRAPH_PROFILE_MARKER, CODEGRAPH_PROFILE_VERSION,
 };
 pub use programmatic::{
-    CodeGraphExpandMode, CodeGraphFindQuery, CodeGraphNavigator, CodeGraphNavigatorSession,
-    CodeGraphNodeSummary, CodeGraphPathHop, CodeGraphPathResult, CodeGraphRecommendedActionsResult,
-    CodeGraphSelectionExplanation, CodeGraphSessionDiff,
+    CodeGraphExpandMode, CodeGraphExportOmissionExplanation, CodeGraphFindQuery,
+    CodeGraphMutationEstimate, CodeGraphNavigator, CodeGraphNavigatorSession, CodeGraphNodeSummary,
+    CodeGraphPathHop, CodeGraphPathResult, CodeGraphProvenanceStep, CodeGraphPruneExplanation,
+    CodeGraphRecommendedActionsResult, CodeGraphSelectionExplanation,
+    CodeGraphSelectorResolutionExplanation, CodeGraphSessionDiff,
 };
 pub use projection::{
     codegraph_prompt_projection, codegraph_prompt_projection_with_config,

@@ -155,7 +155,9 @@ class PythonQueryTool:
         raise_on_error: bool = False,
     ) -> dict[str, Any]:
         function = tool_call.get("function") or {}
-        result = self.execute(function.get("arguments") or {}, raise_on_error=raise_on_error)
+        result = self.execute(
+            function.get("arguments") or {}, raise_on_error=raise_on_error
+        )
         return result.as_openai_message(tool_call_id=str(tool_call["id"]))
 
     def execute_anthropic_tool_use(
@@ -164,7 +166,9 @@ class PythonQueryTool:
         *,
         raise_on_error: bool = False,
     ) -> dict[str, Any]:
-        result = self.execute(tool_use.get("input") or {}, raise_on_error=raise_on_error)
+        result = self.execute(
+            tool_use.get("input") or {}, raise_on_error=raise_on_error
+        )
         return result.as_anthropic_tool_result(tool_use_id=str(tool_use["id"]))
 
 

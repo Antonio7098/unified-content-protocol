@@ -6,7 +6,7 @@
 
 ```toml
 [dependencies]
-ucp-api = "0.1.14"
+ucp-api = "0.1.15"
 ```
 
 ## Core Client (`UcpClient`)
@@ -135,7 +135,14 @@ Useful programmatic helpers include:
 - regex-driven `find_nodes(...)`
 - `path_between(...)`
 - `why_selected(...)`
+- `explain_selector(...)`
+- `explain_export_omission(...)`
+- `why_pruned(...)`
 - `apply_recommended_actions(...)`
+- structured `recommendations(...)`
+- `estimate_expand(...)` / `estimate_hydrate(...)`
+- session `mutation_log()` / `event_log()`
+- session `to_json()` / `save(...)` and graph `load_session(...)`
 - `fork()` and `diff(...)`
 
 ### Incremental rebuilds

@@ -104,6 +104,25 @@ impl PyCodeGraph {
         }
     }
 
+    fn explain_selector(&self, py: Python<'_>, selector: &str) -> PyResult<PyObject> {
+        to_python_json(py, &self.inner.explain_selector(selector))
+    }
+
+    fn load_session_json(&self, payload: &str) -> PyResult<PyCodeGraphSession> {
+        Ok(PyCodeGraphSession {
+            inner: self
+                .inner
+                .load_session_json(payload)
+                .map_err(to_runtime_error)?,
+        })
+    }
+
+    fn load_session(&self, path: &str) -> PyResult<PyCodeGraphSession> {
+        Ok(PyCodeGraphSession {
+            inner: self.inner.load_session(path).map_err(to_runtime_error)?,
+        })
+    }
+
     fn resolve(&self, selector: &str) -> Option<PyBlockId> {
         self.inner.resolve_selector(selector).map(PyBlockId::from)
     }
@@ -183,6 +202,26 @@ impl PyCodeGraphSession {
             .collect()
     }
 
+    fn session_id(&self) -> String {
+        self.inner.session_id().to_string()
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        self.inner.to_json().map_err(to_runtime_error)
+    }
+
+    fn save(&mut self, path: &str) -> PyResult<()> {
+        self.inner.save(path).map_err(to_runtime_error)
+    }
+
+    fn mutation_log(&self, py: Python<'_>) -> PyResult<PyObject> {
+        to_python_json(py, &self.inner.mutation_log())
+    }
+
+    fn event_log(&self, py: Python<'_>) -> PyResult<PyObject> {
+        to_python_json(py, &self.inner.event_log())
+    }
+
     fn summary(&self, py: Python<'_>) -> PyResult<PyObject> {
         to_python_json(py, &self.inner.summary())
     }
@@ -209,7 +248,7 @@ impl PyCodeGraphSession {
         )
     }
 
-    #[pyo3(signature = (target, mode="dependencies", relation=None, relations=None, depth=1, max_add=None, priority_threshold=None))]
+    #[pyo3(signature = (target, mode="dependencies", relation=None, relations=None, depth=1, max_add=None, priority_threshold=None, max_nodes_visited=None, max_elapsed_ms=None, max_emitted_telemetry_events=None))]
     #[allow(clippy::too_many_arguments)]
     fn expand(
         &mut self,
@@ -221,9 +260,25 @@ impl PyCodeGraphSession {
         depth: usize,
         max_add: Option<usize>,
         priority_threshold: Option<u16>,
+        max_nodes_visited: Option<usize>,
+        max_elapsed_ms: Option<u64>,
+        max_emitted_telemetry_events: Option<usize>,
     ) -> PyResult<PyObject> {
         let mode = parse_expand_mode(mode)?;
-        let traversal = build_traversal(relation, relations, depth, max_add, priority_threshold);
+        let traversal = build_traversal(
+            relation,
+            relations,
+            depth,
+            max_add,
+            priority_threshold,
+            build_budget(
+                None,
+                max_nodes_visited,
+                None,
+                max_elapsed_ms,
+                max_emitted_telemetry_events,
+            ),
+        );
         to_python_json(
             py,
             &self
@@ -233,13 +288,31 @@ impl PyCodeGraphSession {
         )
     }
 
-    #[pyo3(signature = (target, padding=2))]
-    fn hydrate(&mut self, py: Python<'_>, target: &str, padding: usize) -> PyResult<PyObject> {
+    #[pyo3(signature = (target, padding=2, max_hydrated_bytes=None, max_elapsed_ms=None, max_emitted_telemetry_events=None))]
+    fn hydrate(
+        &mut self,
+        py: Python<'_>,
+        target: &str,
+        padding: usize,
+        max_hydrated_bytes: Option<usize>,
+        max_elapsed_ms: Option<u64>,
+        max_emitted_telemetry_events: Option<usize>,
+    ) -> PyResult<PyObject> {
         to_python_json(
             py,
             &self
                 .inner
-                .hydrate_source(target, padding)
+                .hydrate_source_with_budget(
+                    target,
+                    padding,
+                    build_budget(
+                        max_hydrated_bytes,
+                        None,
+                        None,
+                        max_elapsed_ms,
+                        max_emitted_telemetry_events,
+                    ),
+                )
                 .map_err(to_runtime_error)?,
         )
     }
@@ -273,7 +346,7 @@ impl PyCodeGraphSession {
         to_python_json(py, &self.inner.prune(max_selected))
     }
 
-    #[pyo3(signature = (max_tokens=None, compact=false, include_rendered=None, visible_levels=None, only_node_classes=None, exclude_node_classes=None, max_frontier_actions=None))]
+    #[pyo3(signature = (max_tokens=None, compact=false, include_rendered=None, visible_levels=None, only_node_classes=None, exclude_node_classes=None, max_frontier_actions=None, max_rendered_bytes=None))]
     #[allow(clippy::too_many_arguments)]
     fn export(
         &self,
@@ -285,8 +358,9 @@ impl PyCodeGraphSession {
         only_node_classes: Option<Vec<String>>,
         exclude_node_classes: Option<Vec<String>>,
         max_frontier_actions: Option<usize>,
+        max_rendered_bytes: Option<usize>,
     ) -> PyResult<PyObject> {
-        let render = render_config(max_tokens);
+        let render = render_config(max_tokens, max_rendered_bytes);
         let export = export_config(
             compact,
             include_rendered,
@@ -298,9 +372,14 @@ impl PyCodeGraphSession {
         to_python_json(py, &self.inner.export(&render, &export))
     }
 
-    #[pyo3(signature = (max_tokens=None))]
-    fn render_prompt(&self, max_tokens: Option<usize>) -> String {
-        self.inner.render_prompt(&render_config(max_tokens))
+    #[pyo3(signature = (max_tokens=None, max_rendered_bytes=None))]
+    fn render_prompt(
+        &self,
+        max_tokens: Option<usize>,
+        max_rendered_bytes: Option<usize>,
+    ) -> String {
+        self.inner
+            .render_prompt(&render_config(max_tokens, max_rendered_bytes))
     }
 
     #[pyo3(signature = (top=1, padding=2, depth=None, max_add=None, priority_threshold=None))]
@@ -322,10 +401,127 @@ impl PyCodeGraphSession {
         )
     }
 
+    #[pyo3(signature = (top=3))]
+    fn recommendations(&self, py: Python<'_>, top: usize) -> PyResult<PyObject> {
+        to_python_json(py, &self.inner.recommendations(top))
+    }
+
     fn why_selected(&self, py: Python<'_>, target: &str) -> PyResult<PyObject> {
         to_python_json(
             py,
             &self.inner.why_selected(target).map_err(to_runtime_error)?,
+        )
+    }
+
+    fn explain_selector(&self, py: Python<'_>, target: &str) -> PyResult<PyObject> {
+        to_python_json(py, &self.inner.explain_selector(target))
+    }
+
+    #[pyo3(signature = (target, max_tokens=None, compact=false, include_rendered=None, visible_levels=None, only_node_classes=None, exclude_node_classes=None, max_frontier_actions=None, max_rendered_bytes=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn explain_export_omission(
+        &self,
+        py: Python<'_>,
+        target: &str,
+        max_tokens: Option<usize>,
+        compact: bool,
+        include_rendered: Option<bool>,
+        visible_levels: Option<usize>,
+        only_node_classes: Option<Vec<String>>,
+        exclude_node_classes: Option<Vec<String>>,
+        max_frontier_actions: Option<usize>,
+        max_rendered_bytes: Option<usize>,
+    ) -> PyResult<PyObject> {
+        let render = render_config(max_tokens, max_rendered_bytes);
+        let export = export_config(
+            compact,
+            include_rendered,
+            visible_levels,
+            only_node_classes,
+            exclude_node_classes,
+            max_frontier_actions,
+        );
+        to_python_json(
+            py,
+            &self
+                .inner
+                .explain_export_omission(target, &render, &export)
+                .map_err(to_runtime_error)?,
+        )
+    }
+
+    fn why_pruned(&self, py: Python<'_>, target: &str) -> PyResult<PyObject> {
+        to_python_json(
+            py,
+            &self.inner.why_pruned(target).map_err(to_runtime_error)?,
+        )
+    }
+
+    #[pyo3(signature = (target, mode="dependencies", relation=None, relations=None, depth=1, max_add=None, priority_threshold=None, max_nodes_visited=None, max_elapsed_ms=None, max_emitted_telemetry_events=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn estimate_expand(
+        &self,
+        py: Python<'_>,
+        target: &str,
+        mode: &str,
+        relation: Option<String>,
+        relations: Option<Vec<String>>,
+        depth: usize,
+        max_add: Option<usize>,
+        priority_threshold: Option<u16>,
+        max_nodes_visited: Option<usize>,
+        max_elapsed_ms: Option<u64>,
+        max_emitted_telemetry_events: Option<usize>,
+    ) -> PyResult<PyObject> {
+        let traversal = build_traversal(
+            relation,
+            relations,
+            depth,
+            max_add,
+            priority_threshold,
+            build_budget(
+                None,
+                max_nodes_visited,
+                None,
+                max_elapsed_ms,
+                max_emitted_telemetry_events,
+            ),
+        );
+        to_python_json(
+            py,
+            &self
+                .inner
+                .estimate_expand(target, parse_expand_mode(mode)?, &traversal)
+                .map_err(to_runtime_error)?,
+        )
+    }
+
+    #[pyo3(signature = (target, padding=2, max_hydrated_bytes=None, max_elapsed_ms=None, max_emitted_telemetry_events=None))]
+    fn estimate_hydrate(
+        &self,
+        py: Python<'_>,
+        target: &str,
+        padding: usize,
+        max_hydrated_bytes: Option<usize>,
+        max_elapsed_ms: Option<u64>,
+        max_emitted_telemetry_events: Option<usize>,
+    ) -> PyResult<PyObject> {
+        to_python_json(
+            py,
+            &self
+                .inner
+                .estimate_hydrate(
+                    target,
+                    padding,
+                    build_budget(
+                        max_hydrated_bytes,
+                        None,
+                        None,
+                        max_elapsed_ms,
+                        max_emitted_telemetry_events,
+                    ),
+                )
+                .map_err(to_runtime_error)?,
         )
     }
 
@@ -411,6 +607,7 @@ fn build_traversal(
     depth: usize,
     max_add: Option<usize>,
     priority_threshold: Option<u16>,
+    budget: Option<ucp_api::CodeGraphOperationBudget>,
 ) -> ucp_api::CodeGraphTraversalConfig {
     let mut relation_filters = relations.unwrap_or_default();
     if let Some(value) = relation {
@@ -421,13 +618,19 @@ fn build_traversal(
         relation_filters,
         max_add,
         priority_threshold,
+        budget,
     }
 }
 
-fn render_config(max_tokens: Option<usize>) -> ucp_api::CodeGraphRenderConfig {
-    max_tokens
+fn render_config(
+    max_tokens: Option<usize>,
+    max_rendered_bytes: Option<usize>,
+) -> ucp_api::CodeGraphRenderConfig {
+    let mut config = max_tokens
         .map(ucp_api::CodeGraphRenderConfig::for_max_tokens)
-        .unwrap_or_default()
+        .unwrap_or_default();
+    config.max_rendered_bytes = max_rendered_bytes;
+    config
 }
 
 fn export_config(
@@ -453,6 +656,33 @@ fn export_config(
         config.max_frontier_actions = value.max(1);
     }
     config
+}
+
+fn build_budget(
+    max_hydrated_bytes: Option<usize>,
+    max_nodes_visited: Option<usize>,
+    max_nodes_added: Option<usize>,
+    max_elapsed_ms: Option<u64>,
+    max_emitted_telemetry_events: Option<usize>,
+) -> Option<ucp_api::CodeGraphOperationBudget> {
+    let budget = ucp_api::CodeGraphOperationBudget {
+        max_depth: None,
+        max_nodes_visited,
+        max_nodes_added,
+        max_hydrated_bytes,
+        max_elapsed_ms,
+        max_emitted_telemetry_events,
+    };
+    if budget.max_nodes_visited.is_none()
+        && budget.max_nodes_added.is_none()
+        && budget.max_hydrated_bytes.is_none()
+        && budget.max_elapsed_ms.is_none()
+        && budget.max_emitted_telemetry_events.is_none()
+    {
+        None
+    } else {
+        Some(budget)
+    }
 }
 
 fn parse_detail_level(value: &str) -> PyResult<ucp_api::CodeGraphDetailLevel> {

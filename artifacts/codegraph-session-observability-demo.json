@@ -1,0 +1,466 @@
+{
+  "metadata": {
+    "schema_version": "codegraph_session.v1",
+    "session_id": "cgs_a218099ca065ed81",
+    "graph_snapshot_hash": "972c90ea9d6130e2de0e03eb6e7a76b429618a29178c006cf5e7be8a61be20a1",
+    "session_snapshot_hash": "e48cb020dc1eff0588b43e6f8d74acefd34db05dbe51f0691e190ad5a8b19545",
+    "mutation_count": 4
+  },
+  "context": {
+    "selected": {
+      "ca19df6efb93453bc3518777": {
+        "block_id": "ca19df6efb93453bc3518777",
+        "detail_level": "skeleton",
+        "pinned": false,
+        "origin": {
+          "kind": "manual"
+        }
+      },
+      "1463cfacf2bd8c2604b76bde": {
+        "block_id": "1463cfacf2bd8c2604b76bde",
+        "detail_level": "skeleton",
+        "pinned": false,
+        "origin": {
+          "kind": "overview"
+        }
+      },
+      "27dd45b9f4f423b3da20d031": {
+        "block_id": "27dd45b9f4f423b3da20d031",
+        "detail_level": "skeleton",
+        "pinned": false,
+        "origin": {
+          "kind": "overview"
+        }
+      },
+      "123d8e68e78ebec442607b86": {
+        "block_id": "123d8e68e78ebec442607b86",
+        "detail_level": "skeleton",
+        "pinned": false,
+        "origin": {
+          "kind": "overview"
+        }
+      },
+      "11f2222350db8eee5bc5ef71": {
+        "block_id": "11f2222350db8eee5bc5ef71",
+        "detail_level": "skeleton",
+        "pinned": false,
+        "origin": {
+          "kind": "overview"
+        }
+      },
+      "3043405a7c5239bd734b2298": {
+        "block_id": "3043405a7c5239bd734b2298",
+        "detail_level": "skeleton",
+        "pinned": false,
+        "origin": {
+          "kind": "overview"
+        }
+      },
+      "4ac20768c8331bfa0dfb0ebf": {
+        "block_id": "4ac20768c8331bfa0dfb0ebf",
+        "detail_level": "neighborhood",
+        "pinned": false,
+        "origin": {
+          "kind": "manual"
+        }
+      },
+      "35d1be9f87753900056d83e5": {
+        "block_id": "35d1be9f87753900056d83e5",
+        "detail_level": "skeleton",
+        "pinned": false,
+        "origin": {
+          "kind": "overview"
+        }
+      }
+    },
+    "focus": "4ac20768c8331bfa0dfb0ebf",
+    "prune_policy": {
+      "max_selected": 8,
+      "demote_before_remove": true,
+      "protect_focus": true,
+      "relation_prune_priority": {
+        "calls": 20,
+        "cited_by": 60,
+        "implements": 15,
+        "imports_symbol": 30,
+        "inherits": 15,
+        "links_to": 55,
+        "reexports_symbol": 25,
+        "references": 60,
+        "uses_symbol": 35
+      }
+    },
+    "history": [
+      "seed:overview:3",
+      "expand:file:blk_ca19df6efb93453bc3518777:1:*:*",
+      "expand:dependencies:blk_4ac20768c8331bfa0dfb0ebf:*:1:*:*",
+      "prune:8"
+    ]
+  },
+  "mutation_log": [
+    {
+      "sequence": 1,
+      "kind": "seed_overview",
+      "operation": "seed_overview",
+      "resolved_block_ids": [
+        "99b62cfb483779db26d3be75",
+        "11f2222350db8eee5bc5ef71",
+        "7cf2a27244897a4b9b334414",
+        "1463cfacf2bd8c2604b76bde",
+        "6a0e503cbb91ad4b20bf7083",
+        "54c55b45f69468fdb717d1f2",
+        "8deca5103a3b10e631b1fa62",
+        "3043405a7c5239bd734b2298",
+        "27dd45b9f4f423b3da20d031",
+        "123d8e68e78ebec442607b86",
+        "686b241bbbc1ebd533b4fb9c",
+        "d2cef3475e8ab2b5ed3ec587",
+        "3febc0ada88477685bc61d98",
+        "e75297e577b337ca2fb68a7a",
+        "6c752b79da406a1c951e3a8b",
+        "b07c00f9cb6f24a8023c3cf2",
+        "27181c8b52e4b06023cc9774",
+        "7fd21c1a401565bdaa0db690",
+        "d559ae668b1892ddb93331ff",
+        "4bc1ec7b7ec959cf48f09aba",
+        "d6f3398b3d61e14dd798624a",
+        "dcc23fc72145f5f411e3743a",
+        "3eebb1e9a0bdbbe648be878e",
+        "d5685d95a7229a5fb2b8a2e3",
+        "a0430a0079b41b34257572b6",
+        "73114ea8e67a3c5edd51420d",
+        "da1e5784051bb4cf30e6d66b",
+        "35d1be9f87753900056d83e5"
+      ],
+      "nodes_added": [
+        "99b62cfb483779db26d3be75",
+        "11f2222350db8eee5bc5ef71",
+        "7cf2a27244897a4b9b334414",
+        "1463cfacf2bd8c2604b76bde",
+        "6a0e503cbb91ad4b20bf7083",
+        "54c55b45f69468fdb717d1f2",
+        "8deca5103a3b10e631b1fa62",
+        "3043405a7c5239bd734b2298",
+        "27dd45b9f4f423b3da20d031",
+        "123d8e68e78ebec442607b86",
+        "686b241bbbc1ebd533b4fb9c",
+        "d2cef3475e8ab2b5ed3ec587",
+        "3febc0ada88477685bc61d98",
+        "e75297e577b337ca2fb68a7a",
+        "6c752b79da406a1c951e3a8b",
+        "b07c00f9cb6f24a8023c3cf2",
+        "27181c8b52e4b06023cc9774",
+        "7fd21c1a401565bdaa0db690",
+        "d559ae668b1892ddb93331ff",
+        "4bc1ec7b7ec959cf48f09aba",
+        "d6f3398b3d61e14dd798624a",
+        "dcc23fc72145f5f411e3743a",
+        "3eebb1e9a0bdbbe648be878e",
+        "d5685d95a7229a5fb2b8a2e3",
+        "a0430a0079b41b34257572b6",
+        "73114ea8e67a3c5edd51420d",
+        "da1e5784051bb4cf30e6d66b",
+        "35d1be9f87753900056d83e5"
+      ],
+      "focus_after": "99b62cfb483779db26d3be75",
+      "elapsed_ms": 82,
+      "reason": "Seeded structural overview up to depth 3"
+    },
+    {
+      "sequence": 2,
+      "kind": "expand_file",
+      "operation": "expand_file",
+      "selector": "crates/ucp-python/src/codegraph.rs",
+      "target_block_id": "ca19df6efb93453bc3518777",
+      "resolved_block_ids": [
+        "ca19df6efb93453bc3518777"
+      ],
+      "traversal": {
+        "depth": 1,
+        "budget": {
+          "max_nodes_visited": 16
+        }
+      },
+      "budget": {
+        "max_nodes_visited": 16
+      },
+      "nodes_added": [
+        "ca19df6efb93453bc3518777",
+        "4db23b2c636638e099ba1716",
+        "183a3c18b3cd680dbd76c053",
+        "b244fc9d04b2363f1f16775e",
+        "c65bb9fcd9a2fb78fe727e73",
+        "ea6deba2d66fdae85f758184",
+        "4251423dff95f312138c2607",
+        "4ac20768c8331bfa0dfb0ebf",
+        "4e63644d5a83a5582e5cc1f1",
+        "2a608d5b737669d0236977ca",
+        "2ed28bc0ecf94a98a3abf8d8",
+        "8c1fa717865c666ef220e78f",
+        "1b4e8cc985e3edb9b2df44f4",
+        "a1838d0e8bb1bdaa7f359010"
+      ],
+      "focus_before": "99b62cfb483779db26d3be75",
+      "focus_after": "ca19df6efb93453bc3518777",
+      "elapsed_ms": 168,
+      "reason": "Expanded blk_ca19df6efb93453bc3518777 via File traversal."
+    },
+    {
+      "sequence": 3,
+      "kind": "expand_dependencies",
+      "operation": "expand_dependencies",
+      "selector": "symbol:crates/ucp-python/src/codegraph.rs::build_traversal",
+      "target_block_id": "4ac20768c8331bfa0dfb0ebf",
+      "resolved_block_ids": [
+        "4ac20768c8331bfa0dfb0ebf"
+      ],
+      "traversal": {
+        "depth": 1
+      },
+      "nodes_changed": [
+        "4ac20768c8331bfa0dfb0ebf"
+      ],
+      "focus_before": "ca19df6efb93453bc3518777",
+      "focus_after": "4ac20768c8331bfa0dfb0ebf",
+      "elapsed_ms": 169,
+      "reason": "Expanded blk_4ac20768c8331bfa0dfb0ebf via Dependencies traversal."
+    },
+    {
+      "sequence": 4,
+      "kind": "prune",
+      "operation": "prune",
+      "nodes_removed": [
+        "ea6deba2d66fdae85f758184",
+        "c65bb9fcd9a2fb78fe727e73",
+        "b244fc9d04b2363f1f16775e",
+        "a1838d0e8bb1bdaa7f359010",
+        "8c1fa717865c666ef220e78f",
+        "4e63644d5a83a5582e5cc1f1",
+        "4db23b2c636638e099ba1716",
+        "4251423dff95f312138c2607",
+        "2ed28bc0ecf94a98a3abf8d8",
+        "2a608d5b737669d0236977ca",
+        "1b4e8cc985e3edb9b2df44f4",
+        "183a3c18b3cd680dbd76c053",
+        "dcc23fc72145f5f411e3743a",
+        "da1e5784051bb4cf30e6d66b",
+        "d6f3398b3d61e14dd798624a",
+        "d5685d95a7229a5fb2b8a2e3",
+        "d559ae668b1892ddb93331ff",
+        "b07c00f9cb6f24a8023c3cf2",
+        "a0430a0079b41b34257572b6",
+        "7fd21c1a401565bdaa0db690",
+        "73114ea8e67a3c5edd51420d",
+        "4bc1ec7b7ec959cf48f09aba",
+        "3eebb1e9a0bdbbe648be878e",
+        "27181c8b52e4b06023cc9774",
+        "e75297e577b337ca2fb68a7a",
+        "d2cef3475e8ab2b5ed3ec587",
+        "99b62cfb483779db26d3be75",
+        "8deca5103a3b10e631b1fa62",
+        "7cf2a27244897a4b9b334414",
+        "6c752b79da406a1c951e3a8b",
+        "6a0e503cbb91ad4b20bf7083",
+        "686b241bbbc1ebd533b4fb9c",
+        "54c55b45f69468fdb717d1f2",
+        "3febc0ada88477685bc61d98"
+      ],
+      "nodes_changed": [
+        "ca19df6efb93453bc3518777"
+      ],
+      "focus_before": "4ac20768c8331bfa0dfb0ebf",
+      "focus_after": "4ac20768c8331bfa0dfb0ebf",
+      "elapsed_ms": 85,
+      "reason": "Applied prune policy with max_selected=8."
+    }
+  ],
+  "event_log": [
+    {
+      "event": "mutation",
+      "mutation": {
+        "sequence": 1,
+        "kind": "seed_overview",
+        "operation": "seed_overview",
+        "resolved_block_ids": [
+          "99b62cfb483779db26d3be75",
+          "11f2222350db8eee5bc5ef71",
+          "7cf2a27244897a4b9b334414",
+          "1463cfacf2bd8c2604b76bde",
+          "6a0e503cbb91ad4b20bf7083",
+          "54c55b45f69468fdb717d1f2",
+          "8deca5103a3b10e631b1fa62",
+          "3043405a7c5239bd734b2298",
+          "27dd45b9f4f423b3da20d031",
+          "123d8e68e78ebec442607b86",
+          "686b241bbbc1ebd533b4fb9c",
+          "d2cef3475e8ab2b5ed3ec587",
+          "3febc0ada88477685bc61d98",
+          "e75297e577b337ca2fb68a7a",
+          "6c752b79da406a1c951e3a8b",
+          "b07c00f9cb6f24a8023c3cf2",
+          "27181c8b52e4b06023cc9774",
+          "7fd21c1a401565bdaa0db690",
+          "d559ae668b1892ddb93331ff",
+          "4bc1ec7b7ec959cf48f09aba",
+          "d6f3398b3d61e14dd798624a",
+          "dcc23fc72145f5f411e3743a",
+          "3eebb1e9a0bdbbe648be878e",
+          "d5685d95a7229a5fb2b8a2e3",
+          "a0430a0079b41b34257572b6",
+          "73114ea8e67a3c5edd51420d",
+          "da1e5784051bb4cf30e6d66b",
+          "35d1be9f87753900056d83e5"
+        ],
+        "nodes_added": [
+          "99b62cfb483779db26d3be75",
+          "11f2222350db8eee5bc5ef71",
+          "7cf2a27244897a4b9b334414",
+          "1463cfacf2bd8c2604b76bde",
+          "6a0e503cbb91ad4b20bf7083",
+          "54c55b45f69468fdb717d1f2",
+          "8deca5103a3b10e631b1fa62",
+          "3043405a7c5239bd734b2298",
+          "27dd45b9f4f423b3da20d031",
+          "123d8e68e78ebec442607b86",
+          "686b241bbbc1ebd533b4fb9c",
+          "d2cef3475e8ab2b5ed3ec587",
+          "3febc0ada88477685bc61d98",
+          "e75297e577b337ca2fb68a7a",
+          "6c752b79da406a1c951e3a8b",
+          "b07c00f9cb6f24a8023c3cf2",
+          "27181c8b52e4b06023cc9774",
+          "7fd21c1a401565bdaa0db690",
+          "d559ae668b1892ddb93331ff",
+          "4bc1ec7b7ec959cf48f09aba",
+          "d6f3398b3d61e14dd798624a",
+          "dcc23fc72145f5f411e3743a",
+          "3eebb1e9a0bdbbe648be878e",
+          "d5685d95a7229a5fb2b8a2e3",
+          "a0430a0079b41b34257572b6",
+          "73114ea8e67a3c5edd51420d",
+          "da1e5784051bb4cf30e6d66b",
+          "35d1be9f87753900056d83e5"
+        ],
+        "focus_after": "99b62cfb483779db26d3be75",
+        "elapsed_ms": 82,
+        "reason": "Seeded structural overview up to depth 3"
+      }
+    },
+    {
+      "event": "mutation",
+      "mutation": {
+        "sequence": 2,
+        "kind": "expand_file",
+        "operation": "expand_file",
+        "selector": "crates/ucp-python/src/codegraph.rs",
+        "target_block_id": "ca19df6efb93453bc3518777",
+        "resolved_block_ids": [
+          "ca19df6efb93453bc3518777"
+        ],
+        "traversal": {
+          "depth": 1,
+          "budget": {
+            "max_nodes_visited": 16
+          }
+        },
+        "budget": {
+          "max_nodes_visited": 16
+        },
+        "nodes_added": [
+          "ca19df6efb93453bc3518777",
+          "4db23b2c636638e099ba1716",
+          "183a3c18b3cd680dbd76c053",
+          "b244fc9d04b2363f1f16775e",
+          "c65bb9fcd9a2fb78fe727e73",
+          "ea6deba2d66fdae85f758184",
+          "4251423dff95f312138c2607",
+          "4ac20768c8331bfa0dfb0ebf",
+          "4e63644d5a83a5582e5cc1f1",
+          "2a608d5b737669d0236977ca",
+          "2ed28bc0ecf94a98a3abf8d8",
+          "8c1fa717865c666ef220e78f",
+          "1b4e8cc985e3edb9b2df44f4",
+          "a1838d0e8bb1bdaa7f359010"
+        ],
+        "focus_before": "99b62cfb483779db26d3be75",
+        "focus_after": "ca19df6efb93453bc3518777",
+        "elapsed_ms": 168,
+        "reason": "Expanded blk_ca19df6efb93453bc3518777 via File traversal."
+      }
+    },
+    {
+      "event": "mutation",
+      "mutation": {
+        "sequence": 3,
+        "kind": "expand_dependencies",
+        "operation": "expand_dependencies",
+        "selector": "symbol:crates/ucp-python/src/codegraph.rs::build_traversal",
+        "target_block_id": "4ac20768c8331bfa0dfb0ebf",
+        "resolved_block_ids": [
+          "4ac20768c8331bfa0dfb0ebf"
+        ],
+        "traversal": {
+          "depth": 1
+        },
+        "nodes_changed": [
+          "4ac20768c8331bfa0dfb0ebf"
+        ],
+        "focus_before": "ca19df6efb93453bc3518777",
+        "focus_after": "4ac20768c8331bfa0dfb0ebf",
+        "elapsed_ms": 169,
+        "reason": "Expanded blk_4ac20768c8331bfa0dfb0ebf via Dependencies traversal."
+      }
+    },
+    {
+      "event": "mutation",
+      "mutation": {
+        "sequence": 4,
+        "kind": "prune",
+        "operation": "prune",
+        "nodes_removed": [
+          "ea6deba2d66fdae85f758184",
+          "c65bb9fcd9a2fb78fe727e73",
+          "b244fc9d04b2363f1f16775e",
+          "a1838d0e8bb1bdaa7f359010",
+          "8c1fa717865c666ef220e78f",
+          "4e63644d5a83a5582e5cc1f1",
+          "4db23b2c636638e099ba1716",
+          "4251423dff95f312138c2607",
+          "2ed28bc0ecf94a98a3abf8d8",
+          "2a608d5b737669d0236977ca",
+          "1b4e8cc985e3edb9b2df44f4",
+          "183a3c18b3cd680dbd76c053",
+          "dcc23fc72145f5f411e3743a",
+          "da1e5784051bb4cf30e6d66b",
+          "d6f3398b3d61e14dd798624a",
+          "d5685d95a7229a5fb2b8a2e3",
+          "d559ae668b1892ddb93331ff",
+          "b07c00f9cb6f24a8023c3cf2",
+          "a0430a0079b41b34257572b6",
+          "7fd21c1a401565bdaa0db690",
+          "73114ea8e67a3c5edd51420d",
+          "4bc1ec7b7ec959cf48f09aba",
+          "3eebb1e9a0bdbbe648be878e",
+          "27181c8b52e4b06023cc9774",
+          "e75297e577b337ca2fb68a7a",
+          "d2cef3475e8ab2b5ed3ec587",
+          "99b62cfb483779db26d3be75",
+          "8deca5103a3b10e631b1fa62",
+          "7cf2a27244897a4b9b334414",
+          "6c752b79da406a1c951e3a8b",
+          "6a0e503cbb91ad4b20bf7083",
+          "686b241bbbc1ebd533b4fb9c",
+          "54c55b45f69468fdb717d1f2",
+          "3febc0ada88477685bc61d98"
+        ],
+        "nodes_changed": [
+          "ca19df6efb93453bc3518777"
+        ],
+        "focus_before": "4ac20768c8331bfa0dfb0ebf",
+        "focus_after": "4ac20768c8331bfa0dfb0ebf",
+        "elapsed_ms": 85,
+        "reason": "Applied prune policy with max_selected=8."
+      }
+    }
+  ]
+}

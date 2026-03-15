@@ -111,9 +111,7 @@ class TestExpansion:
         session = traversal.create_session()
 
         result = traversal.expand(
-            session, doc.root_id, "down",
-            depth=2,
-            view_mode=ucp.ViewMode.preview(50)
+            session, doc.root_id, "down", depth=2, view_mode=ucp.ViewMode.preview(50)
         )
         assert result.total_blocks >= 1
 
@@ -527,7 +525,9 @@ class TestExpandDirections:
         session = traversal.create_session()
 
         for direction in ["down", "up", "both", "semantic"]:
-            result = traversal.expand(session, doc.root_id, direction=direction, depth=1)
+            result = traversal.expand(
+                session, doc.root_id, direction=direction, depth=1
+            )
             assert result.root == doc.root_id
 
         traversal.close_session(session)
@@ -727,9 +727,7 @@ class TestContextRelevance:
 
         # Should work with both parameters
         traversal.context_add(
-            session, doc.root_id,
-            reason="semantic match",
-            relevance=0.95
+            session, doc.root_id, reason="semantic match", relevance=0.95
         )
 
         traversal.close_session(session)

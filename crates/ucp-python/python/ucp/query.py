@@ -188,7 +188,9 @@ class BaseQueryGraph:
     def __getattr__(self, name: str) -> Any:
         return getattr(self.raw, name)
 
-    def _with_state(self, runtime_state: Optional["_QueryRuntimeState"]) -> "BaseQueryGraph":
+    def _with_state(
+        self, runtime_state: Optional["_QueryRuntimeState"]
+    ) -> "BaseQueryGraph":
         return type(self)(self.raw, runtime_state=runtime_state)
 
     def _record_operation(self, name: str) -> None:
@@ -202,6 +204,10 @@ class BaseQueryGraph:
     def describe(self, selector: Any) -> Any:
         self._record_operation("graph.describe")
         return self.raw.describe(_selector_value(selector))
+
+    def explain_selector(self, selector: Any) -> Any:
+        self._record_operation("graph.explain_selector")
+        return self.raw.explain_selector(_selector_value(selector))
 
     def find(self, **filters: Any) -> Any:
         self._record_operation("graph.find")
@@ -226,7 +232,9 @@ class QueryGraph(BaseQueryGraph):
 class CodeQueryGraph(BaseQueryGraph):
     def session(self) -> "CodeQuerySession":
         self._record_operation("graph.session")
-        return CodeQuerySession(self.raw.session(), self, runtime_state=self._runtime_state)
+        return CodeQuerySession(
+            self.raw.session(), self, runtime_state=self._runtime_state
+        )
 
 
 class BaseQuerySession:
@@ -286,9 +294,27 @@ class BaseQuerySession:
         self._record_operation("session.export")
         return self.raw.export(**kwargs)
 
+    def mutation_log(self) -> Any:
+        self._record_operation("session.mutation_log")
+        return self.raw.mutation_log()
+
+    def event_log(self) -> Any:
+        self._record_operation("session.event_log")
+        return self.raw.event_log()
+
+    def explain_export_omission(self, target: Any, **kwargs: Any) -> Any:
+        self._record_operation("session.explain_export_omission")
+        return self.raw.explain_export_omission(_selector_value(target), **kwargs)
+
+    def why_pruned(self, target: Any) -> Any:
+        self._record_operation("session.why_pruned")
+        return self.raw.why_pruned(_selector_value(target))
+
     def fork(self) -> "BaseQuerySession":
         self._record_operation("session.fork")
-        return type(self)(self.raw.fork(), self.graph, runtime_state=self._runtime_state)
+        return type(self)(
+            self.raw.fork(), self.graph, runtime_state=self._runtime_state
+        )
 
     def diff(self, other: "BaseQuerySession") -> Any:
         self._record_operation("session.diff")
@@ -338,6 +364,9 @@ class CodeQuerySession(BaseQuerySession):
         relation: Optional[str] = None,
         relations: Optional[list[str]] = None,
         priority_threshold: Optional[int] = None,
+        max_nodes_visited: Optional[int] = None,
+        max_elapsed_ms: Optional[int] = None,
+        max_emitted_telemetry_events: Optional[int] = None,
     ) -> Any:
         self._record_operation("session.walk")
         return self.raw.expand(
@@ -348,11 +377,75 @@ class CodeQuerySession(BaseQuerySession):
             depth=depth,
             max_add=limit,
             priority_threshold=priority_threshold,
+            max_nodes_visited=max_nodes_visited,
+            max_elapsed_ms=max_elapsed_ms,
+            max_emitted_telemetry_events=max_emitted_telemetry_events,
         )
 
-    def hydrate(self, target: Any, padding: int = 2) -> Any:
+    def hydrate(
+        self,
+        target: Any,
+        padding: int = 2,
+        max_hydrated_bytes: Optional[int] = None,
+        max_elapsed_ms: Optional[int] = None,
+        max_emitted_telemetry_events: Optional[int] = None,
+    ) -> Any:
         self._record_operation("session.hydrate")
-        return self.raw.hydrate(_selector_value(target), padding=padding)
+        return self.raw.hydrate(
+            _selector_value(target),
+            padding=padding,
+            max_hydrated_bytes=max_hydrated_bytes,
+            max_elapsed_ms=max_elapsed_ms,
+            max_emitted_telemetry_events=max_emitted_telemetry_events,
+        )
+
+    def recommendations(self, top: int = 3) -> Any:
+        self._record_operation("session.recommendations")
+        return self.raw.recommendations(top=top)
+
+    def estimate_expand(
+        self,
+        target: Any,
+        mode: str = "dependencies",
+        depth: int = 1,
+        limit: Optional[int] = None,
+        relation: Optional[str] = None,
+        relations: Optional[list[str]] = None,
+        priority_threshold: Optional[int] = None,
+        max_nodes_visited: Optional[int] = None,
+        max_elapsed_ms: Optional[int] = None,
+        max_emitted_telemetry_events: Optional[int] = None,
+    ) -> Any:
+        self._record_operation("session.estimate_expand")
+        return self.raw.estimate_expand(
+            _selector_value(target),
+            mode=mode,
+            relation=relation,
+            relations=relations,
+            depth=depth,
+            max_add=limit,
+            priority_threshold=priority_threshold,
+            max_nodes_visited=max_nodes_visited,
+            max_elapsed_ms=max_elapsed_ms,
+            max_emitted_telemetry_events=max_emitted_telemetry_events,
+        )
+
+    def estimate_hydrate(
+        self,
+        target: Any,
+        padding: int = 2,
+        max_hydrated_bytes: Optional[int] = None,
+        max_elapsed_ms: Optional[int] = None,
+        max_emitted_telemetry_events: Optional[int] = None,
+    ) -> Any:
+        self._record_operation("session.estimate_hydrate")
+        return self.raw.estimate_hydrate(
+            _selector_value(target),
+            padding=padding,
+            max_hydrated_bytes=max_hydrated_bytes,
+            max_elapsed_ms=max_elapsed_ms,
+            max_emitted_telemetry_events=max_emitted_telemetry_events,
+        )
 
 
 def query(graph: Graph | CodeGraph | BaseQueryGraph) -> BaseQueryGraph:
@@ -417,7 +510,9 @@ def run_python_query(
         sys.settrace(previous_trace)
 
     if error is not None and raise_on_error:
-        raise QueryExecutionError(type(error).__name__, str(error), traceback_text or "") from error
+        raise QueryExecutionError(
+            type(error).__name__, str(error), traceback_text or ""
+        ) from error
 
     return _query_result(
         wrapped_graph,
@@ -446,8 +541,12 @@ def _wrap_session(
 ) -> BaseQuerySession:
     if session is None:
         if isinstance(graph, CodeQueryGraph):
-            return CodeQuerySession(graph.raw.session(), graph, runtime_state=graph._runtime_state)
-        return QuerySession(graph.raw.session(), graph, runtime_state=graph._runtime_state)
+            return CodeQuerySession(
+                graph.raw.session(), graph, runtime_state=graph._runtime_state
+            )
+        return QuerySession(
+            graph.raw.session(), graph, runtime_state=graph._runtime_state
+        )
     if isinstance(session, BaseQuerySession):
         return session._with_graph(graph)
     if isinstance(session, CodeGraphSession):
@@ -475,7 +574,9 @@ def _query_result(
         result=result,
         stdout=stdout,
         summary=session.raw.summary(),
-        selected_block_ids=[str(block_id) for block_id in session.raw.selected_block_ids()],
+        selected_block_ids=[
+            str(block_id) for block_id in session.raw.selected_block_ids()
+        ],
         usage=runtime_state.usage(),
         limits=runtime_state.limits,
         graph=graph,
@@ -522,9 +623,13 @@ def _merge_limits(
     left = _coerce_limits(base)
     right = _coerce_limits(override)
     return QueryLimits(
-        max_seconds=right.max_seconds if right.max_seconds is not None else left.max_seconds,
+        max_seconds=right.max_seconds
+        if right.max_seconds is not None
+        else left.max_seconds,
         max_operations=(
-            right.max_operations if right.max_operations is not None else left.max_operations
+            right.max_operations
+            if right.max_operations is not None
+            else left.max_operations
         ),
         max_trace_events=(
             right.max_trace_events
@@ -532,7 +637,9 @@ def _merge_limits(
             else left.max_trace_events
         ),
         max_stdout_chars=(
-            right.max_stdout_chars if right.max_stdout_chars is not None else left.max_stdout_chars
+            right.max_stdout_chars
+            if right.max_stdout_chars is not None
+            else left.max_stdout_chars
         ),
     )
 

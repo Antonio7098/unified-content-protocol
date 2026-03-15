@@ -206,7 +206,9 @@ Old content
         doc = ucp.parse("# Intro")
         section_id = ucp.find_section_by_path(doc, "Intro")
 
-        result = ucp.write_section(doc, section_id, "# Child Heading", base_heading_level=3)
+        result = ucp.write_section(
+            doc, section_id, "# Child Heading", base_heading_level=3
+        )
 
         assert result.success is True
         new_block = doc.get_block(result.blocks_added[0])
@@ -228,7 +230,9 @@ Old content
         doc = ucp.parse("# Intro")
         section_id = doc.root_id
 
-        result = doc.write_section(section_id, "## Child\n\nContent", base_heading_level=4)
+        result = doc.write_section(
+            section_id, "## Child\n\nContent", base_heading_level=4
+        )
 
         assert result.success is True
         assert len(result.blocks_added) > 0

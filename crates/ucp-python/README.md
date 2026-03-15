@@ -45,6 +45,7 @@ for node in graph.find_nodes(node_class="symbol", name_regex="Session|Context"):
 
 exported = session.export(compact=True, max_frontier_actions=6)
 print(exported["summary"])
+print(session.mutation_log()[-1]["operation"])
 ```
 
 ## Agent-facing query façade
@@ -67,9 +68,12 @@ for node in graph.find(node_class="symbol", name_regex="auth|login", limit=5):
 
 Core façade methods:
 
-- `graph.find(...)`, `graph.describe(...)`, `graph.path(...)`
+- `graph.find(...)`, `graph.describe(...)`, `graph.explain_selector(...)`, `graph.path(...)`
 - `session.add(...)`, `session.walk(...)`, `session.focus(...)`, `session.why(...)`
-- `session.export(...)`, `session.fork()`, `session.diff(...)`
+- `session.export(...)`, `session.explain_export_omission(...)`, `session.why_pruned(...)`
+- `session.recommendations(...)`, `session.estimate_expand(...)`, `session.estimate_hydrate(...)`
+- `session.mutation_log()`, `session.event_log()`
+- `session.fork()`, `session.diff(...)`
 - `session.hydrate(...)` for CodeGraph
 
 ## Python query runner
@@ -206,12 +210,17 @@ print(session.export())
 - `CodeGraph.build(...)` from a repository
 - `find_nodes(...)` with regex filters
 - `resolve(...)` and `describe(...)`
+- `explain_selector(...)` for selector provenance / ambiguity
 - `path_between(...)` for short graph explanations
 - `CodeGraphSession` for stateful exploration
-- `why_selected(...)` provenance/explainability
-- `apply_recommended(...)` frontier-driven exploration
+- `why_selected(...)` provenance/explainability with provenance chains
+- `apply_recommended(...)` and structured `recommendations(...)`
+- `estimate_expand(...)` / `estimate_hydrate(...)` for budget-aware traversal
+- `mutation_log()` / `event_log()` for observability
+- `explain_export_omission(...)` and `why_pruned(...)`
 - `fork()` and `diff(...)` for branch-and-compare workflows
 - `to_json()`, `from_json(...)`, `save(...)`, and `load(...)`
+- session `to_json()`, `save(...)`, `graph.load_session(...)`, and `graph.load_session_json(...)`
 
 ## General features
 
@@ -236,3 +245,4 @@ print(session.export())
 - `scripts/demo_codegraph_query_recipes.py`
 - `scripts/demo_codegraph_query_edge_cases.py`
 - `scripts/demo_codegraph_context_walk.py`
+- `scripts/demo_codegraph_session_observability.py`

@@ -19,6 +19,68 @@
   },
   "entries": [
     {
+      "version": "v0.1.15",
+      "date": "2026-03-15",
+      "changes": [
+        {
+          "type": "added",
+          "area": "codegraph.session-observability",
+          "description": "Added structured mutation telemetry, event logs, selector/provenance explanations, omission reporting, prune explanations, session persistence, and budget-aware cost estimation to the Rust CodeGraph session API.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-codegraph/src/context.rs",
+            "crates/ucp-codegraph/src/programmatic/**",
+            "crates/ucp-codegraph/tests/programmatic_api.rs"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "python.codegraph",
+          "description": "Exposed the new CodeGraph observability, recommendation, estimate, and session persistence APIs through the Python bindings and the thin query façade, with matching regression coverage.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/src/codegraph.rs",
+            "crates/ucp-python/python/ucp/query.py",
+            "crates/ucp-python/tests/test_codegraph.py",
+            "crates/ucp-python/tests/test_query_api.py"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "docs.codegraph",
+          "description": "Documented the session observability and persistence surface, added a dedicated smoke script, and published demo artifacts for the new workflow.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/ucp-api/README.md",
+            "docs/ucp-api/codegraph-programmatic.md",
+            "docs/ucp-api/python-query-tools.md",
+            "crates/ucp-python/README.md",
+            "scripts/demo_codegraph_session_observability.py",
+            "artifacts/codegraph-session-observability-demo-transcript.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped workspace and public package versions to 0.1.15 and updated release/install references.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "crates/ucp-python/pyproject.toml",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/Cargo.toml",
+            "README.md",
+            "docs/getting-started/installation.md",
+            "changelog.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.14",
       "date": "2026-03-09",
       "changes": [

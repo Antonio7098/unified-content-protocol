@@ -1,7 +1,6 @@
 """Tests for LLM utilities (IdMapper, PromptBuilder)."""
 
 
-
 class TestIdMapper:
     """Test IdMapper for token-efficient LLM prompts."""
 
@@ -15,6 +14,7 @@ class TestIdMapper:
     def test_from_document(self, doc_with_blocks):
         """Test creating IdMapper from a document."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -33,6 +33,7 @@ class TestIdMapper:
     def test_to_short_id(self, doc_with_blocks):
         """Test converting block ID to short ID."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -44,6 +45,7 @@ class TestIdMapper:
     def test_to_block_id(self, doc_with_blocks):
         """Test converting short ID back to block ID."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -55,6 +57,7 @@ class TestIdMapper:
     def test_shorten_text(self, doc_with_blocks):
         """Test shortening text with block IDs."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -68,6 +71,7 @@ class TestIdMapper:
     def test_expand_text(self, doc_with_blocks):
         """Test expanding text with short IDs."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -81,6 +85,7 @@ class TestIdMapper:
     def test_shorten_ucl(self, doc_with_blocks):
         """Test shortening UCL commands."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -94,6 +99,7 @@ class TestIdMapper:
     def test_expand_ucl(self, doc_with_blocks):
         """Test expanding UCL commands."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -107,6 +113,7 @@ class TestIdMapper:
     def test_estimate_token_savings(self, doc_with_blocks):
         """Test estimating token savings."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -120,6 +127,7 @@ class TestIdMapper:
     def test_document_to_prompt(self, doc_with_blocks):
         """Test generating document prompt."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -131,6 +139,7 @@ class TestIdMapper:
     def test_mapping_table(self, doc_with_blocks):
         """Test getting mapping table."""
         import ucp
+
         doc, root, block1, block2, block3 = doc_with_blocks
 
         mapper = ucp.IdMapper.from_document(doc)
@@ -273,7 +282,7 @@ class TestPromptBuilder:
         builder = ucp.PromptBuilder().with_capability(ucp.UclCapability.Edit)
         prompt = builder.build_prompt(
             "Document with blocks: [1] Title, [2] Paragraph",
-            "Edit block 2 to say 'Hello World'"
+            "Edit block 2 to say 'Hello World'",
         )
 
         assert "Document Structure" in prompt
