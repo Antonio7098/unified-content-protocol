@@ -69,7 +69,7 @@ cargo build --release -p ucp-cli
 
     ```toml
     [dependencies]
-    ucp-api = "0.1.15"
+    ucp-api = "0.1.16"
     ```
 
     [View ucp-api on crates.io](https://crates.io/crates/ucp-api)
@@ -81,28 +81,28 @@ cargo build --release -p ucp-cli
     ```toml
     [dependencies]
     # Core types only
-    ucm-core = "0.1.15"
+    ucm-core = "0.1.16"
 
     # Core + transformation engine
-    ucm-engine = "0.1.15"
+    ucm-engine = "0.1.16"
 
     # UCL command parsing
-    ucl-parser = "0.1.15"
+    ucl-parser = "0.1.16"
 
     # Markdown conversion
-    ucp-translator-markdown = "0.1.15"
+    ucp-translator-markdown = "0.1.16"
 
     # HTML conversion
-    ucp-translator-html = "0.1.15"
+    ucp-translator-html = "0.1.16"
 
     # Observability utilities
-    ucp-observe = "0.1.15"
+    ucp-observe = "0.1.16"
 
     # LLM utilities
-    ucp-llm = "0.1.15"
+    ucp-llm = "0.1.16"
 
     # Agent graph traversal
-    ucp-agent = "0.1.15"
+    ucp-agent = "0.1.16"
     ```
 
     **All crates on crates.io:**
@@ -254,7 +254,7 @@ If you're using multiple UCP crates, ensure they're all from the same version:
 
 ```toml
 [dependencies]
-ucm-core = "0.1.15"
+ucm-core = "0.1.16"
 ucm-engine = "0.1.9"  # Must match ucm-core version
 ```
 

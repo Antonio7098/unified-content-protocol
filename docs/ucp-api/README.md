@@ -6,7 +6,7 @@
 
 ```toml
 [dependencies]
-ucp-api = "0.1.15"
+ucp-api = "0.1.16"
 ```
 
 ## Core Client (`UcpClient`)
