@@ -47,7 +47,7 @@ let why = session.why_selected("symbol:src/lib.rs::add")?;
 
 ## Python entry points
 
-The Python bindings export low-level `ucp.CodeGraph` / `ucp.CodeGraphSession`, plus the higher-level `ucp.query(...)` façade and `ucp.run_python_query(...)` helper.
+The Python bindings export low-level `ucp.CodeGraph` / `ucp.CodeGraphSession`, plus the higher-level `ucp.query(...)`, `ucp.run_python_query(...)`, and `ucp.prepare_python_query(...)` helpers.
 
 Example:
 
@@ -179,9 +179,11 @@ The richer recommendation/explanation APIs are designed for auditability and ben
 
 Use `ucp.run_python_query(...)` when you want the model to mix those primitives with Python loops, regex, and branching logic.
 
+Use `ucp.prepare_python_query(...)` when the same snippet will run repeatedly across different bindings, sessions, or graphs and you want to reuse the compiled query object.
+
 For richer cookbook-style examples on the UCP repo itself, see `docs/ucp-api/python-query-tools.md` plus the recipe/edge-case smoke scripts under `scripts/`.
 
-For provider/tool integration, guarded execution, and benchmark-style workflow evaluation, also see the `PythonQueryTool`, `QueryLimits`, and `QueryBenchmarkCase` sections in `docs/ucp-api/python-query-tools.md`.
+For provider/tool integration, guarded execution, prepared-query reuse, and benchmark-style workflow evaluation, also see the `PythonQueryTool`, `PreparedQuery`, `QueryLimits`, and `QueryBenchmarkCase` sections in `docs/ucp-api/python-query-tools.md`.
 
 ## Agent-oriented patterns
 

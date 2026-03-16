@@ -1,5 +1,6 @@
 """Tests for the agent-facing Python query facade and runner."""
 
+import importlib
 from pathlib import Path
 
 import pytest
@@ -103,6 +104,40 @@ def test_run_python_query_dedents_common_triple_quoted_snippets_and_exposes_comm
 
     assert run.ok is True
     assert run.result == ("dict", 1)
+
+
+def test_prepare_python_query_reuses_compilation_and_runs_multiple_times(monkeypatch):
+    import ucp
+
+    query_module = importlib.import_module("ucp.query")
+    query_module._prepare_python_query_cached.cache_clear()
+
+    compile_calls = []
+    original = query_module._compile_normalized_query
+
+    def counting_compile(source):
+        compile_calls.append(source)
+        return original(source)
+
+    monkeypatch.setattr(query_module, "_compile_normalized_query", counting_compile)
+
+    graph = ucp.query(ucp.Graph.from_document(_build_doc(ucp)))
+    prepared = ucp.prepare_python_query(
+        """
+            hits = graph.find(label_regex="note|helper")
+            result = len(hits) + bonus
+        """
+    )
+
+    first = prepared.run(graph, bindings={"bonus": 1})
+    second = ucp.run_python_query(graph, prepared, bindings={"bonus": 40})
+
+    assert first.ok is True
+    assert second.ok is True
+    assert first.result == 3
+    assert second.result == 42
+    assert prepared.source == 'hits = graph.find(label_regex="note|helper")\nresult = len(hits) + bonus'
+    assert len(compile_calls) == 1
 
 
 def test_run_python_query_reports_errors_and_can_raise():
