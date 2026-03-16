@@ -19,6 +19,71 @@
   },
   "entries": [
     {
+      "version": "v0.1.16",
+      "date": "2026-03-16",
+      "changes": [
+        {
+          "type": "added",
+          "area": "python.query-runtime",
+          "description": "Added PreparedQuery API with prepare_python_query() for pre-compiling queries and LRU compile cache for reusing identical snippets, plus selective sys.settrace() that only enables tracing when max_seconds or max_trace_events require it.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/python/ucp/query.py",
+            "crates/ucp-python/python/ucp/__init__.py"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "python.query-tests",
+          "description": "Added regression coverage for prepared query reuse across multiple executions, compile-cache reuse, and proof that the no-trace fast path is used when only operation limits are active.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/tests/test_query_api.py",
+            "crates/ucp-python/tests/test_query_tools.py"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "docs.python-query",
+          "description": "Updated python-query-tools.md and codegraph-programmatic.md documentation to cover the new PreparedQuery API.",
+          "commit": "pending",
+          "files_affected": [
+            "docs/ucp-api/python-query-tools.md",
+            "docs/ucp-api/codegraph-programmatic.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "added",
+          "area": "ops.sprint-notes",
+          "description": "Added sprint note documenting the Monty-inspired performance improvements to the Python query runtime.",
+          "commit": "pending",
+          "files_affected": [
+            "ops/sprint-XX-monty-inspired-ucp-python-performance.md"
+          ],
+          "issues": []
+        },
+        {
+          "type": "changed",
+          "area": "release",
+          "description": "Bumped workspace and public package versions to 0.1.16 and updated release/install references.",
+          "commit": "pending",
+          "files_affected": [
+            "Cargo.toml",
+            "crates/ucp-python/pyproject.toml",
+            "crates/ucp-python/python/ucp/__init__.py",
+            "crates/ucp-wasm/Cargo.toml",
+            "README.md",
+            "docs/getting-started/installation.md",
+            "changelog.json"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.15",
       "date": "2026-03-15",
       "changes": [

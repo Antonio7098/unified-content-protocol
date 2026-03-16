@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections
 import contextlib
+import functools
 import io
 import json
 import math
@@ -71,6 +72,17 @@ _CODEGRAPH_DETAIL_ALIASES = {
     "full": "source",
     "source": "source",
     "neighborhood": "neighborhood",
+}
+
+_QUERY_FILENAME = "<ucp-python-query>"
+_PREPARED_QUERY_CACHE_SIZE = 128
+_BASE_QUERY_ENV = {
+    "__builtins__": _SAFE_BUILTINS,
+    "__name__": "__ucp_query__",
+    "collections": collections,
+    "json": json,
+    "math": math,
+    "re": re,
 }
 
 
@@ -175,6 +187,35 @@ class QueryRunResult:
         }
 
 
+@dataclass(frozen=True)
+class PreparedQuery:
+    source: str
+    kind: str = field(repr=False)
+    _compiled: Any = field(repr=False, compare=False)
+
+    def run(
+        self,
+        graph: Graph | CodeGraph | "BaseQueryGraph",
+        *,
+        session: Optional["BaseQuerySession" | GraphSession | CodeGraphSession] = None,
+        bindings: Optional[Mapping[str, Any]] = None,
+        include_export: bool = False,
+        export_kwargs: Optional[Mapping[str, Any]] = None,
+        limits: Optional[QueryLimits | Mapping[str, Any]] = None,
+        raise_on_error: bool = False,
+    ) -> QueryRunResult:
+        return run_python_query(
+            graph,
+            self,
+            session=session,
+            bindings=bindings,
+            include_export=include_export,
+            export_kwargs=export_kwargs,
+            limits=limits,
+            raise_on_error=raise_on_error,
+        )
+
+
 class BaseQueryGraph:
     def __init__(
         self,
@@ -219,7 +260,7 @@ class BaseQueryGraph:
             _selector_value(start), _selector_value(end), max_hops=max_hops
         )
 
-    def run(self, code: str, **kwargs: Any) -> QueryRunResult:
+    def run(self, code: str | PreparedQuery, **kwargs: Any) -> QueryRunResult:
         return run_python_query(self, code, **kwargs)
 
 
@@ -320,7 +361,7 @@ class BaseQuerySession:
         self._record_operation("session.diff")
         return self.raw.diff(_wrap_session(other, self.graph).raw)
 
-    def run(self, code: str, **kwargs: Any) -> QueryRunResult:
+    def run(self, code: str | PreparedQuery, **kwargs: Any) -> QueryRunResult:
         return run_python_query(self.graph, code, session=self, **kwargs)
 
     def _normalize_detail(self, detail: Optional[str]) -> str:
@@ -460,7 +501,7 @@ def query(graph: Graph | CodeGraph | BaseQueryGraph) -> BaseQueryGraph:
 
 def run_python_query(
     graph: Graph | CodeGraph | BaseQueryGraph,
-    code: str,
+    code: str | PreparedQuery,
     *,
     session: Optional[BaseQuerySession | GraphSession | CodeGraphSession] = None,
     bindings: Optional[Mapping[str, Any]] = None,
@@ -472,42 +513,32 @@ def run_python_query(
     runtime_state = _QueryRuntimeState(_coerce_limits(limits))
     wrapped_graph = query(graph)._with_state(runtime_state)
     wrapped_session = _wrap_session(session, wrapped_graph)
-    env = {
-        "__builtins__": _SAFE_BUILTINS,
-        "__name__": "__ucp_query__",
-        "collections": collections,
-        "graph": wrapped_graph,
-        "json": json,
-        "math": math,
-        "raw_graph": wrapped_graph.raw,
-        "raw_session": wrapped_session.raw,
-        "re": re,
-        "session": wrapped_session,
-    }
-    if bindings:
-        env.update(dict(bindings))
+    prepared = prepare_python_query(code)
+    env = _query_env(wrapped_graph, wrapped_session, bindings)
 
     stdout = _GuardedStdout(runtime_state)
     result: Any = None
     error: Optional[Exception] = None
     traceback_text: Optional[str] = None
-    previous_trace = sys.gettrace()
+    tracing_enabled = runtime_state.requires_trace()
+    previous_trace = sys.gettrace() if tracing_enabled else None
 
     try:
-        kind, compiled = _compile_query(code)
-        sys.settrace(runtime_state.trace)
+        if tracing_enabled:
+            sys.settrace(runtime_state.trace)
         with contextlib.redirect_stdout(stdout):
-            if kind == "eval":
-                result = eval(compiled, env, env)
+            if prepared.kind == "eval":
+                result = eval(prepared._compiled, env, env)
             else:
-                exec(compiled, env, env)
+                exec(prepared._compiled, env, env)
                 result = env.get("result")
         runtime_state.check_limits()
     except Exception as exc:  # pragma: no cover - exercised through result assertions
         error = exc
         traceback_text = traceback_module.format_exc()
     finally:
-        sys.settrace(previous_trace)
+        if tracing_enabled:
+            sys.settrace(previous_trace)
 
     if error is not None and raise_on_error:
         raise QueryExecutionError(
@@ -527,12 +558,34 @@ def run_python_query(
     )
 
 
-def _compile_query(code: str) -> tuple[str, Any]:
-    source = textwrap.dedent(code).strip()
+def prepare_python_query(code: str | PreparedQuery) -> PreparedQuery:
+    if isinstance(code, PreparedQuery):
+        return code
+    if not isinstance(code, str):
+        raise TypeError(f"Unsupported query code object: {type(code)!r}")
+    return _prepare_python_query_cached(_normalize_query_source(code))
+
+
+@functools.lru_cache(maxsize=_PREPARED_QUERY_CACHE_SIZE)
+def _prepare_python_query_cached(source: str) -> PreparedQuery:
+    kind, compiled = _compile_normalized_query(source)
+    return PreparedQuery(source=source, kind=kind, _compiled=compiled)
+
+
+def _normalize_query_source(code: str) -> str:
+    return textwrap.dedent(code).strip()
+
+
+def _compile_query(code: str | PreparedQuery) -> tuple[str, Any]:
+    prepared = prepare_python_query(code)
+    return prepared.kind, prepared._compiled
+
+
+def _compile_normalized_query(source: str) -> tuple[str, Any]:
     try:
-        return "eval", compile(source, "<ucp-python-query>", "eval")
+        return "eval", compile(source, _QUERY_FILENAME, "eval")
     except SyntaxError:
-        return "exec", compile(source, "<ucp-python-query>", "exec")
+        return "exec", compile(source, _QUERY_FILENAME, "exec")
 
 
 def _wrap_session(
@@ -601,6 +654,25 @@ def _current_time() -> float:
     return time.perf_counter()
 
 
+def _query_env(
+    wrapped_graph: BaseQueryGraph,
+    wrapped_session: BaseQuerySession,
+    bindings: Optional[Mapping[str, Any]],
+) -> dict[str, Any]:
+    env = dict(_BASE_QUERY_ENV)
+    env.update(
+        {
+            "graph": wrapped_graph,
+            "raw_graph": wrapped_graph.raw,
+            "raw_session": wrapped_session.raw,
+            "session": wrapped_session,
+        }
+    )
+    if bindings:
+        env.update(dict(bindings))
+    return env
+
+
 def _coerce_limits(limits: Optional[QueryLimits | Mapping[str, Any]]) -> QueryLimits:
     if limits is None:
         return QueryLimits()
@@ -654,6 +726,12 @@ class _QueryRuntimeState:
 
     def elapsed_seconds(self) -> float:
         return _current_time() - self.started_at
+
+    def requires_trace(self) -> bool:
+        return (
+            self.limits.max_seconds is not None
+            or self.limits.max_trace_events is not None
+        )
 
     def check_limits(self) -> None:
         elapsed = self.elapsed_seconds()

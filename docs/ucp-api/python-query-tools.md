@@ -33,6 +33,7 @@ session = graph.session()
 
 Additional integration helpers:
 
+- `ucp.prepare_python_query(...)` / `ucp.PreparedQuery.run(...)` for compile-once, run-many workflows
 - `ucp.QueryLimits(...)` for guarded execution
 - `ucp.PythonQueryTool(...)` for provider-facing tool definitions and execution
 - `ucp.QueryBenchmarkCase(...)` / `ucp.run_query_benchmark_suite(...)` for workflow evaluation
@@ -93,6 +94,8 @@ Useful optional arguments:
 - `export_kwargs={...}` to control that export
 - `limits=ucp.QueryLimits(...)` to bound model-authored queries
 
+`run_python_query(...)` automatically dedents and LRU-caches compiled snippets, so repeated calls with identical code reuse the compiled Python object rather than paying `compile(...)` each time.
+
 Example:
 
 ```python
@@ -125,6 +128,24 @@ The result includes:
 - structured error details if execution failed
 
 Queries are automatically `textwrap.dedent(...)`-ed before execution, so normal indented triple-quoted snippets work as expected.
+
+### Prepared queries and warm execution
+
+For benchmark suites, agent loops, or any other repeated workflow, compile once and reuse the prepared object:
+
+```python
+prepared = ucp.prepare_python_query(
+    """
+    hits = graph.find(node_class="symbol", name_regex=name_rx, limit=8)
+    result = [node["logical_key"] for node in hits]
+    """
+)
+
+first = prepared.run(graph, bindings={"name_rx": r"auth|login"})
+second = prepared.run(graph, bindings={"name_rx": r"session|context"})
+```
+
+This is the closest analogue to Monty's reusable `MontyRun`: the expensive parsing/compilation step is separated from execution, but queries still run inside normal CPython with the UCP graph/session objects bound into the environment.
 
 For CodeGraph sessions, exported nodes include convenient top-level fields like `logical_key`, `path`, and `symbol_name`, which makes lightweight Python ranking/filtering much easier.
 
@@ -171,6 +192,8 @@ run = ucp.run_python_query(
 ```
 
 These guards are designed for agent workflows: they keep queries short and cheap without adding a separate graph DSL.
+
+Tracing is only enabled when it is actually needed for `max_seconds` or `max_trace_events`. If a workflow only sets `max_operations` and/or `max_stdout_chars`, the runner stays on the faster no-trace path and counts those limits directly from graph/session/stdout activity.
 
 ## Provider-facing tool wrapper
 

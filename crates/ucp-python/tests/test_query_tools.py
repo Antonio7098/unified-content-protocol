@@ -35,13 +35,14 @@ def test_run_python_query_reports_usage_and_limits():
     run = ucp.run_python_query(
         graph,
         "hits = graph.find(label_regex='note|helper')\nresult = len(hits)",
-        limits=ucp.QueryLimits(max_operations=10, max_trace_events=1000),
+        limits=ucp.QueryLimits(max_operations=10),
     )
 
     assert run.ok is True
     assert run.result == 2
     assert run.usage.operation_count >= 1
     assert run.limits.max_operations == 10
+    assert run.usage.trace_events == 0
 
 
 def test_run_python_query_enforces_max_operations():
@@ -109,6 +110,7 @@ def test_run_python_query_enforces_max_seconds_via_monkeypatched_clock(monkeypat
 
     assert run.ok is False
     assert run.error_type == "QueryLimitExceededError"
+    assert run.usage.trace_events > 0
 
 
 def test_python_query_tool_exposes_provider_schemas_and_executes_calls(tmp_path):
