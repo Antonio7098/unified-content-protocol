@@ -19,6 +19,32 @@
   },
   "entries": [
     {
+      "version": "v0.1.18",
+      "date": "2026-03-19",
+      "changes": [
+        {
+          "type": "fixed",
+          "area": "python.query-tools",
+          "description": "Sync PythonQueryTool.default_include_export to True to match schema default, ensuring agents receive session mutations by default.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/python/ucp/query_tools.py"
+          ],
+          "issues": []
+        },
+        {
+          "type": "fixed",
+          "area": "python.version-sync",
+          "description": "Update ucp.__version__ to match package metadata.",
+          "commit": "pending",
+          "files_affected": [
+            "crates/ucp-python/python/ucp/__init__.py"
+          ],
+          "issues": []
+        }
+      ]
+    },
+    {
       "version": "v0.1.16",
       "date": "2026-03-16",
       "changes": [
