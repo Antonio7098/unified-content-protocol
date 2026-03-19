@@ -35,7 +35,8 @@ _PYTHON_QUERY_TOOL_INPUT_SCHEMA = {
         },
         "include_export": {
             "type": "boolean",
-            "description": "If true, include the final session export in the tool result.",
+            "description": "If true (default), include the final session export in the tool result. Defaults to true since agents need to see session mutations.",
+            "default": True,
         },
         "export_kwargs": {
             "type": "object",
