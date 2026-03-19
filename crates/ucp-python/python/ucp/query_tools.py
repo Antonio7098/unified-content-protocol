@@ -90,7 +90,7 @@ class PythonQueryTool:
         session: Optional[BaseQuerySession | Any] = None,
         name: str = "run_python_query",
         description: str = _PYTHON_QUERY_TOOL_DESCRIPTION,
-        default_include_export: bool = False,
+        default_include_export: bool = True,
         default_export_kwargs: Optional[Mapping[str, Any]] = None,
         default_limits: Optional[QueryLimits | Mapping[str, Any]] = None,
     ):
